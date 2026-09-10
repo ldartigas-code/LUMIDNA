@@ -1,35 +1,168 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>LumiDNA LD-000001</title>
-  <style>
-    body{font-family:Arial,sans-serif;background:#f4f6f8;margin:0;padding:24px;color:#1f252b}
-    .card{max-width:680px;margin:30px auto;background:#fff;border-radius:18px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
-    .logo{font-size:30px;font-weight:800;margin-bottom:20px}.logo span{color:#ff6a1a}
-    .badge{display:inline-block;background:#e9f7ee;color:#247a45;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700}
-    h1{font-size:24px;margin:18px 0 8px}
-    .grid{display:grid;grid-template-columns:160px 1fr;gap:10px 16px;margin-top:20px}
-    .k{color:#6b747d}
-    .note{margin-top:24px;background:#fff6ef;border-left:4px solid #ff6a1a;padding:12px;border-radius:8px}
-    @media(max-width:600px){.grid{grid-template-columns:1fr}.k{font-weight:700;margin-top:6px}}
-  </style>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LumiDNA Admin v1</title>
+<style>
+:root{--bg:#f4f6f8;--panel:#fff;--text:#1f252b;--muted:#6c7580;--line:#e2e6ea;--orange:#ff6a1a;--green:#2e9d59;--red:#d94b4b;--nav:#171d23}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}aside{background:var(--nav);color:#fff;padding:20px 14px}
+.logo{font-size:26px;font-weight:800;margin:6px 10px 24px}.logo span{color:var(--orange)}
+.nav{display:block;width:100%;padding:11px 12px;border:0;background:transparent;color:#d9e0e6;text-align:left;border-radius:9px;margin:4px 0;cursor:pointer}
+.nav.active,.nav:hover{background:var(--orange);color:#fff}main{padding:24px;max-width:1400px}
+h1{margin:0 0 6px;font-size:28px}.sub{color:var(--muted);margin-bottom:18px}.top{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:18px}
+.status{padding:7px 10px;border-radius:999px;background:#e9f7ee;color:#257944;font-size:12px;font-weight:700}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.03)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.field{display:flex;flex-direction:column;gap:6px}label{font-size:12px;font-weight:700;color:var(--muted)}
+input,select,textarea{border:1px solid var(--line);border-radius:9px;padding:10px 11px;background:#fff}textarea{min-height:92px;resize:vertical}.span2{grid-column:span 2}
+.actions{display:flex;gap:10px;flex-wrap:wrap}.primary{background:var(--orange);color:white;border:0;border-radius:9px;padding:10px 14px;font-weight:700;cursor:pointer}
+.secondary{background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px 14px;cursor:pointer}
+.alert{padding:12px 14px;border-left:4px solid var(--orange);background:#fff7f0;border-radius:8px;margin-bottom:14px}
+.success{padding:12px 14px;border-left:4px solid var(--green);background:#eef9f2;border-radius:8px;margin-bottom:14px}
+.hidden{display:none!important}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}
+th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pill{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;background:#edf3ff;color:#355fa8}
+@media(max-width:900px){.app{grid-template-columns:1fr}aside{display:flex;overflow:auto;gap:4px}.logo{display:none}.nav{width:auto;white-space:nowrap}.grid,.grid3{grid-template-columns:1fr}.span2{grid-column:auto}}
+</style>
 </head>
 <body>
-  <div class="card">
-    <div class="logo">Lumi<span>DNA</span></div>
-    <span class="badge">PROTÓTIPO ATIVO</span>
-    <h1>LD-000001</h1>
-    <div>Primeiro ativo de teste do LumiDNA</div>
-    <div class="grid">
-      <div class="k">Modelo</div><div>Luminária de teste</div>
-      <div class="k">Fabricante</div><div>LDARTI</div>
-      <div class="k">Status</div><div>Em prototipagem</div>
-      <div class="k">Identidade</div><div>LD-000001</div>
-      <div class="k">Acesso</div><div>NFC / QR / URL</div>
-    </div>
-    <div class="note"><b>Teste LumiDNA:</b> esta página valida o fluxo TAG → URL → ativo digital.</div>
-  </div>
-</body>
-</html>
+<div class="app">
+<aside>
+<div class="logo">Lumi<span>DNA</span></div>
+<button class="nav active" data-tab="identificacao">Identificação</button>
+<button class="nav" data-tab="tecnicos">Dados técnicos</button>
+<button class="nav" data-tab="componentes">Componentes</button>
+<button class="nav" data-tab="localizacao">Cliente e localização</button>
+<button class="nav" data-tab="garantias">Garantias</button>
+<button class="nav" data-tab="fotos">Fotos</button>
+<button class="nav" data-tab="manutencao">Manutenção</button>
+<button class="nav" data-tab="reposicao">Reposição</button>
+</aside>
+<main>
+<div class="top"><div><h1>LumiDNA Admin v1</h1><div class="sub">Cadastro da primeira luminária operacional: <b>LD-000002</b></div></div><span id="connStatus" class="status">Conectando...</span></div>
+<div id="msg"></div>
+<form id="formLum">
+<section class="card section" data-section="identificacao">
+<div class="alert"><b>DNA ORIGINAL.</b> Estes campos representam como a luminária nasceu. No produto final, alterações deverão gerar trilha de auditoria.</div>
+<div class="grid">
+<div class="field"><label>ID LumiDNA</label><input name="lumidna_id" value="LD-000002" readonly></div>
+<div class="field"><label>Modelo</label><input name="modelo"></div>
+<div class="field"><label>Fabricante</label><input name="fabricante"></div>
+<div class="field"><label>Lote</label><input name="lote"></div>
+<div class="field"><label>Número de série</label><input name="numero_serie"></div>
+<div class="field"><label>Data da venda</label><input type="date" name="data_venda"></div>
+<div class="field"><label>Status</label><select name="status"><option>Ativa</option><option>Em manutenção</option><option>Falha</option><option>Desativada</option></select></div>
+<div class="field"><label>Criticidade</label><select name="criticidade"><option>Baixa</option><option selected>Média</option><option>Alta</option><option>Crítica</option></select></div>
+<div class="field span2"><label>Observações</label><textarea name="observacoes"></textarea></div>
+</div></section>
+
+<section class="card section hidden" data-section="tecnicos">
+<div class="grid3">
+<div class="field"><label>Potência (W)</label><input type="number" step="0.01" name="potencia_w"></div>
+<div class="field"><label>CCT (K)</label><input type="number" name="cct_k"></div>
+<div class="field"><label>IRC</label><input type="number" step="0.1" name="irc"></div>
+<div class="field"><label>Fluxo (lm)</label><input type="number" step="0.1" name="fluxo_lm"></div>
+<div class="field"><label>Facho (graus)</label><input type="number" step="0.1" name="facho_graus"></div>
+<div class="field"><label>IP</label><input name="ip"></div>
+<div class="field"><label>IK</label><input name="ik"></div>
+<div class="field"><label>Data de instalação</label><input type="date" name="data_instalacao"></div>
+</div></section>
+
+<section class="card section hidden" data-section="componentes">
+<div class="grid3">
+<div class="field"><label>Driver original</label><input id="driver_original"></div>
+<div class="field"><label>LED original</label><input id="led_original"></div>
+<div class="field"><label>Óptica original</label><input id="optica_original"></div>
+</div></section>
+
+<section class="card section hidden" data-section="localizacao">
+<div class="grid">
+<div class="field"><label>Cliente</label><input name="cliente"></div>
+<div class="field"><label>Empreendimento</label><input name="empreendimento"></div>
+<div class="field"><label>Edifício / Torre / Bloco</label><input name="edificio"></div>
+<div class="field"><label>Andar</label><input name="andar"></div>
+<div class="field"><label>Ambiente</label><input name="ambiente"></div>
+<div class="field"><label>Posição</label><input name="posicao"></div>
+</div></section>
+
+<section class="card section hidden" data-section="garantias">
+<div class="grid">
+<div class="field"><label>Tipo</label><input id="gar_tipo" value="Luminária completa"></div>
+<div class="field"><label>Responsável</label><input id="gar_resp"></div>
+<div class="field"><label>Fornecedor</label><input id="gar_forn"></div>
+<div class="field"><label>Status</label><select id="gar_status"><option>Ativa</option><option>Expirada</option><option>Em análise</option></select></div>
+<div class="field"><label>Início</label><input type="date" id="gar_inicio"></div>
+<div class="field"><label>Fim</label><input type="date" id="gar_fim"></div>
+</div>
+<div class="actions" style="margin-top:12px"><button type="button" class="secondary" onclick="addWarranty()">Adicionar garantia</button></div>
+<div id="garList" style="margin-top:14px"></div>
+</section>
+
+<section class="card section hidden" data-section="fotos">
+<div class="alert">Nesta versão, use URLs públicas de imagens. Upload direto para Supabase Storage fica para a próxima etapa.</div>
+<div class="grid">
+<div class="field"><label>Foto principal (URL)</label><input name="foto_principal_url"></div>
+<div class="field"><label>Foto instalada (URL)</label><input name="foto_instalada_url"></div>
+<div class="field"><label>Foto da etiqueta (URL)</label><input name="foto_etiqueta_url"></div>
+</div></section>
+
+<section class="card section hidden" data-section="manutencao">
+<div class="grid">
+<div class="field"><label>Tipo</label><select id="man_tipo"><option>Preventiva</option><option>Corretiva</option><option>Inspeção</option><option>Substituição de componente</option></select></div>
+<div class="field"><label>Responsável</label><input id="man_resp"></div>
+<div class="field"><label>Status</label><select id="man_status"><option>Concluída</option><option>Em andamento</option><option>Aguardando peça</option></select></div>
+<div class="field"><label>Data</label><input type="date" id="man_data"></div>
+<div class="field span2"><label>Problema</label><textarea id="man_prob"></textarea></div>
+<div class="field span2"><label>Serviço realizado</label><textarea id="man_serv"></textarea></div>
+</div>
+<div class="actions" style="margin-top:12px"><button type="button" class="secondary" onclick="addMaintenance()">Registrar manutenção</button></div>
+<div id="manList" style="margin-top:14px"></div>
+</section>
+
+<section class="card section hidden" data-section="reposicao">
+<div class="alert"><b>Regra LumiDNA:</b> somente LumiDNA homologa equivalentes. O preço é referência de venda LumiDNA.</div>
+<div class="grid3">
+<div class="field"><label>Componente de origem</label><input id="rep_comp" value="Driver"></div>
+<div class="field"><label>Fabricante original</label><input id="rep_fab_orig"></div>
+<div class="field"><label>Modelo original</label><input id="rep_mod_orig"></div>
+<div class="field"><label>Fabricante equivalente</label><input id="rep_fab_eq"></div>
+<div class="field"><label>Modelo equivalente</label><input id="rep_mod_eq"></div>
+<div class="field"><label>Nível</label><select id="rep_nivel"><option>Homologado LumiDNA</option><option>Alternativa possível</option></select></div>
+<div class="field"><label>Preço referência</label><input type="number" step="0.01" id="rep_preco"></div>
+<div class="field"><label>Disponibilidade</label><input id="rep_disp" value="Sob consulta"></div>
+<div class="field"><label>Especificação</label><input id="rep_spec"></div>
+</div>
+<div class="actions" style="margin-top:12px"><button type="button" class="secondary" onclick="addReplacement()">Adicionar equivalente</button></div>
+<div id="repList" style="margin-top:14px"></div>
+</section>
+
+<div class="actions"><button class="primary" type="submit">SALVAR LD-000002</button><button class="secondary" type="button" onclick="loadAll()">Recarregar do banco</button></div>
+</form>
+</main></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL="https://qqujrfciiunpmrdnjqpx.supabase.co";
+const SUPABASE_KEY="sb_publishable_cH0vTVBMGV8squljoN6esg_KYAcTyIo";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const LID="LD-000002"; let luminariaDbId=null;
+const q=s=>document.querySelector(s), qa=s=>[...document.querySelectorAll(s)];
+qa(".nav").forEach(btn=>btn.onclick=()=>{qa(".nav").forEach(b=>b.classList.toggle("active",b===btn));qa(".section").forEach(s=>s.classList.toggle("hidden",s.dataset.section!==btn.dataset.tab))});
+function msg(t,ok=true){q("#msg").innerHTML=`<div class="${ok?"success":"alert"}">${t}</div>`}
+function norm(v){return v===""?null:v}
+async function ensureAsset(){const r=await sb.from("luminarias").select("*").eq("lumidna_id",LID).maybeSingle();if(r.error)throw r.error;if(r.data){luminariaDbId=r.data.id;return r.data}const c=await sb.from("luminarias").insert({lumidna_id:LID,status:"Ativa",criticidade:"Média"}).select().single();if(c.error)throw c.error;luminariaDbId=c.data.id;return c.data}
+function fill(d){[...q("#formLum").elements].forEach(e=>{if(e.name&&d[e.name]!=null)e.value=d[e.name]})}
+async function loadComponents(){const r=await sb.from("componentes").select("*").eq("luminaria_id",luminariaDbId).eq("original",true);(r.data||[]).forEach(c=>{if(c.tipo==="Driver")q("#driver_original").value=c.modelo||"";if(c.tipo==="LED")q("#led_original").value=c.modelo||"";if(c.tipo==="Óptica")q("#optica_original").value=c.modelo||""})}
+async function saveComponent(tipo,modelo){if(!modelo)return;const r=await sb.from("componentes").select("id").eq("luminaria_id",luminariaDbId).eq("tipo",tipo).eq("original",true).maybeSingle();if(r.data)await sb.from("componentes").update({modelo,ativo_atual:true}).eq("id",r.data.id);else await sb.from("componentes").insert({luminaria_id:luminariaDbId,tipo,modelo,original:true,ativo_atual:true})}
+q("#formLum").onsubmit=async e=>{e.preventDefault();const p={};for(const [k,v] of new FormData(e.target).entries())p[k]=norm(v);delete p.lumidna_id;const r=await sb.from("luminarias").update(p).eq("lumidna_id",LID);if(r.error)return msg("Erro: "+r.error.message,false);await saveComponent("Driver",q("#driver_original").value.trim());await saveComponent("LED",q("#led_original").value.trim());await saveComponent("Óptica",q("#optica_original").value.trim());msg("LD-000002 salva no Supabase.")}
+
+async function addWarranty(){const p={luminaria_id:luminariaDbId,tipo:q("#gar_tipo").value,responsavel:norm(q("#gar_resp").value),fornecedor:norm(q("#gar_forn").value),inicio:norm(q("#gar_inicio").value),fim:norm(q("#gar_fim").value),status:q("#gar_status").value};const r=await sb.from("garantias").insert(p);if(r.error)return msg("Erro na garantia: "+r.error.message,false);loadWarranties();msg("Garantia adicionada.")}
+async function loadWarranties(){const r=await sb.from("garantias").select("*").eq("luminaria_id",luminariaDbId).order("id",{ascending:false});q("#garList").innerHTML=(r.data&&r.data.length)?`<table><tr><th>Tipo</th><th>Responsável</th><th>Fim</th><th>Status</th></tr>${r.data.map(x=>`<tr><td>${x.tipo||""}</td><td>${x.responsavel||""}</td><td>${x.fim||""}</td><td>${x.status||""}</td></tr>`).join("")}</table>`:"<div class='small'>Nenhuma garantia cadastrada.</div>"}
+async function addMaintenance(){const p={luminaria_id:luminariaDbId,data:norm(q("#man_data").value),tipo:q("#man_tipo").value,problema:norm(q("#man_prob").value),servico_realizado:norm(q("#man_serv").value),responsavel:norm(q("#man_resp").value),status:q("#man_status").value};const r=await sb.from("manutencoes").insert(p);if(r.error)return msg("Erro na manutenção: "+r.error.message,false);loadMaintenance();msg("Manutenção registrada.")}
+async function loadMaintenance(){const r=await sb.from("manutencoes").select("*").eq("luminaria_id",luminariaDbId).order("id",{ascending:false});q("#manList").innerHTML=(r.data&&r.data.length)?`<table><tr><th>Data</th><th>Tipo</th><th>Responsável</th><th>Status</th></tr>${r.data.map(x=>`<tr><td>${x.data||""}</td><td>${x.tipo||""}</td><td>${x.responsavel||""}</td><td>${x.status||""}</td></tr>`).join("")}</table>`:"<div class='small'>Nenhuma manutenção registrada.</div>"}
+async function addReplacement(){const p={componente_origem:q("#rep_comp").value,fabricante_original:norm(q("#rep_fab_orig").value),modelo_original:norm(q("#rep_mod_orig").value),fabricante_equivalente:norm(q("#rep_fab_eq").value),modelo_equivalente:norm(q("#rep_mod_eq").value),especificacao:norm(q("#rep_spec").value),nivel:q("#rep_nivel").value,preco_referencia:norm(q("#rep_preco").value),disponibilidade:q("#rep_disp").value,homologado_por:"LumiDNA"};const r=await sb.from("equivalentes").insert(p);if(r.error)return msg("Erro no equivalente: "+r.error.message,false);loadReplacement();msg("Equivalente adicionado.")}
+async function loadReplacement(){const r=await sb.from("equivalentes").select("*").order("id",{ascending:false}).limit(20);q("#repList").innerHTML=(r.data&&r.data.length)?`<table><tr><th>Origem</th><th>Equivalente</th><th>Nível</th><th>Preço</th></tr>${r.data.map(x=>`<tr><td>${x.modelo_original||""}</td><td>${x.modelo_equivalente||""}</td><td>${x.nivel||""}</td><td>${x.preco_referencia||""}</td></tr>`).join("")}</table>`:"<div class='small'>Nenhum equivalente cadastrado.</div>"}
+async function loadAll(){try{q("#connStatus").textContent="Conectando...";const d=await ensureAsset();fill(d);await Promise.all([loadComponents(),loadWarranties(),loadMaintenance(),loadReplacement()]);q("#connStatus").textContent="Supabase conectado"}catch(e){q("#connStatus").textContent="Erro de conexão";msg("Falha ao acessar Supabase: "+e.message,false)}}
+loadAll();
+</script>
+</body></html>

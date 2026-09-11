@@ -20,8 +20,6 @@ h2{font-size:15px;margin:0 0 10px;color:#39424b}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left}
 th{color:var(--muted);font-weight:600}
 .small{font-size:12px;color:var(--muted)}
-.searchCard input{border:1px solid var(--line);border-radius:9px;padding:10px 11px;width:100%;margin-bottom:10px;font-family:inherit}
-.searchCard button{background:var(--orange);color:#fff;border:0;border-radius:9px;padding:10px 14px;font-weight:700;cursor:pointer}
 .footer{text-align:center;font-size:12px;color:var(--muted);margin-top:20px}
 </style>
 </head>
@@ -41,47 +39,30 @@ const sb=supabase.createClient(LUMIDNA_SUPABASE_URL,LUMIDNA_SUPABASE_KEY);
 const content=document.getElementById("content");
 const esc=s=>(s??"").toString().replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
-function notFoundCard(id){
+function notFoundCard(){
   content.innerHTML=`
     <div class="card">
       <h1>Ativo não encontrado</h1>
-      <div class="sub">${id?`Nenhuma luminária com o ID "${esc(id)}".`:"Nenhum ID informado na URL."}</div>
-      <div class="searchCard" style="margin-top:14px">
-        <input id="searchId" placeholder="Ex: LD-000002" style="text-transform:uppercase">
-        <button onclick="goToId()">Consultar</button>
-      </div>
+      <div class="sub">Esse link não corresponde a nenhuma luminária cadastrada.</div>
     </div>`;
-}
-function goToId(){
-  const id=document.getElementById("searchId").value.trim().toUpperCase();
-  if(id) window.location.search="?id="+encodeURIComponent(id);
 }
 
 async function loadAsset(){
-  const id=new URLSearchParams(window.location.search).get("id");
-  if(!id) return notFoundCard(null);
+  const code=new URLSearchParams(window.location.search).get("c");
+  if(!code) return notFoundCard();
 
-  const r=await sb.from("luminarias").select("*").eq("lumidna_id",id).maybeSingle();
+  const r=await sb.rpc("get_ativo_publico",{p_code:code});
   if(r.error){content.innerHTML=`<div class="card">Erro ao consultar: ${esc(r.error.message)}</div>`;return}
-  if(!r.data) return notFoundCard(id);
   const lum=r.data;
-
-  const [comps,warranties,maint] = await Promise.all([
-    sb.from("componentes").select("*").eq("luminaria_id",lum.id).eq("ativo_atual",true),
-    sb.from("garantias").select("*").eq("luminaria_id",lum.id).order("id",{ascending:false}),
-    sb.from("manutencoes").select("*").eq("luminaria_id",lum.id).order("id",{ascending:false}).limit(5)
-  ]);
-
-  const compList = comps.data||[];
-  const models = compList.map(c=>c.modelo).filter(Boolean);
-  let equivs=[];
-  if(models.length){
-    const eq = await sb.from("equivalentes").select("*").in("modelo_original",models);
-    equivs = eq.data||[];
-  }
+  if(!lum || !lum.lumidna_id) return notFoundCard();
 
   const statusClassMap={"Ativa":"st-ok","Falha":"st-bad","Em manutenção":"st-warn","Desativada":"st-off"};
   const statusClass = statusClassMap[lum.status]||"st-off";
+  const compList = lum.componentes||[];
+  const equivs = lum.equivalentes||[];
+  const warranties = lum.garantias||[];
+  const maint = lum.manutencoes||[];
+
   content.innerHTML = `
     <div class="card">
       ${lum.foto_principal_url?`<img class="photo" src="${esc(lum.foto_principal_url)}" alt="Foto da luminária">`:""}
@@ -117,17 +98,17 @@ async function loadAsset(){
 
     <div class="card">
       <h2>Garantias</h2>
-      ${(warranties.data&&warranties.data.length)?`<table><tr><th>Tipo</th><th>Status</th><th>Fim</th></tr>${warranties.data.map(x=>`<tr><td>${esc(x.tipo)}</td><td>${esc(x.status)}</td><td>${esc(x.fim)||"—"}</td></tr>`).join("")}</table>`:`<div class="small">Nenhuma garantia registrada.</div>`}
+      ${warranties.length?`<table><tr><th>Tipo</th><th>Status</th><th>Fim</th></tr>${warranties.map(x=>`<tr><td>${esc(x.tipo)}</td><td>${esc(x.status)}</td><td>${esc(x.fim)||"—"}</td></tr>`).join("")}</table>`:`<div class="small">Nenhuma garantia registrada.</div>`}
     </div>
 
     <div class="card">
       <h2>Manutenções recentes</h2>
-      ${(maint.data&&maint.data.length)?`<table><tr><th>Data</th><th>Tipo</th><th>Status</th></tr>${maint.data.map(x=>`<tr><td>${esc(x.data)||"—"}</td><td>${esc(x.tipo)}</td><td>${esc(x.status)}</td></tr>`).join("")}</table>`:`<div class="small">Nenhuma manutenção registrada.</div>`}
+      ${maint.length?`<table><tr><th>Data</th><th>Tipo</th><th>Status</th></tr>${maint.map(x=>`<tr><td>${esc(x.data)||"—"}</td><td>${esc(x.tipo)}</td><td>${esc(x.status)}</td></tr>`).join("")}</table>`:`<div class="small">Nenhuma manutenção registrada.</div>`}
     </div>
 
     <div class="card">
       <h2>Equivalentes homologados LumiDNA</h2>
-      ${equivs.length?`<table><tr><th>Origem</th><th>Equivalente</th><th>Nível</th><th>Preço ref.</th></tr>${equivs.map(x=>`<tr><td>${esc(x.modelo_original)}</td><td>${esc(x.modelo_equivalente)}</td><td>${esc(x.nivel)}</td><td>${x.preco_referencia??"—"}</td></tr>`).join("")}</table>`:`<div class="small">Nenhum equivalente homologado para os componentes atuais.</div>`}
+      ${equivs.length?`<table><tr><th>Origem</th><th>Equivalente</th><th>Nível</th><th>Preço ref.</th><th>Evidências</th></tr>${equivs.map(x=>`<tr><td>${esc(x.modelo_original)}</td><td>${esc(x.modelo_equivalente)}</td><td>${esc(x.nivel)}</td><td>${x.preco_referencia??"—"}</td><td>${x.evidencias_campo??0}</td></tr>`).join("")}</table>`:`<div class="small">Nenhum equivalente homologado para os componentes atuais.</div>`}
     </div>
   `;
 }

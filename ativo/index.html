@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LumiDNA</title>
+<style>
+:root{--bg:#f4f6f8;--text:#1f252b;--muted:#6c7580;--line:#e2e6ea;--orange:#ff6a1a;--green:#2e9d59;--red:#d94b4b;--amber:#c98a12;--gray:#6c7580}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text);padding:20px}
+.wrap{max-width:640px;margin:0 auto}
+.logo{font-size:26px;font-weight:800;margin:6px 0 18px}.logo span{color:var(--orange)}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,.05)}
+.photo{width:100%;max-height:280px;object-fit:cover;border-radius:12px;margin-bottom:14px;display:block}
+h1{margin:0 0 4px;font-size:22px}.sub{color:var(--muted);margin-bottom:10px}
+.pill{display:inline-block;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:700}
+.pill.st-ok{background:#e9f7ee;color:var(--green)}.pill.st-bad{background:#fdecec;color:var(--red)}
+.pill.st-warn{background:#fff4e0;color:var(--amber)}.pill.st-off{background:#eee;color:var(--gray)}
+.grid{display:grid;grid-template-columns:150px 1fr;gap:8px 14px;margin-top:14px;font-size:14px}
+.k{color:var(--muted)}
+h2{font-size:15px;margin:0 0 10px;color:#39424b}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--muted);font-weight:600}
+.small{font-size:12px;color:var(--muted)}
+.searchCard input{border:1px solid var(--line);border-radius:9px;padding:10px 11px;width:100%;margin-bottom:10px;font-family:inherit}
+.searchCard button{background:var(--orange);color:#fff;border:0;border-radius:9px;padding:10px 14px;font-weight:700;cursor:pointer}
+.footer{text-align:center;font-size:12px;color:var(--muted);margin-top:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">Lumi<span>DNA</span></div>
+  <div id="content">
+    <div class="card small">Carregando ativo…</div>
+  </div>
+  <div class="footer">Registro técnico permanente da iluminação — LumiDNA</div>
+</div>
+
+<script src="../assets/supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb=supabase.createClient(LUMIDNA_SUPABASE_URL,LUMIDNA_SUPABASE_KEY);
+const content=document.getElementById("content");
+const esc=s=>(s??"").toString().replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function notFoundCard(id){
+  content.innerHTML=`
+    <div class="card">
+      <h1>Ativo não encontrado</h1>
+      <div class="sub">${id?`Nenhuma luminária com o ID "${esc(id)}".`:"Nenhum ID informado na URL."}</div>
+      <div class="searchCard" style="margin-top:14px">
+        <input id="searchId" placeholder="Ex: LD-000002" style="text-transform:uppercase">
+        <button onclick="goToId()">Consultar</button>
+      </div>
+    </div>`;
+}
+function goToId(){
+  const id=document.getElementById("searchId").value.trim().toUpperCase();
+  if(id) window.location.search="?id="+encodeURIComponent(id);
+}
+
+async function loadAsset(){
+  const id=new URLSearchParams(window.location.search).get("id");
+  if(!id) return notFoundCard(null);
+
+  const r=await sb.from("luminarias").select("*").eq("lumidna_id",id).maybeSingle();
+  if(r.error){content.innerHTML=`<div class="card">Erro ao consultar: ${esc(r.error.message)}</div>`;return}
+  if(!r.data) return notFoundCard(id);
+  const lum=r.data;
+
+  const [comps,warranties,maint] = await Promise.all([
+    sb.from("componentes").select("*").eq("luminaria_id",lum.id).eq("ativo_atual",true),
+    sb.from("garantias").select("*").eq("luminaria_id",lum.id).order("id",{ascending:false}),
+    sb.from("manutencoes").select("*").eq("luminaria_id",lum.id).order("id",{ascending:false}).limit(5)
+  ]);
+
+  const compList = comps.data||[];
+  const models = compList.map(c=>c.modelo).filter(Boolean);
+  let equivs=[];
+  if(models.length){
+    const eq = await sb.from("equivalentes").select("*").in("modelo_original",models);
+    equivs = eq.data||[];
+  }
+
+  const statusClassMap={"Ativa":"st-ok","Falha":"st-bad","Em manutenção":"st-warn","Desativada":"st-off"};
+  const statusClass = statusClassMap[lum.status]||"st-off";
+  content.innerHTML = `
+    <div class="card">
+      ${lum.foto_principal_url?`<img class="photo" src="${esc(lum.foto_principal_url)}" alt="Foto da luminária">`:""}
+      <span class="pill ${statusClass}">${esc(lum.status||"—")}</span>
+      <h1>${esc(lum.lumidna_id)}</h1>
+      <div class="sub">${esc(lum.modelo||"Modelo não informado")} ${lum.fabricante?"— "+esc(lum.fabricante):""}</div>
+      <div class="grid">
+        <div class="k">Potência</div><div>${lum.potencia_w??"—"} W</div>
+        <div class="k">CCT</div><div>${lum.cct_k??"—"} K</div>
+        <div class="k">IRC</div><div>${lum.irc??"—"}</div>
+        <div class="k">Fluxo</div><div>${lum.fluxo_lm??"—"} lm</div>
+        <div class="k">Facho</div><div>${lum.facho_graus??"—"}°</div>
+        <div class="k">IP / IK</div><div>${lum.ip??"—"} / ${lum.ik??"—"}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Localização atual</h2>
+      <div class="grid">
+        <div class="k">Cliente</div><div>${esc(lum.cliente)||"—"}</div>
+        <div class="k">Empreendimento</div><div>${esc(lum.empreendimento)||"—"}</div>
+        <div class="k">Edifício</div><div>${esc(lum.edificio)||"—"}</div>
+        <div class="k">Andar</div><div>${esc(lum.andar)||"—"}</div>
+        <div class="k">Ambiente</div><div>${esc(lum.ambiente)||"—"}</div>
+        <div class="k">Posição</div><div>${esc(lum.posicao)||"—"}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Componentes ativos</h2>
+      ${compList.length?`<table><tr><th>Tipo</th><th>Modelo</th></tr>${compList.map(c=>`<tr><td>${esc(c.tipo)}</td><td>${esc(c.modelo)||"—"}</td></tr>`).join("")}</table>`:`<div class="small">Nenhum componente registrado.</div>`}
+    </div>
+
+    <div class="card">
+      <h2>Garantias</h2>
+      ${(warranties.data&&warranties.data.length)?`<table><tr><th>Tipo</th><th>Status</th><th>Fim</th></tr>${warranties.data.map(x=>`<tr><td>${esc(x.tipo)}</td><td>${esc(x.status)}</td><td>${esc(x.fim)||"—"}</td></tr>`).join("")}</table>`:`<div class="small">Nenhuma garantia registrada.</div>`}
+    </div>
+
+    <div class="card">
+      <h2>Manutenções recentes</h2>
+      ${(maint.data&&maint.data.length)?`<table><tr><th>Data</th><th>Tipo</th><th>Status</th></tr>${maint.data.map(x=>`<tr><td>${esc(x.data)||"—"}</td><td>${esc(x.tipo)}</td><td>${esc(x.status)}</td></tr>`).join("")}</table>`:`<div class="small">Nenhuma manutenção registrada.</div>`}
+    </div>
+
+    <div class="card">
+      <h2>Equivalentes homologados LumiDNA</h2>
+      ${equivs.length?`<table><tr><th>Origem</th><th>Equivalente</th><th>Nível</th><th>Preço ref.</th></tr>${equivs.map(x=>`<tr><td>${esc(x.modelo_original)}</td><td>${esc(x.modelo_equivalente)}</td><td>${esc(x.nivel)}</td><td>${x.preco_referencia??"—"}</td></tr>`).join("")}</table>`:`<div class="small">Nenhum equivalente homologado para os componentes atuais.</div>`}
+    </div>
+  `;
+}
+loadAsset();
+</script>
+</body></html>

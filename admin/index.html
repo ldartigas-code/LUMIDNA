@@ -80,10 +80,27 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 </div>
 
 <div class="card">
+  <h2 style="margin:0 0 12px;font-size:16px">Buscar luminária</h2>
   <div class="grid3">
-    <div class="field"><label>ID LumiDNA</label><input id="lidInput" placeholder="LD-000003" style="text-transform:uppercase"></div>
-    <div class="field"><label>Luminárias cadastradas</label><select id="lidList"><option value="">— selecionar —</option></select></div>
-    <div class="field"><label>&nbsp;</label><div class="actions"><button type="button" class="secondary" onclick="loadExisting()">Carregar</button><button type="button" class="primary" onclick="createNew()">Criar novo</button></div></div>
+    <div class="field"><label>ID LumiDNA</label><input id="f_id" placeholder="LD-000002" style="text-transform:uppercase"></div>
+    <div class="field"><label>Fabricante</label><input id="f_fabricante"></div>
+    <div class="field"><label>Modelo</label><input id="f_modelo"></div>
+    <div class="field"><label>Cliente</label><input id="f_cliente"></div>
+    <div class="field"><label>Obra / Empreendimento</label><input id="f_empreendimento"></div>
+    <div class="field"><label>Local (edifício, andar, ambiente...)</label><input id="f_local"></div>
+  </div>
+  <div class="actions" style="margin-top:12px">
+    <button type="button" class="primary" onclick="searchAssets()">Buscar</button>
+    <button type="button" class="secondary" onclick="clearSearch()">Limpar</button>
+  </div>
+  <div id="searchResults" style="margin-top:14px"></div>
+</div>
+
+<div class="card">
+  <h2 style="margin:0 0 12px;font-size:16px">Cadastrar nova luminária</h2>
+  <div class="grid3">
+    <div class="field"><label>Novo ID LumiDNA</label><input id="lidInput" placeholder="LD-000003" style="text-transform:uppercase"></div>
+    <div class="field"><label>&nbsp;</label><button type="button" class="primary" onclick="createNew()">Criar novo</button></div>
   </div>
 </div>
 
@@ -204,7 +221,7 @@ q("#loginForm").onsubmit=async e=>{
 };
 function logout(){sb.auth.signOut()}
 function showLogin(){q("#loginScreen").classList.remove("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.add("hidden")}
-function showApp(user){q("#loginScreen").classList.add("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.remove("hidden");q("#userEmail").textContent=user.email;q("#connStatus").textContent="Supabase conectado";refreshAssetList()}
+function showApp(user){q("#loginScreen").classList.add("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.remove("hidden");q("#userEmail").textContent=user.email;q("#connStatus").textContent="Supabase conectado"}
 function showReset(){q("#loginScreen").classList.add("hidden");q("#appScreen").classList.add("hidden");q("#resetScreen").classList.remove("hidden")}
 function resetMsg(t,ok=true){q("#resetMsg").innerHTML=`<div class="${ok?"success":"alert"}">${t}</div>`}
 q("#resetForm").onsubmit=async e=>{
@@ -227,34 +244,53 @@ qa(".nav").forEach(btn=>btn.onclick=()=>{qa(".nav").forEach(b=>b.classList.toggl
 function msg(t,ok=true){q("#msg").innerHTML=`<div class="${ok?"success":"alert"}">${t}</div>`}
 function norm(v){return v===""?null:v}
 
-// ---- Seleção / criação de ativo ----
-async function refreshAssetList(){
-  const r=await sb.from("luminarias").select("lumidna_id,modelo,status").order("lumidna_id");
-  const sel=q("#lidList");
-  sel.innerHTML='<option value="">— selecionar —</option>'+(r.data||[]).map(x=>`<option value="${x.lumidna_id}">${x.lumidna_id} — ${x.modelo||"sem modelo"} (${x.status||""})</option>`).join("");
-}
-q("#lidList").onchange=()=>{if(q("#lidList").value){q("#lidInput").value=q("#lidList").value;loadExisting()}};
+// ---- Busca de luminárias ----
+function esc(s){return (s??"").toString().replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function clearSearch(){["f_id","f_fabricante","f_modelo","f_cliente","f_empreendimento","f_local"].forEach(id=>q("#"+id).value="");q("#searchResults").innerHTML=""}
 
-async function loadExisting(){
-  const id=q("#lidInput").value.trim().toUpperCase();
-  if(!id) return msg("Informe um ID.",false);
+async function searchAssets(){
+  let query=sb.from("luminarias").select("id,lumidna_id,modelo,fabricante,cliente,empreendimento,edificio,andar,ambiente,posicao,status").order("lumidna_id").limit(100);
+  const id=q("#f_id").value.trim(), fab=q("#f_fabricante").value.trim(), mod=q("#f_modelo").value.trim(), cli=q("#f_cliente").value.trim(), emp=q("#f_empreendimento").value.trim(), loc=q("#f_local").value.trim();
+  if(id) query=query.ilike("lumidna_id",`%${id}%`);
+  if(fab) query=query.ilike("fabricante",`%${fab}%`);
+  if(mod) query=query.ilike("modelo",`%${mod}%`);
+  if(cli) query=query.ilike("cliente",`%${cli}%`);
+  if(emp) query=query.ilike("empreendimento",`%${emp}%`);
+  if(loc) query=query.or(`edificio.ilike.%${loc}%,andar.ilike.%${loc}%,ambiente.ilike.%${loc}%,posicao.ilike.%${loc}%`);
+  const r=await query;
+  if(r.error) return msg("Erro na busca: "+r.error.message,false);
+  renderSearchResults(r.data||[]);
+}
+
+function renderSearchResults(rows){
+  const box=q("#searchResults");
+  if(!rows.length){box.innerHTML="<div class='small'>Nenhuma luminária encontrada com esses filtros.</div>";return}
+  box.innerHTML=`<table><tr><th>ID</th><th>Modelo</th><th>Fabricante</th><th>Cliente</th><th>Local</th><th>Status</th><th></th></tr>
+    ${rows.map(x=>{
+      const local=[x.edificio,x.andar,x.ambiente,x.posicao].filter(Boolean).join(" / ");
+      return `<tr><td>${esc(x.lumidna_id)}</td><td>${esc(x.modelo)||"—"}</td><td>${esc(x.fabricante)||"—"}</td><td>${esc(x.cliente)||"—"}</td><td>${esc(local)||"—"}</td><td>${esc(x.status)||"—"}</td><td><button type="button" class="secondary" onclick="loadById('${x.lumidna_id}')">Abrir</button></td></tr>`;
+    }).join("")}
+  </table>`;
+}
+
+async function loadById(id){
   const r=await sb.from("luminarias").select("*").eq("lumidna_id",id).maybeSingle();
   if(r.error) return msg("Erro: "+r.error.message,false);
-  if(!r.data) return msg(`Luminária ${id} não encontrada. Use "Criar novo" para cadastrá-la.`,false);
+  if(!r.data) return msg(`Luminária ${id} não encontrada.`,false);
   await openAsset(r.data);
   msg(id+" carregada.");
+  window.scrollTo({top:q("#formLum").getBoundingClientRect().top+window.scrollY-20,behavior:"smooth"});
 }
 
 async function createNew(){
   const id=q("#lidInput").value.trim().toUpperCase();
   if(!id) return msg("Informe um ID para o novo ativo.",false);
   const existing=await sb.from("luminarias").select("id").eq("lumidna_id",id).maybeSingle();
-  if(existing.data) return msg("Já existe um ativo com esse ID. Use Carregar.",false);
+  if(existing.data) return msg("Já existe um ativo com esse ID. Busque por ele acima.",false);
   const c=await sb.from("luminarias").insert({lumidna_id:id,status:"Ativa",criticidade:"Média"}).select().single();
   if(c.error) return msg("Erro ao criar: "+c.error.message,false);
   q("#formLum").reset();
   await openAsset(c.data);
-  await refreshAssetList();
   msg(id+" criada. Preencha os dados e clique em Salvar.");
 }
 
@@ -281,7 +317,6 @@ q("#formLum").onsubmit=async e=>{
   await saveComponent("Driver",q("#driver_original").value.trim());
   await saveComponent("LED",q("#led_original").value.trim());
   await saveComponent("Óptica",q("#optica_original").value.trim());
-  await refreshAssetList();
   msg(LID+" salva no Supabase.");
 };
 

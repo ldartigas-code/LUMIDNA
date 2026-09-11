@@ -23,6 +23,7 @@ input,select,textarea{border:1px solid var(--line);border-radius:9px;padding:10p
 .success{padding:12px 14px;border-left:4px solid var(--green);background:#eef9f2;border-radius:8px;margin-bottom:14px}
 .hidden{display:none!important}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}
 th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pill{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;background:#edf3ff;color:#355fa8}
+.fotoPreview{width:100%;max-height:160px;object-fit:cover;border-radius:9px;margin-top:6px}
 .loginWrap{min-height:100vh;display:flex;align-items:center;justify-content:center}
 .loginCard{width:100%;max-width:360px;background:#fff;border-radius:16px;padding:28px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
 @media(max-width:900px){.app{grid-template-columns:1fr}aside{display:flex;overflow:auto;gap:4px}.logo{display:none}.nav{width:auto;white-space:nowrap}.grid,.grid3{grid-template-columns:1fr}.span2{grid-column:auto}}
@@ -79,6 +80,8 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
     <button class="secondary" onclick="logout()">Sair</button>
   </div>
 </div>
+
+<div id="alertBox"></div>
 
 <div class="card">
   <h2 style="margin:0 0 12px;font-size:16px">Buscar luminária</h2>
@@ -165,11 +168,26 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 </section>
 
 <section class="card section hidden" data-section="fotos">
-<div class="alert">Nesta versão, use URLs públicas de imagens. Upload direto para Supabase Storage fica para a próxima etapa.</div>
+<div class="alert">Envie a foto direto do celular ou computador. Também aceita colar uma URL pública manualmente.</div>
 <div class="grid">
-<div class="field"><label>Foto principal (URL)</label><input name="foto_principal_url"></div>
-<div class="field"><label>Foto instalada (URL)</label><input name="foto_instalada_url"></div>
-<div class="field"><label>Foto da etiqueta (URL)</label><input name="foto_etiqueta_url"></div>
+<div class="field">
+  <label>Foto principal</label>
+  <input name="foto_principal_url" placeholder="URL (gerada ao enviar, ou cole uma)">
+  <input type="file" accept="image/*" data-target="foto_principal_url" onchange="uploadPhoto(event)">
+  <img class="fotoPreview hidden" data-preview="foto_principal_url">
+</div>
+<div class="field">
+  <label>Foto instalada</label>
+  <input name="foto_instalada_url" placeholder="URL (gerada ao enviar, ou cole uma)">
+  <input type="file" accept="image/*" data-target="foto_instalada_url" onchange="uploadPhoto(event)">
+  <img class="fotoPreview hidden" data-preview="foto_instalada_url">
+</div>
+<div class="field">
+  <label>Foto da etiqueta</label>
+  <input name="foto_etiqueta_url" placeholder="URL (gerada ao enviar, ou cole uma)">
+  <input type="file" accept="image/*" data-target="foto_etiqueta_url" onchange="uploadPhoto(event)">
+  <img class="fotoPreview hidden" data-preview="foto_etiqueta_url">
+</div>
 </div></section>
 
 <section class="card section hidden" data-section="manutencao">
@@ -242,7 +260,17 @@ q("#loginForm").onsubmit=async e=>{
 };
 function logout(){sb.auth.signOut()}
 function showLogin(){q("#loginScreen").classList.remove("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.add("hidden")}
-function showApp(user){currentUserEmail=user.email;q("#loginScreen").classList.add("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.remove("hidden");q("#userEmail").textContent=user.email;q("#connStatus").textContent="Supabase conectado"}
+function showApp(user){currentUserEmail=user.email;q("#loginScreen").classList.add("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.remove("hidden");q("#userEmail").textContent=user.email;q("#connStatus").textContent="Supabase conectado";checkWarrantyAlerts()}
+
+// ---- Alerta de garantias vencendo ----
+async function checkWarrantyAlerts(){
+  const today=new Date().toISOString().slice(0,10);
+  const in30=new Date(Date.now()+30*86400000).toISOString().slice(0,10);
+  const r=await sb.from("garantias").select("tipo,fim,luminarias(lumidna_id,modelo,cliente)").eq("status","Ativa").gte("fim",today).lte("fim",in30).order("fim");
+  const box=q("#alertBox");
+  if(r.error||!r.data||!r.data.length){box.innerHTML="";return}
+  box.innerHTML=`<div class="card" style="border-left:4px solid var(--orange)"><b>⚠️ ${r.data.length} garantia(s) vencendo nos próximos 30 dias</b><table style="margin-top:10px"><tr><th>Luminária</th><th>Cliente</th><th>Tipo</th><th>Vence em</th></tr>${r.data.map(x=>`<tr><td>${esc(x.luminarias?.lumidna_id)}</td><td>${esc(x.luminarias?.cliente)||"—"}</td><td>${esc(x.tipo)}</td><td>${esc(x.fim)}</td></tr>`).join("")}</table></div>`;
+}
 function showReset(){q("#loginScreen").classList.add("hidden");q("#appScreen").classList.add("hidden");q("#resetScreen").classList.remove("hidden")}
 function resetMsg(t,ok=true){q("#resetMsg").innerHTML=`<div class="${ok?"success":"alert"}">${t}</div>`}
 q("#resetForm").onsubmit=async e=>{
@@ -322,7 +350,28 @@ async function openAsset(data){
   q("input[name=lumidna_id]").value=LID;
   q("#lidInput").value=LID;
   q("#publicLink").value=data.public_code?`${LUMIDNA_SITE_BASE}/ativo/?c=${data.public_code}`:"(salve a luminária para gerar o link)";
+  ["foto_principal_url","foto_instalada_url","foto_etiqueta_url"].forEach(k=>updatePhotoPreview(k,data[k]));
   await Promise.all([loadComponents(),loadWarranties(),loadMaintenance(),loadReplacement(),loadAudit()]);
+}
+
+// ---- Upload de fotos (Supabase Storage) ----
+async function uploadPhoto(e){
+  if(!LID) return msg("Selecione ou crie um ativo primeiro.",false);
+  const file=e.target.files[0]; if(!file) return;
+  const targetName=e.target.dataset.target;
+  const path=`${LID}/${targetName}_${Date.now()}_${file.name}`.replace(/\s+/g,"_");
+  msg("Enviando foto...");
+  const up=await sb.storage.from("fotos").upload(path,file,{upsert:true});
+  if(up.error) return msg("Erro no upload: "+up.error.message,false);
+  const {data}=sb.storage.from("fotos").getPublicUrl(path);
+  q(`[name="${targetName}"]`).value=data.publicUrl;
+  updatePhotoPreview(targetName,data.publicUrl);
+  msg("Foto enviada. Clique em SALVAR para gravar o link.");
+}
+function updatePhotoPreview(name,url){
+  const img=q(`.fotoPreview[data-preview="${name}"]`);
+  if(!img) return;
+  if(url){img.src=url;img.classList.remove("hidden")}else{img.classList.add("hidden")}
 }
 
 function copyPublicLink(){

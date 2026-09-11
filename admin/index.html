@@ -44,6 +44,19 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
   </div>
 </div>
 
+<div id="resetScreen" class="loginWrap hidden">
+  <div class="loginCard">
+    <div class="logo">Lumi<span>DNA</span></div>
+    <div class="sub" style="margin-bottom:16px">Defina sua nova senha</div>
+    <div id="resetMsg"></div>
+    <form id="resetForm">
+      <div class="field" style="margin-bottom:12px"><label>Nova senha</label><input type="password" id="resetPassword" minlength="6" required></div>
+      <div class="field" style="margin-bottom:16px"><label>Confirmar senha</label><input type="password" id="resetPassword2" minlength="6" required></div>
+      <button class="primary" type="submit" style="width:100%">Salvar nova senha</button>
+    </form>
+  </div>
+</div>
+
 <div id="appScreen" class="app hidden">
 <aside>
 <div class="logo">Lumi<span>DNA</span></div>
@@ -190,9 +203,23 @@ q("#loginForm").onsubmit=async e=>{
   if(error) loginMsg("Erro ao entrar: "+error.message,false);
 };
 function logout(){sb.auth.signOut()}
-function showLogin(){q("#loginScreen").classList.remove("hidden");q("#appScreen").classList.add("hidden")}
-function showApp(user){q("#loginScreen").classList.add("hidden");q("#appScreen").classList.remove("hidden");q("#userEmail").textContent=user.email;q("#connStatus").textContent="Supabase conectado";refreshAssetList()}
-sb.auth.onAuthStateChange((_event,session)=>{session?showApp(session.user):showLogin()});
+function showLogin(){q("#loginScreen").classList.remove("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.add("hidden")}
+function showApp(user){q("#loginScreen").classList.add("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.remove("hidden");q("#userEmail").textContent=user.email;q("#connStatus").textContent="Supabase conectado";refreshAssetList()}
+function showReset(){q("#loginScreen").classList.add("hidden");q("#appScreen").classList.add("hidden");q("#resetScreen").classList.remove("hidden")}
+function resetMsg(t,ok=true){q("#resetMsg").innerHTML=`<div class="${ok?"success":"alert"}">${t}</div>`}
+q("#resetForm").onsubmit=async e=>{
+  e.preventDefault();
+  const p1=q("#resetPassword").value, p2=q("#resetPassword2").value;
+  if(p1!==p2) return resetMsg("As senhas não coincidem.",false);
+  const {error}=await sb.auth.updateUser({password:p1});
+  if(error) return resetMsg("Erro: "+error.message,false);
+  resetMsg("Senha atualizada. Você já está logado.");
+  setTimeout(()=>sb.auth.getSession().then(({data:{session}})=>session&&showApp(session.user)),800);
+};
+sb.auth.onAuthStateChange((event,session)=>{
+  if(event==="PASSWORD_RECOVERY") return showReset();
+  session?showApp(session.user):showLogin();
+});
 sb.auth.getSession().then(({data:{session}})=>{session?showApp(session.user):showLogin()});
 
 // ---- Navegação de abas ----

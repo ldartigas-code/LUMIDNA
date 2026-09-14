@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LumiDNA Admin</title>
+<style>
+:root{--bg:#f4f6f8;--panel:#fff;--text:#1f252b;--muted:#6c7580;--line:#e2e6ea;--orange:#ff6a1a;--green:#2e9d59;--red:#d94b4b;--nav:#171d23}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}aside{background:var(--nav);color:#fff;padding:20px 14px}
+.logo{font-size:26px;font-weight:800;margin:6px 10px 24px}.logo span{color:var(--orange)}
+.nav{display:block;width:100%;padding:11px 12px;border:0;background:transparent;color:#d9e0e6;text-align:left;border-radius:9px;margin:4px 0;cursor:pointer}
+.nav.active,.nav:hover{background:var(--orange);color:#fff}main{padding:24px;max-width:1400px}
+h1{margin:0 0 6px;font-size:28px}.sub{color:var(--muted);margin-bottom:18px}.top{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:18px}
+.status{padding:7px 10px;border-radius:999px;background:#e9f7ee;color:#257944;font-size:12px;font-weight:700}
+.userbar{display:flex;align-items:center;gap:10px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.03)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.field{display:flex;flex-direction:column;gap:6px}label{font-size:12px;font-weight:700;color:var(--muted)}
+input,select,textarea{border:1px solid var(--line);border-radius:9px;padding:10px 11px;background:#fff;font-family:inherit}textarea{min-height:92px;resize:vertical}.span2{grid-column:span 2}
+.actions{display:flex;gap:10px;flex-wrap:wrap}.primary{background:var(--orange);color:white;border:0;border-radius:9px;padding:10px 14px;font-weight:700;cursor:pointer}
+.secondary{background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px 14px;cursor:pointer}
+.alert{padding:12px 14px;border-left:4px solid var(--orange);background:#fff7f0;border-radius:8px;margin-bottom:14px}
+.success{padding:12px 14px;border-left:4px solid var(--green);background:#eef9f2;border-radius:8px;margin-bottom:14px}
+.hidden{display:none!important}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}
+th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pill{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;background:#edf3ff;color:#355fa8}
+.fotoPreview{width:100%;max-height:160px;object-fit:cover;border-radius:9px;margin-top:6px}
+.modeBtn{background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 16px;font-weight:700;cursor:pointer;color:var(--muted)}
+.modeBtn.active{background:var(--nav);color:#fff;border-color:var(--nav)}
+.loginWrap{min-height:100vh;display:flex;align-items:center;justify-content:center}
+.loginCard{width:100%;max-width:360px;background:#fff;border-radius:16px;padding:28px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
+@media(max-width:900px){.app{grid-template-columns:1fr}aside{display:flex;overflow:auto;gap:4px}.logo{display:none}.nav{width:auto;white-space:nowrap}.grid,.grid3{grid-template-columns:1fr}.span2{grid-column:auto}}
+</style>
+</head>
+<body>
+
+<div id="loginScreen" class="loginWrap">
+  <div class="loginCard">
+    <div class="logo">Lumi<span>DNA</span></div>
+    <div class="sub" style="margin-bottom:16px">Acesso restrito ao Admin</div>
+    <div id="loginMsg"></div>
+    <form id="loginForm">
+      <div class="field" style="margin-bottom:12px"><label>E-mail</label><input type="email" id="loginEmail" required></div>
+      <div class="field" style="margin-bottom:16px"><label>Senha</label><input type="password" id="loginPassword" required></div>
+      <button class="primary" type="submit" style="width:100%">Entrar</button>
+    </form>
+    <div class="small" style="margin-top:14px">Conta criada pelo administrador diretamente no Supabase (Authentication → Users).</div>
+  </div>
+</div>
+
+<div id="resetScreen" class="loginWrap hidden">
+  <div class="loginCard">
+    <div class="logo">Lumi<span>DNA</span></div>
+    <div class="sub" style="margin-bottom:16px">Defina sua nova senha</div>
+    <div id="resetMsg"></div>
+    <form id="resetForm">
+      <div class="field" style="margin-bottom:12px"><label>Nova senha</label><input type="password" id="resetPassword" minlength="6" required></div>
+      <div class="field" style="margin-bottom:16px"><label>Confirmar senha</label><input type="password" id="resetPassword2" minlength="6" required></div>
+      <button class="primary" type="submit" style="width:100%">Salvar nova senha</button>
+    </form>
+  </div>
+</div>
+
+<div id="appScreen" class="app hidden">
+<aside>
+<div class="logo">Lumi<span>DNA</span></div>
+<button class="nav active" data-tab="identificacao">Identificação</button>
+<button class="nav" data-tab="tecnicos">Dados técnicos</button>
+<button class="nav" data-tab="componentes">Componentes</button>
+<button class="nav" data-tab="localizacao">Cliente e localização</button>
+<button class="nav" data-tab="garantias">Garantias</button>
+<button class="nav" data-tab="fotos">Fotos</button>
+<button class="nav" data-tab="manutencao">Manutenção</button>
+<button class="nav" data-tab="reposicao">Reposição</button>
+<button class="nav" data-tab="historico">Histórico</button>
+</aside>
+<main>
+<div class="top">
+  <div><h1>LumiDNA Admin</h1><div class="sub">Cadastro e edição de luminárias</div></div>
+  <div class="userbar">
+    <span id="connStatus" class="status">Conectando...</span>
+    <span id="userEmail" class="small"></span>
+    <button class="secondary" onclick="logout()">Sair</button>
+  </div>
+</div>
+
+<div id="alertBox"></div>
+
+<div class="actions" style="margin-bottom:16px">
+  <button type="button" class="modeBtn active" data-mode="luminarias" onclick="setMode('luminarias')">Luminárias</button>
+  <button type="button" class="modeBtn" data-mode="modelos" onclick="setMode('modelos')">Modelos e importação</button>
+</div>
+
+<div id="msg"></div>
+
+<div id="modeModelos" class="hidden">
+  <div class="card">
+    <h2 style="margin:0 0 12px;font-size:16px">Modelos cadastrados</h2>
+    <div class="actions" style="margin-bottom:10px">
+      <input id="modeloSearch" placeholder="Buscar por fabricante, linha, código ou descrição..." style="flex:1">
+      <button type="button" class="secondary" onclick="loadModelos()">Buscar</button>
+    </div>
+    <div id="modelosList"><div class="small">Nenhuma busca feita ainda.</div></div>
+  </div>
+
+  <div class="card" id="batchCard">
+    <h2 style="margin:0 0 12px;font-size:16px">Gerar unidades em lote</h2>
+    <div class="small" style="margin-bottom:10px;display:flex;align-items:center;gap:8px">Modelo selecionado: <b id="batchModeloLabel">nenhum — clique em "Gerar unidades" na lista acima</b><img id="batchModeloFoto" src="" alt="" style="display:none;width:36px;height:36px;object-fit:contain;border:1px solid #eee;border-radius:4px"></div>
+    <div class="grid3">
+      <div class="field"><label>Quantidade</label><input type="number" id="batch_qty" min="1" value="1"></div>
+      <div class="field"><label>Número inicial do ID</label><input type="number" id="batch_start" placeholder="selecione um modelo acima"></div>
+      <div class="field"><label>Cliente (opcional, aplica a todas)</label><input id="batch_cliente"></div>
+      <div class="field"><label>Empreendimento (opcional)</label><input id="batch_empreendimento"></div>
+      <div class="field"><label>Edifício (opcional)</label><input id="batch_edificio"></div>
+    </div>
+    <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="generateBatch()">Gerar unidades</button></div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 12px;font-size:16px">Cadastrar modelo manualmente</h2>
+    <div class="grid3">
+      <div class="field"><label>Fabricante</label><input id="mo_fabricante"></div>
+      <div class="field"><label>Linha</label><input id="mo_linha"></div>
+      <div class="field"><label>Código (SKU)</label><input id="mo_codigo"></div>
+      <div class="field span2"><label>Descrição</label><input id="mo_descricao"></div>
+      <div class="field"><label>Potência (W)</label><input type="number" step="0.01" id="mo_potencia"></div>
+      <div class="field"><label>CCT (K)</label><input type="number" id="mo_cct"></div>
+      <div class="field"><label>IRC</label><input type="number" step="0.1" id="mo_irc"></div>
+      <div class="field"><label>Fluxo (lm)</label><input type="number" step="0.1" id="mo_fluxo"></div>
+      <div class="field"><label>Facho (graus)</label><input type="number" step="0.1" id="mo_facho"></div>
+      <div class="field"><label>IP</label><input id="mo_ip"></div>
+      <div class="field"><label>IK</label><input id="mo_ik"></div>
+      <div class="field"><label>Tensão</label><input id="mo_tensao"></div>
+      <div class="field"><label>Vida útil</label><input id="mo_vida"></div>
+      <div class="field span2"><label>Observações</label><input id="mo_obs"></div>
+    </div>
+    <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="addModelo()">Salvar modelo</button></div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 12px;font-size:16px">Importar catálogo (CSV)</h2>
+    <div class="alert">Cabeçalho esperado: <code>fabricante,linha,codigo,descricao,potencia_w,cct_k,irc,fluxo_lm,facho_graus,ip,ik,tensao,vida_util_h,observacoes</code>. Aceita vírgula ou ponto e vírgula. Se o modelo já existir (mesmo fabricante+código), ele é atualizado em vez de duplicado.</div>
+    <textarea id="modelosCsvInput" style="min-height:160px;width:100%" placeholder="Cole aqui o CSV..."></textarea>
+    <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="importModelosCSV()">Importar</button></div>
+  </div>
+</div>
+
+<div id="modeLuminarias">
+<div class="card">
+  <h2 style="margin:0 0 12px;font-size:16px">Buscar luminária</h2>
+  <div class="grid3">
+    <div class="field"><label>ID LumiDNA</label><input id="f_id" placeholder="LD-000002" style="text-transform:uppercase"></div>
+    <div class="field"><label>Fabricante</label><input id="f_fabricante"></div>
+    <div class="field"><label>Modelo</label><input id="f_modelo"></div>
+    <div class="field"><label>Cliente</label><input id="f_cliente"></div>
+    <div class="field"><label>Obra / Empreendimento</label><input id="f_empreendimento"></div>
+    <div class="field"><label>Local (edifício, andar, ambiente...)</label><input id="f_local"></div>
+  </div>
+  <div class="actions" style="margin-top:12px">
+    <button type="button" class="primary" onclick="searchAssets()">Buscar</button>
+    <button type="button" class="secondary" onclick="clearSearch()">Limpar</button>
+  </div>
+  <div id="searchResults" style="margin-top:14px"></div>
+</div>
+
+<div class="card">
+  <h2 style="margin:0 0 12px;font-size:16px">Cadastrar nova luminária</h2>
+  <div class="grid3">
+    <div class="field"><label>Novo ID LumiDNA</label><input id="lidInput" placeholder="LD-000003" style="text-transform:uppercase"></div>
+    <div class="field"><label>&nbsp;</label><button type="button" class="primary" onclick="createNew()">Criar novo</button></div>
+  </div>
+</div>
+
+<form id="formLum" class="hidden">
+<section class="card section" data-section="identificacao">
+<div class="alert"><b>DNA ORIGINAL.</b> Estes campos representam como a luminária nasceu. No produto final, alterações deverão gerar trilha de auditoria.</div>
+<div class="grid">
+<div class="field"><label>ID LumiDNA</label><input name="lumidna_id" readonly></div>
+<div class="field span2"><label>Link público (NFC/QR)</label><div class="actions"><input id="publicLink" readonly style="flex:1"><button type="button" class="secondary" onclick="copyPublicLink()">Copiar</button></div></div>
+<input type="hidden" name="modelo_id">
+<div class="field span2">
+  <label>Vincular a um modelo do catálogo (opcional, preenche os dados técnicos sozinho)</label>
+  <div class="actions"><select id="modeloPicker" style="flex:1"><option value="">— nenhum / preencher manualmente —</option></select><button type="button" class="secondary" onclick="applyModeloToForm()">Aplicar dados do modelo</button></div>
+</div>
+<div class="field"><label>Modelo</label><input name="modelo"></div>
+<div class="field"><label>Fabricante</label><input name="fabricante"></div>
+<div class="field"><label>Lote</label><input name="lote"></div>
+<div class="field"><label>Número de série</label><input name="numero_serie"></div>
+<div class="field"><label>Data da venda</label><input type="date" name="data_venda"></div>
+<div class="field"><label>Status</label><select name="status"><option>Ativa</option><option>Em manutenção</option><option>Falha</option><option>Desativada</option></select></div>
+<div class="field"><label>Criticidade</label><select name="criticidade"><option>Baixa</option><option selected>Média</option><option>Alta</option><option>Crítica</option></select></div>
+<div class="field span2"><label>Observações</label><textarea name="observacoes"></textarea></div>
+</div></section>
+
+<section class="card section hidden" data-section="tecnicos">
+<div class="grid3">
+<div class="field"><label>Potência (W)</label><input type="number" step="0.01" name="potencia_w"></div>
+<div class="field"><label>CCT (K)</label><input type="number" name="cct_k"></div>
+<div class="field"><label>IRC</label><input type="number" step="0.1" name="irc"></div>
+<div class="field"><label>Fluxo (lm)</label><input type="number" step="0.1" name="fluxo_lm"></div>
+<div class="field"><label>Facho (graus)</label><input type="number" step="0.1" name="facho_graus"></div>
+<div class="field"><label>IP</label><input name="ip"></div>
+<div class="field"><label>IK</label><input name="ik"></div>
+<div class="field"><label>Data de instalação</label><input type="date" name="data_instalacao"></div>
+</div></section>
+
+<section class="card section hidden" data-section="componentes">
+<div class="grid3">
+<div class="field"><label>Driver original</label><input id="driver_original"></div>
+<div class="field"><label>LED original</label><input id="led_original"></div>
+<div class="field"><label>Óptica original</label><input id="optica_original"></div>
+</div></section>
+
+<section class="card section hidden" data-section="localizacao">
+<div class="grid">
+<div class="field"><label>Cliente</label><input name="cliente"></div>
+<div class="field"><label>Empreendimento</label><input name="empreendimento"></div>
+<div class="field"><label>Edifício / Torre / Bloco</label><input name="edificio"></div>
+<div class="field"><label>Andar</label><input name="andar"></div>
+<div class="field"><label>Ambiente</label><input name="ambiente"></div>
+<div class="field"><label>Posição</label><input name="posicao"></div>
+</div></section>
+
+<section class="card section hidden" data-section="garantias">
+<div class="grid">
+<div class="field"><label>Tipo</label><input id="gar_tipo" value="Luminária completa"></div>
+<div class="field"><label>Responsável</label><input id="gar_resp"></div>
+<div class="field"><label>Fornecedor</label><input id="gar_forn"></div>
+<div class="field"><label>Status</label><select id="gar_status"><option>Ativa</option><option>Expirada</option><option>Em análise</option></select></div>
+<div class="field"><label>Início</label><input type="date" id="gar_inicio"></div>
+<div class="field"><label>Fim</label><input type="date" id="gar_fim"></div>
+</div>
+<div class="actions" style="margin-top:12px"><button type="button" class="secondary" onclick="addWarranty()">Adicionar garantia</button></div>
+<div id="garList" style="margin-top:14px"></div>
+</section>
+
+<section class="card section hidden" data-section="fotos">
+<div class="alert">Envie a foto direto do celular ou computador. Também aceita colar uma URL pública manualmente.</div>
+<div class="grid">
+<div class="field">
+  <label>Foto principal</label>
+  <input name="foto_principal_url" placeholder="URL (gerada ao enviar, ou cole uma)">
+  <input type="file" accept="image/*" data-target="foto_principal_url" onchange="uploadPhoto(event)">
+  <img class="fotoPreview hidden" data-preview="foto_principal_url">
+</div>
+<div class="field">
+  <label>Foto instalada</label>
+  <input name="foto_instalada_url" placeholder="URL (gerada ao enviar, ou cole uma)">
+  <input type="file" accept="image/*" data-target="foto_instalada_url" onchange="uploadPhoto(event)">
+  <img class="fotoPreview hidden" data-preview="foto_instalada_url">
+</div>
+<div class="field">
+  <label>Foto da etiqueta</label>
+  <input name="foto_etiqueta_url" placeholder="URL (gerada ao enviar, ou cole uma)">
+  <input type="file" accept="image/*" data-target="foto_etiqueta_url" onchange="uploadPhoto(event)">
+  <img class="fotoPreview hidden" data-preview="foto_etiqueta_url">
+</div>
+</div></section>
+
+<section class="card section hidden" data-section="manutencao">
+<div class="grid">
+<div class="field"><label>Tipo</label><select id="man_tipo"><option>Preventiva</option><option>Corretiva</option><option>Inspeção</option><option>Substituição de componente</option></select></div>
+<div class="field"><label>Responsável</label><input id="man_resp"></div>
+<div class="field"><label>Status</label><select id="man_status"><option>Concluída</option><option>Em andamento</option><option>Aguardando peça</option></select></div>
+<div class="field"><label>Data</label><input type="date" id="man_data"></div>
+<div class="field"><label>Categoria da falha</label><select id="man_categoria">
+  <option value="">— não classificado —</option>
+  <option>Falha de driver</option>
+  <option>Degradação de LED</option>
+  <option>Infiltração / umidade</option>
+  <option>Mau contato / conector</option>
+  <option>Dano físico</option>
+  <option>Falha de instalação</option>
+  <option>Outro</option>
+</select></div>
+<div class="field span2"><label>Problema</label><textarea id="man_prob"></textarea></div>
+<div class="field span2"><label>Serviço realizado</label><textarea id="man_serv"></textarea></div>
+<div class="field"><label>Componente removido (modelo)</label><input id="man_comp_removido" placeholder="ex: LF-GIRO13YS0300BU"></div>
+<div class="field"><label>Componente instalado (modelo)</label><input id="man_comp_instalado" placeholder="ex: LF-GIRO13YS0400BU"></div>
+</div>
+<div class="small" style="margin-top:8px">Preenchendo os dois campos de componente, o LumiDNA registra automaticamente essa troca como evidência de campo no catálogo de equivalentes.</div>
+<div class="actions" style="margin-top:12px"><button type="button" class="secondary" onclick="addMaintenance()">Registrar manutenção</button></div>
+<div id="manList" style="margin-top:14px"></div>
+</section>
+
+<section class="card section hidden" data-section="reposicao">
+<div class="alert"><b>Regra LumiDNA:</b> somente LumiDNA homologa equivalentes. O preço é referência de venda LumiDNA.</div>
+<div class="grid3">
+<div class="field"><label>Componente de origem</label><input id="rep_comp" value="Driver"></div>
+<div class="field"><label>Fabricante original</label><input id="rep_fab_orig"></div>
+<div class="field"><label>Modelo original</label><input id="rep_mod_orig"></div>
+<div class="field"><label>Fabricante equivalente</label><input id="rep_fab_eq"></div>
+<div class="field"><label>Modelo equivalente</label><input id="rep_mod_eq"></div>
+<div class="field"><label>Nível</label><select id="rep_nivel"><option>Homologado LumiDNA</option><option>Alternativa possível</option></select></div>
+<div class="field"><label>Preço referência</label><input type="number" step="0.01" id="rep_preco"></div>
+<div class="field"><label>Disponibilidade</label><input id="rep_disp" value="Sob consulta"></div>
+<div class="field"><label>Especificação</label><input id="rep_spec"></div>
+</div>
+<div class="actions" style="margin-top:12px"><button type="button" class="secondary" onclick="addReplacement()">Adicionar equivalente</button></div>
+<div id="repList" style="margin-top:14px"></div>
+</section>
+
+<section class="card section hidden" data-section="historico">
+<div class="alert">Registro de alterações desta luminária: quem mudou, quando, e de que valor para qual.</div>
+<div id="histList"></div>
+</section>
+
+<div class="actions"><button class="primary" type="submit">SALVAR</button></div>
+</form>
+</div>
+</main></div>
+
+<script src="../assets/supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb=supabase.createClient(LUMIDNA_SUPABASE_URL,LUMIDNA_SUPABASE_KEY);
+let LID=null, luminariaDbId=null, currentUserEmail=null, originalData=null, originalComponents={};
+const q=s=>document.querySelector(s), qa=s=>[...document.querySelectorAll(s)];
+function esc(s){return (s??"").toString().replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+
+// ---- Auth ----
+function loginMsg(t,ok=true){q("#loginMsg").innerHTML=`<div class="${ok?"success":"alert"}">${t}</div>`}
+q("#loginForm").onsubmit=async e=>{
+  e.preventDefault();
+  const email=q("#loginEmail").value.trim(), password=q("#loginPassword").value;
+  const {error}=await sb.auth.signInWithPassword({email,password});
+  if(error) loginMsg("Erro ao entrar: "+error.message,false);
+};
+function logout(){sb.auth.signOut()}
+function showLogin(){q("#loginScreen").classList.remove("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.add("hidden")}
+function showApp(user){currentUserEmail=user.email;q("#loginScreen").classList.add("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.remove("hidden");q("#userEmail").textContent=user.email;q("#connStatus").textContent="Supabase conectado";checkWarrantyAlerts();populateModeloPicker()}
+
+// ---- Modo Luminárias x Modelos ----
+function setMode(mode){
+  qa(".modeBtn").forEach(b=>b.classList.toggle("active",b.dataset.mode===mode));
+  q("#modeLuminarias").classList.toggle("hidden",mode!=="luminarias");
+  q("#modeModelos").classList.toggle("hidden",mode!=="modelos");
+  if(mode==="modelos") loadModelos();
+}
+
+// ---- Catálogo de Modelos ----
+let batchModelo=null;
+
+async function populateModeloPicker(){
+  const r=await sb.from("modelos").select("id,fabricante,codigo").order("fabricante").order("codigo").limit(1000);
+  const sel=q("#modeloPicker");
+  if(!sel) return;
+  const current=sel.value;
+  sel.innerHTML='<option value="">— nenhum / preencher manualmente —</option>'+(r.data||[]).map(m=>`<option value="${m.id}">${esc(m.fabricante)||"?"} — ${esc(m.codigo)}</option>`).join("");
+  sel.value=current;
+}
+
+async function applyModeloToForm(){
+  const id=q("#modeloPicker").value;
+  if(!id) return;
+  const r=await sb.from("modelos").select("*").eq("id",id).single();
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  const m=r.data;
+  q("input[name=modelo_id]").value=m.id;
+  q("input[name=modelo]").value=m.codigo||"";
+  q("input[name=fabricante]").value=m.fabricante||"";
+  if(m.potencia_w!=null) q("input[name=potencia_w]").value=m.potencia_w;
+  if(m.cct_k!=null) q("input[name=cct_k]").value=m.cct_k;
+  if(m.irc!=null) q("input[name=irc]").value=m.irc;
+  if(m.fluxo_lm!=null) q("input[name=fluxo_lm]").value=m.fluxo_lm;
+  if(m.facho_graus!=null) q("input[name=facho_graus]").value=m.facho_graus;
+  if(m.ip) q("input[name=ip]").value=m.ip;
+  if(m.ik) q("input[name=ik]").value=m.ik;
+  msg("Dados do modelo aplicados no formulário. Clique em SALVAR para gravar.");
+}
+
+async function loadModelos(){
+  const term=q("#modeloSearch").value.trim();
+  let query=sb.from("modelos").select("*").order("fabricante").order("codigo").limit(500);
+  if(term) query=query.or(`fabricante.ilike.%${term}%,linha.ilike.%${term}%,codigo.ilike.%${term}%,descricao.ilike.%${term}%`);
+  const r=await query;
+  const box=q("#modelosList");
+  if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
+  const rows=r.data||[];
+  box.innerHTML = rows.length ? `<table><tr><th>Foto</th><th>Fabricante</th><th>Linha</th><th>Código</th><th>Descrição</th><th>Potência</th><th>CCT</th><th>Fluxo</th><th>Facho</th><th></th></tr>${rows.map(m=>`<tr><td>${m.imagem_url?`<img src="${esc(m.imagem_url)}" alt="" style="width:44px;height:44px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:`<span class="small" style="color:#bbb">—</span>`}</td><td>${esc(m.fabricante)}</td><td>${esc(m.linha)}</td><td>${esc(m.codigo)}</td><td>${esc(m.descricao)}</td><td>${m.potencia_w??"—"}W</td><td>${m.cct_k??"—"}</td><td>${m.fluxo_lm??"—"}lm</td><td>${m.facho_graus??"—"}°</td><td><button type="button" class="secondary" onclick="selectModeloForBatch(${m.id})">Gerar unidades</button></td></tr>`).join("")}</table>` : "<div class='small'>Nenhum modelo encontrado.</div>";
+}
+
+async function addModelo(){
+  const codigo=q("#mo_codigo").value.trim();
+  if(!codigo) return msg("Informe o código (SKU) do modelo.",false);
+  const p={
+    fabricante:norm(q("#mo_fabricante").value.trim()), linha:norm(q("#mo_linha").value.trim()), codigo,
+    descricao:norm(q("#mo_descricao").value.trim()),
+    potencia_w:q("#mo_potencia").value?Number(q("#mo_potencia").value):null,
+    cct_k:q("#mo_cct").value?Number(q("#mo_cct").value):null,
+    irc:q("#mo_irc").value?Number(q("#mo_irc").value):null,
+    fluxo_lm:q("#mo_fluxo").value?Number(q("#mo_fluxo").value):null,
+    facho_graus:q("#mo_facho").value?Number(q("#mo_facho").value):null,
+    ip:norm(q("#mo_ip").value.trim()), ik:norm(q("#mo_ik").value.trim()),
+    tensao:norm(q("#mo_tensao").value.trim()), vida_util_h:norm(q("#mo_vida").value.trim()),
+    observacoes:norm(q("#mo_obs").value.trim())
+  };
+  const r=await sb.from("modelos").upsert(p,{onConflict:"fabricante,codigo"}).select();
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  msg("Modelo salvo.");
+  loadModelos();populateModeloPicker();
+}
+
+function parseCSV(text){
+  const firstLine=text.trim().split(/\r?\n/)[0]||"";
+  const delim=(firstLine.split(";").length>firstLine.split(",").length)?";":",";
+  const lines=text.trim().split(/\r?\n/).filter(l=>l.trim().length);
+  const rows=lines.map(line=>{
+    const out=[]; let cur=""; let inQ=false;
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(inQ){
+        if(c==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else inQ=false; }
+        else cur+=c;
+      }else{
+        if(c==='"') inQ=true;
+        else if(c===delim){out.push(cur);cur="";}
+        else cur+=c;
+      }
+    }
+    out.push(cur);
+    return out.map(s=>s.trim());
+  });
+  const header=rows[0].map(h=>h.toLowerCase().trim());
+  return rows.slice(1).map(r=>{
+    const obj={};
+    header.forEach((h,i)=>obj[h]=(r[i]!==undefined&&r[i]!=="")?r[i]:null);
+    return obj;
+  });
+}
+
+async function importModelosCSV(){
+  const text=q("#modelosCsvInput").value.trim();
+  if(!text) return msg("Cole o CSV primeiro.",false);
+  const rows=parseCSV(text);
+  if(!rows.length) return msg("Nenhuma linha encontrada no CSV.",false);
+  const num=v=>v!=null&&v!==""?Number(v):null;
+  const payload=rows.map(r=>({
+    fabricante:r.fabricante||null, linha:r.linha||null, codigo:r.codigo,
+    descricao:r.descricao||null,
+    potencia_w:num(r.potencia_w), cct_k:num(r.cct_k), irc:num(r.irc),
+    fluxo_lm:num(r.fluxo_lm), facho_graus:num(r.facho_graus),
+    ip:r.ip||null, ik:r.ik||null, tensao:r.tensao||null,
+    vida_util_h:r.vida_util_h||null, observacoes:r.observacoes||null
+  })).filter(r=>r.codigo);
+  if(!payload.length) return msg("Nenhuma linha com 'codigo' preenchido.",false);
+  const res=await sb.from("modelos").upsert(payload,{onConflict:"fabricante,codigo"}).select();
+  if(res.error) return msg("Erro na importação: "+res.error.message,false);
+  msg(`${res.data.length} modelo(s) importado(s)/atualizado(s).`);
+  loadModelos();populateModeloPicker();
+}
+
+function fabCode(fabricante){
+  const letters=(fabricante||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z]/g,"").toUpperCase();
+  return letters.slice(0,3)||"GEN";
+}
+function modelBase(codigo){
+  return (codigo||"").split(".")[0]||codigo||"MODELO";
+}
+function buildLumidnaId(modelo,num){
+  return `LD-${fabCode(modelo.fabricante)}-${modelBase(modelo.codigo)}-${String(num).padStart(6,"0")}`;
+}
+
+async function selectModeloForBatch(id){
+  const r=await sb.from("modelos").select("*").eq("id",id).single();
+  if(r.error) return msg(r.error.message,false);
+  batchModelo=r.data;
+  q("#batchModeloLabel").textContent=`${batchModelo.fabricante||""} — ${batchModelo.codigo}`;
+  const foto=q("#batchModeloFoto");
+  if(batchModelo.imagem_url){foto.src=batchModelo.imagem_url;foto.style.display="inline-block"}else{foto.style.display="none"}
+  q("#batch_start").placeholder=`ex: 1 → ${buildLumidnaId(batchModelo,1)}`;
+  q("#batchCard").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+async function generateBatch(){
+  if(!batchModelo) return msg("Selecione um modelo na lista acima primeiro (botão 'Gerar unidades').",false);
+  const qty=parseInt(q("#batch_qty").value,10);
+  const startNum=parseInt(q("#batch_start").value,10);
+  if(!qty||qty<1) return msg("Informe uma quantidade válida.",false);
+  if(!startNum||startNum<1) return msg(`Informe o número inicial do ID (ex: 1 para gerar ${buildLumidnaId(batchModelo,1)}).`,false);
+  const shared={
+    cliente:norm(q("#batch_cliente").value.trim()),
+    empreendimento:norm(q("#batch_empreendimento").value.trim()),
+    edificio:norm(q("#batch_edificio").value.trim())
+  };
+  const rows=[];
+  for(let i=0;i<qty;i++){
+    const num=startNum+i;
+    rows.push({
+      lumidna_id:buildLumidnaId(batchModelo,num),
+      modelo_id:batchModelo.id, modelo:batchModelo.codigo, fabricante:batchModelo.fabricante,
+      potencia_w:batchModelo.potencia_w, cct_k:batchModelo.cct_k, irc:batchModelo.irc,
+      fluxo_lm:batchModelo.fluxo_lm, facho_graus:batchModelo.facho_graus,
+      ip:batchModelo.ip, ik:batchModelo.ik,
+      status:"Ativa", criticidade:"Média", ...shared
+    });
+  }
+  const r=await sb.from("luminarias").insert(rows).select("lumidna_id");
+  if(r.error) return msg("Erro ao gerar unidades (talvez algum ID já exista): "+r.error.message,false);
+  const ids=r.data.map(x=>x.lumidna_id);
+  msg(`${ids.length} unidade(s) criada(s): ${ids[0]} até ${ids[ids.length-1]}.`);
+}
+
+// ---- Alerta de garantias vencendo ----
+async function checkWarrantyAlerts(){
+  const today=new Date().toISOString().slice(0,10);
+  const in30=new Date(Date.now()+30*86400000).toISOString().slice(0,10);
+  const r=await sb.from("garantias").select("tipo,fim,luminarias(lumidna_id,modelo,cliente)").eq("status","Ativa").gte("fim",today).lte("fim",in30).order("fim");
+  const box=q("#alertBox");
+  if(r.error||!r.data||!r.data.length){box.innerHTML="";return}
+  box.innerHTML=`<div class="card" style="border-left:4px solid var(--orange)"><b>⚠️ ${r.data.length} garantia(s) vencendo nos próximos 30 dias</b><table style="margin-top:10px"><tr><th>Luminária</th><th>Cliente</th><th>Tipo</th><th>Vence em</th></tr>${r.data.map(x=>`<tr><td>${esc(x.luminarias?.lumidna_id)}</td><td>${esc(x.luminarias?.cliente)||"—"}</td><td>${esc(x.tipo)}</td><td>${esc(x.fim)}</td></tr>`).join("")}</table></div>`;
+}
+function showReset(){q("#loginScreen").classList.add("hidden");q("#appScreen").classList.add("hidden");q("#resetScreen").classList.remove("hidden")}
+function resetMsg(t,ok=true){q("#resetMsg").innerHTML=`<div class="${ok?"success":"alert"}">${t}</div>`}
+q("#resetForm").onsubmit=async e=>{
+  e.preventDefault();
+  const p1=q("#resetPassword").value, p2=q("#resetPassword2").value;
+  if(p1!==p2) return resetMsg("As senhas não coincidem.",false);
+  const {error}=await sb.auth.updateUser({password:p1});
+  if(error) return resetMsg("Erro: "+error.message,false);
+  resetMsg("Senha atualizada. Você já está logado.");
+  setTimeout(()=>sb.auth.getSession().then(({data:{session}})=>session&&showApp(session.user)),800);
+};
+sb.auth.onAuthStateChange((event,session)=>{
+  if(event==="PASSWORD_RECOVERY") return showReset();
+  session?showApp(session.user):showLogin();
+});
+sb.auth.getSession().then(({data:{session}})=>{session?showApp(session.user):showLogin()});
+
+// ---- Navegação de abas ----
+qa(".nav").forEach(btn=>btn.onclick=()=>{qa(".nav").forEach(b=>b.classList.toggle("active",b===btn));qa(".section").forEach(s=>s.classList.toggle("hidden",s.dataset.section!==btn.dataset.tab))});
+function msg(t,ok=true){q("#msg").innerHTML=`<div class="${ok?"success":"alert"}">${t}</div>`}
+function norm(v){return v===""?null:v}
+
+// ---- Busca de luminárias ----
+function clearSearch(){["f_id","f_fabricante","f_modelo","f_cliente","f_empreendimento","f_local"].forEach(id=>q("#"+id).value="");q("#searchResults").innerHTML=""}
+
+async function searchAssets(){
+  let query=sb.from("luminarias").select("id,lumidna_id,modelo,fabricante,cliente,empreendimento,edificio,andar,ambiente,posicao,status").order("lumidna_id").limit(100);
+  const id=q("#f_id").value.trim(), fab=q("#f_fabricante").value.trim(), mod=q("#f_modelo").value.trim(), cli=q("#f_cliente").value.trim(), emp=q("#f_empreendimento").value.trim(), loc=q("#f_local").value.trim();
+  if(id) query=query.ilike("lumidna_id",`%${id}%`);
+  if(fab) query=query.ilike("fabricante",`%${fab}%`);
+  if(mod) query=query.ilike("modelo",`%${mod}%`);
+  if(cli) query=query.ilike("cliente",`%${cli}%`);
+  if(emp) query=query.ilike("empreendimento",`%${emp}%`);
+  if(loc) query=query.or(`edificio.ilike.%${loc}%,andar.ilike.%${loc}%,ambiente.ilike.%${loc}%,posicao.ilike.%${loc}%`);
+  const r=await query;
+  if(r.error) return msg("Erro na busca: "+r.error.message,false);
+  renderSearchResults(r.data||[]);
+}
+
+function renderSearchResults(rows){
+  const box=q("#searchResults");
+  if(!rows.length){box.innerHTML="<div class='small'>Nenhuma luminária encontrada com esses filtros.</div>";return}
+  box.innerHTML=`<table><tr><th>ID</th><th>Modelo</th><th>Fabricante</th><th>Cliente</th><th>Local</th><th>Status</th><th></th></tr>
+    ${rows.map(x=>{
+      const local=[x.edificio,x.andar,x.ambiente,x.posicao].filter(Boolean).join(" / ");
+      return `<tr><td>${esc(x.lumidna_id)}</td><td>${esc(x.modelo)||"—"}</td><td>${esc(x.fabricante)||"—"}</td><td>${esc(x.cliente)||"—"}</td><td>${esc(local)||"—"}</td><td>${esc(x.status)||"—"}</td><td><button type="button" class="secondary" onclick="loadById('${x.lumidna_id}')">Abrir</button></td></tr>`;
+    }).join("")}
+  </table>`;
+}
+
+async function loadById(id){
+  const r=await sb.from("luminarias").select("*").eq("lumidna_id",id).maybeSingle();
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  if(!r.data) return msg(`Luminária ${id} não encontrada.`,false);
+  await openAsset(r.data);
+  msg(id+" carregada.");
+  window.scrollTo({top:q("#formLum").getBoundingClientRect().top+window.scrollY-20,behavior:"smooth"});
+}
+
+async function createNew(){
+  const id=q("#lidInput").value.trim().toUpperCase();
+  if(!id) return msg("Informe um ID para o novo ativo.",false);
+  const existing=await sb.from("luminarias").select("id").eq("lumidna_id",id).maybeSingle();
+  if(existing.data) return msg("Já existe um ativo com esse ID. Busque por ele acima.",false);
+  const c=await sb.from("luminarias").insert({lumidna_id:id,status:"Ativa",criticidade:"Média"}).select().single();
+  if(c.error) return msg("Erro ao criar: "+c.error.message,false);
+  q("#formLum").reset();
+  await openAsset(c.data);
+  msg(id+" criada. Preencha os dados e clique em Salvar.");
+}
+
+async function openAsset(data){
+  LID=data.lumidna_id; luminariaDbId=data.id;
+  originalData={...data};
+  q("#formLum").classList.remove("hidden");
+  fill(data);
+  q("input[name=lumidna_id]").value=LID;
+  q("#lidInput").value=LID;
+  q("#publicLink").value=data.public_code?`${LUMIDNA_SITE_BASE}/ativo/?c=${data.public_code}`:"(salve a luminária para gerar o link)";
+  q("#modeloPicker").value=data.modelo_id||"";
+  ["foto_principal_url","foto_instalada_url","foto_etiqueta_url"].forEach(k=>updatePhotoPreview(k,data[k]));
+  await Promise.all([loadComponents(),loadWarranties(),loadMaintenance(),loadReplacement(),loadAudit()]);
+}
+
+// ---- Upload de fotos (Supabase Storage) ----
+async function uploadPhoto(e){
+  if(!LID) return msg("Selecione ou crie um ativo primeiro.",false);
+  const file=e.target.files[0]; if(!file) return;
+  const targetName=e.target.dataset.target;
+  const path=`${LID}/${targetName}_${Date.now()}_${file.name}`.replace(/\s+/g,"_");
+  msg("Enviando foto...");
+  const up=await sb.storage.from("fotos").upload(path,file,{upsert:true});
+  if(up.error) return msg("Erro no upload: "+up.error.message,false);
+  const {data}=sb.storage.from("fotos").getPublicUrl(path);
+  q(`[name="${targetName}"]`).value=data.publicUrl;
+  updatePhotoPreview(targetName,data.publicUrl);
+  msg("Foto enviada. Clique em SALVAR para gravar o link.");
+}
+function updatePhotoPreview(name,url){
+  const img=q(`.fotoPreview[data-preview="${name}"]`);
+  if(!img) return;
+  if(url){img.src=url;img.classList.remove("hidden")}else{img.classList.add("hidden")}
+}
+
+function copyPublicLink(){
+  const v=q("#publicLink").value;
+  if(!v||v.startsWith("(")) return;
+  navigator.clipboard.writeText(v).then(()=>msg("Link copiado.")).catch(()=>msg("Não foi possível copiar. Selecione e copie manualmente.",false));
+}
+
+function fill(d){[...q("#formLum").elements].forEach(e=>{if(e.name&&d[e.name]!=null)e.value=d[e.name]})}
+
+// ---- Auditoria ----
+async function logAudit(campo,before,after){
+  const b=before??"", a=after??"";
+  if(String(b)===String(a)) return;
+  await sb.from("auditoria").insert({luminaria_id:luminariaDbId,tabela:"luminarias",campo,valor_anterior:String(b),valor_novo:String(a),usuario_email:currentUserEmail});
+}
+async function loadAudit(){
+  const r=await sb.from("auditoria").select("*").eq("luminaria_id",luminariaDbId).order("criado_em",{ascending:false}).limit(100);
+  q("#histList").innerHTML=(r.data&&r.data.length)?`<table><tr><th>Data/hora</th><th>Usuário</th><th>Campo</th><th>De</th><th>Para</th></tr>${r.data.map(x=>`<tr><td>${new Date(x.criado_em).toLocaleString('pt-BR')}</td><td>${esc(x.usuario_email)}</td><td>${esc(x.campo)}</td><td>${esc(x.valor_anterior)}</td><td>${esc(x.valor_novo)}</td></tr>`).join("")}</table>`:"<div class='small'>Nenhuma alteração registrada ainda.</div>";
+}
+
+async function loadComponents(){const r=await sb.from("componentes").select("*").eq("luminaria_id",luminariaDbId).eq("original",true);originalComponents={};q("#driver_original").value="";q("#led_original").value="";q("#optica_original").value="";(r.data||[]).forEach(c=>{originalComponents[c.tipo]=c.modelo||"";if(c.tipo==="Driver")q("#driver_original").value=c.modelo||"";if(c.tipo==="LED")q("#led_original").value=c.modelo||"";if(c.tipo==="Óptica")q("#optica_original").value=c.modelo||""})}
+async function saveComponent(tipo,modelo){
+  if(!modelo)return;
+  const before=originalComponents[tipo]||"";
+  if(before===modelo) return;
+  const r=await sb.from("componentes").select("id").eq("luminaria_id",luminariaDbId).eq("tipo",tipo).eq("original",true).maybeSingle();
+  if(r.data)await sb.from("componentes").update({modelo,ativo_atual:true}).eq("id",r.data.id);
+  else await sb.from("componentes").insert({luminaria_id:luminariaDbId,tipo,modelo,original:true,ativo_atual:true});
+  await logAudit(`componente_${tipo.toLowerCase()}`,before,modelo);
+  originalComponents[tipo]=modelo;
+}
+
+q("#formLum").onsubmit=async e=>{
+  e.preventDefault();
+  if(!LID) return msg("Selecione ou crie um ativo primeiro.",false);
+  const p={};for(const [k,v] of new FormData(e.target).entries())p[k]=norm(v);delete p.lumidna_id;
+  const r=await sb.from("luminarias").update(p).eq("lumidna_id",LID);
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  for(const k of Object.keys(p)) await logAudit(k,originalData?originalData[k]:null,p[k]);
+  originalData={...originalData,...p};
+  await saveComponent("Driver",q("#driver_original").value.trim());
+  await saveComponent("LED",q("#led_original").value.trim());
+  await saveComponent("Óptica",q("#optica_original").value.trim());
+  await loadAudit();
+  msg(LID+" salva no Supabase.");
+};
+
+async function addWarranty(){
+  if(!LID)return msg("Selecione um ativo primeiro.",false);
+  const p={luminaria_id:luminariaDbId,tipo:q("#gar_tipo").value,responsavel:norm(q("#gar_resp").value),fornecedor:norm(q("#gar_forn").value),inicio:norm(q("#gar_inicio").value),fim:norm(q("#gar_fim").value),status:q("#gar_status").value};
+  const r=await sb.from("garantias").insert(p);
+  if(r.error)return msg("Erro na garantia: "+r.error.message,false);
+  await logAudit("garantia_adicionada","",`${p.tipo} (${p.status}, até ${p.fim||"—"})`);
+  loadWarranties();loadAudit();msg("Garantia adicionada.");
+}
+async function loadWarranties(){const r=await sb.from("garantias").select("*").eq("luminaria_id",luminariaDbId).order("id",{ascending:false});q("#garList").innerHTML=(r.data&&r.data.length)?`<table><tr><th>Tipo</th><th>Responsável</th><th>Fim</th><th>Status</th></tr>${r.data.map(x=>`<tr><td>${x.tipo||""}</td><td>${x.responsavel||""}</td><td>${x.fim||""}</td><td>${x.status||""}</td></tr>`).join("")}</table>`:"<div class='small'>Nenhuma garantia cadastrada.</div>"}
+
+async function addMaintenance(){
+  if(!LID)return msg("Selecione um ativo primeiro.",false);
+  const compRemovido=norm(q("#man_comp_removido").value.trim()), compInstalado=norm(q("#man_comp_instalado").value.trim());
+  const p={luminaria_id:luminariaDbId,data:norm(q("#man_data").value),tipo:q("#man_tipo").value,categoria_falha:norm(q("#man_categoria").value),problema:norm(q("#man_prob").value),servico_realizado:norm(q("#man_serv").value),responsavel:norm(q("#man_resp").value),status:q("#man_status").value,componente_removido:compRemovido,componente_instalado:compInstalado};
+  const r=await sb.from("manutencoes").insert(p);
+  if(r.error)return msg("Erro na manutenção: "+r.error.message,false);
+  await logAudit("manutencao_registrada","",`${p.tipo} em ${p.data||"—"} (${p.status})`);
+  if(compRemovido && compInstalado) await registerFieldEvidence(compRemovido,compInstalado);
+  loadMaintenance();loadAudit();loadReplacement();
+  msg("Manutenção registrada."+(compRemovido&&compInstalado?" Evidência de equivalência registrada.":""));
+}
+async function loadMaintenance(){const r=await sb.from("manutencoes").select("*").eq("luminaria_id",luminariaDbId).order("id",{ascending:false});q("#manList").innerHTML=(r.data&&r.data.length)?`<table><tr><th>Data</th><th>Tipo</th><th>Categoria da falha</th><th>Responsável</th><th>Status</th></tr>${r.data.map(x=>`<tr><td>${x.data||""}</td><td>${x.tipo||""}</td><td>${x.categoria_falha||"—"}</td><td>${x.responsavel||""}</td><td>${x.status||""}</td></tr>`).join("")}</table>`:"<div class='small'>Nenhuma manutenção registrada.</div>"}
+
+// ---- Equivalência por evidência de campo ----
+async function registerFieldEvidence(modeloOriginal,modeloEquivalente){
+  const existing=await sb.from("equivalentes").select("*").eq("modelo_original",modeloOriginal).eq("modelo_equivalente",modeloEquivalente).maybeSingle();
+  if(existing.data){
+    await sb.from("equivalentes").update({evidencias_campo:(existing.data.evidencias_campo||0)+1}).eq("id",existing.data.id);
+  }else{
+    await sb.from("equivalentes").insert({componente_origem:"Campo",modelo_original:modeloOriginal,modelo_equivalente:modeloEquivalente,nivel:"Alternativa possível",disponibilidade:"Sob consulta",evidencias_campo:1});
+  }
+}
+
+async function addReplacement(){const p={componente_origem:q("#rep_comp").value,fabricante_original:norm(q("#rep_fab_orig").value),modelo_original:norm(q("#rep_mod_orig").value),fabricante_equivalente:norm(q("#rep_fab_eq").value),modelo_equivalente:norm(q("#rep_mod_eq").value),especificacao:norm(q("#rep_spec").value),nivel:q("#rep_nivel").value,preco_referencia:norm(q("#rep_preco").value),disponibilidade:q("#rep_disp").value,homologado_por:"LumiDNA"};const r=await sb.from("equivalentes").insert(p);if(r.error)return msg("Erro no equivalente: "+r.error.message,false);loadReplacement();msg("Equivalente adicionado.")}
+async function loadReplacement(){const r=await sb.from("equivalentes").select("*").order("id",{ascending:false}).limit(20);q("#repList").innerHTML=(r.data&&r.data.length)?`<table><tr><th>Origem</th><th>Equivalente</th><th>Nível</th><th>Preço</th><th>Evidências de campo</th></tr>${r.data.map(x=>`<tr><td>${x.modelo_original||""}</td><td>${x.modelo_equivalente||""}</td><td>${x.nivel||""}</td><td>${x.preco_referencia||""}</td><td>${x.evidencias_campo||0}</td></tr>`).join("")}</table>`:"<div class='small'>Nenhum equivalente cadastrado.</div>"}
+</script>
+</body></html>

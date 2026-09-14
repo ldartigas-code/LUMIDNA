@@ -49,8 +49,14 @@ th{color:var(--muted);font-weight:600}
       <div class="field"><label>Tipo</label><select id="pm_tipo"><option>Preventiva</option><option>Corretiva</option><option>Inspeção</option><option>Substituição de componente</option></select></div>
       <div class="field"><label>Problema encontrado</label><textarea id="pm_problema"></textarea></div>
       <div class="field"><label>Serviço realizado</label><textarea id="pm_servico"></textarea></div>
-      <div class="field"><label>Componente removido (modelo, se houve troca)</label><input id="pm_comp_removido" placeholder="ex: LF-GIRO13YS0300BU"></div>
-      <div class="field"><label>Componente instalado (modelo, se houve troca)</label><input id="pm_comp_instalado" placeholder="ex: LF-GIRO13YS0400BU"></div>
+      <div class="field"><label>Componente removido (se houve troca)</label><select id="pm_comp_removido"><option value="">— não houve troca —</option><option>Luminária inteira</option><option>Driver</option><option>LED</option><option>Óptica</option></select></div>
+      <div class="field"><label>Componente instalado</label><select id="pm_comp_instalado_tipo" onchange="onCompInstaladoChange()"><option value="">— não houve troca —</option><option value="Original">Original (igual ao que já tinha)</option><option value="Homologado">Homologado LumiDNA</option><option value="Outro">Outro modelo</option></select></div>
+      <div id="outroCompFields" class="hidden">
+        <div class="field"><label>Qual modelo foi instalado</label><input id="pm_comp_modelo" placeholder="ex: LF-GIRO13YS0400BU"></div>
+        <div class="field"><label>Fabricante</label><input id="pm_comp_fabricante"></div>
+        <div class="field"><label>Foto do componente instalado</label><input type="file" accept="image/*" id="pm_comp_foto"></div>
+        <div class="small">Como não é original nem homologado, a LumiDNA precisa da foto e do fabricante pra avaliar antes de aprovar.</div>
+      </div>
       <div id="manutMsg"></div>
       <div style="display:flex;gap:10px">
         <button type="button" class="btn secondary" onclick="hideManutForm()">Cancelar</button>
@@ -101,9 +107,12 @@ async function loadAsset(){
   const warranties = lum.garantias||[];
   const maint = lum.manutencoes||[];
 
+  const foto = lum.foto_principal_url || lum.foto_catalogo_url;
+  const fotoEhCatalogo = !lum.foto_principal_url && !!lum.foto_catalogo_url;
+
   content.innerHTML = `
     <div class="card">
-      ${lum.foto_principal_url?`<img class="photo" src="${esc(lum.foto_principal_url)}" alt="Foto da luminária">`:""}
+      ${foto?`<img class="photo" src="${esc(foto)}" alt="Foto da luminária">${fotoEhCatalogo?`<div class="small" style="margin:-8px 0 12px">Foto de referência do catálogo — ainda sem foto real desta peça instalada.</div>`:""}`:""}
       <span class="pill ${statusClass}">${esc(lum.status||"—")}</span>
       <h1>${esc(lum.lumidna_id)}</h1>
       <div class="sub">${esc(lum.modelo||"Modelo não informado")} ${lum.fabricante?"— "+esc(lum.fabricante):""}</div>
@@ -130,8 +139,9 @@ async function loadAsset(){
     </div>
 
     <div class="card">
-      <h2>Componentes ativos</h2>
-      ${compList.length?`<table><tr><th>Tipo</th><th>Modelo</th></tr>${compList.map(c=>`<tr><td>${esc(c.tipo)}</td><td>${esc(c.modelo)||"—"}</td></tr>`).join("")}</table>`:`<div class="small">Nenhum componente registrado.</div>`}
+      <h2>Peças instaladas</h2>
+      <div class="small" style="margin-bottom:8px">Driver, LED e óptica atualmente nesta luminária.</div>
+      ${compList.length?`<table><tr><th>Tipo</th><th>Modelo</th></tr>${compList.map(c=>`<tr><td>${esc(c.tipo)}</td><td>${esc(c.modelo)||"—"}</td></tr>`).join("")}</table>`:`<div class="small">Nenhuma peça registrada ainda.</div>`}
     </div>
 
     <div class="card">
@@ -160,12 +170,38 @@ function hideManutForm(){
   document.getElementById("manutForm").classList.add("hidden");
   document.getElementById("manutBtnWrap").classList.remove("hidden");
 }
+function onCompInstaladoChange(){
+  const v=document.getElementById("pm_comp_instalado_tipo").value;
+  document.getElementById("outroCompFields").classList.toggle("hidden", v!=="Outro");
+}
 
 async function enviarManutencao(){
   const nome=document.getElementById("pm_nome").value.trim();
   const empresa=document.getElementById("pm_empresa").value.trim();
   const msgBox=document.getElementById("manutMsg");
+  msgBox.innerHTML="";
   if(!nome||!empresa){msgBox.innerHTML=`<div class="small" style="color:var(--red)">Preencha seu nome e a empresa/fornecedor.</div>`;return}
+
+  const compInstaladoTipo=document.getElementById("pm_comp_instalado_tipo").value||null;
+  let compModelo=null, compFabricante=null, compFotoUrl=null;
+
+  if(compInstaladoTipo==="Outro"){
+    compModelo=document.getElementById("pm_comp_modelo").value.trim();
+    compFabricante=document.getElementById("pm_comp_fabricante").value.trim();
+    const file=document.getElementById("pm_comp_foto").files[0];
+    if(!compModelo||!compFabricante||!file){
+      msgBox.innerHTML=`<div class="small" style="color:var(--red)">Pra componente "Outro", informe modelo, fabricante e a foto.</div>`;
+      return;
+    }
+    msgBox.innerHTML=`<div class="small">Enviando foto...</div>`;
+    const path=`${assetCode}/${Date.now()}_${file.name}`.replace(/\s+/g,"_");
+    const up=await sb.storage.from("evidencias").upload(path,file);
+    if(up.error){msgBox.innerHTML=`<div class="small" style="color:var(--red)">Erro ao enviar foto: ${esc(up.error.message)}</div>`;return}
+    compFotoUrl=sb.storage.from("evidencias").getPublicUrl(path).data.publicUrl;
+  }else if(compInstaladoTipo==="Original"||compInstaladoTipo==="Homologado"){
+    compModelo=compInstaladoTipo;
+  }
+
   const p={
     p_code:assetCode,
     p_tipo:document.getElementById("pm_tipo").value,
@@ -173,8 +209,11 @@ async function enviarManutencao(){
     p_empresa:empresa,
     p_problema:document.getElementById("pm_problema").value.trim()||null,
     p_servico:document.getElementById("pm_servico").value.trim()||null,
-    p_comp_removido:document.getElementById("pm_comp_removido").value.trim()||null,
-    p_comp_instalado:document.getElementById("pm_comp_instalado").value.trim()||null
+    p_comp_removido:document.getElementById("pm_comp_removido").value||null,
+    p_comp_instalado_tipo:compInstaladoTipo,
+    p_comp_instalado_modelo:compModelo,
+    p_comp_instalado_fabricante:compFabricante,
+    p_comp_instalado_foto:compFotoUrl
   };
   const r=await sb.rpc("enviar_manutencao_pendente",p);
   if(r.error){msgBox.innerHTML=`<div class="small" style="color:var(--red)">Erro ao enviar: ${esc(r.error.message)}</div>`;return}

@@ -21,6 +21,13 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px;borde
 th{color:var(--muted);font-weight:600}
 .small{font-size:12px;color:var(--muted)}
 .footer{text-align:center;font-size:12px;color:var(--muted);margin-top:20px}
+.btn{display:inline-block;width:100%;background:var(--orange);color:#fff;border:0;border-radius:10px;padding:13px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn.secondary{background:#fff;color:var(--text);border:1px solid var(--line)}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.field label{font-size:12px;font-weight:700;color:var(--muted)}
+.field input,.field select,.field textarea{border:1px solid var(--line);border-radius:9px;padding:10px 11px;font-family:inherit;font-size:14px}
+.field textarea{min-height:70px;resize:vertical}
+.hidden{display:none!important}
 </style>
 </head>
 <body>
@@ -29,6 +36,33 @@ th{color:var(--muted);font-weight:600}
   <div id="content">
     <div class="card small">Carregando ativo…</div>
   </div>
+
+  <div id="manutBox" class="card hidden">
+    <div id="manutBtnWrap">
+      <button type="button" class="btn" onclick="showManutForm()">Registrar manutenção</button>
+      <div class="small" style="margin-top:8px">Preencha se você fez alguma troca ou reparo nesta luminária. O envio passa por aprovação da LumiDNA antes de virar registro oficial.</div>
+    </div>
+    <form id="manutForm" class="hidden" onsubmit="return false">
+      <h2>Registrar manutenção</h2>
+      <div class="field"><label>Seu nome</label><input id="pm_nome" required></div>
+      <div class="field"><label>Empresa / fornecedor</label><input id="pm_empresa" required></div>
+      <div class="field"><label>Tipo</label><select id="pm_tipo"><option>Preventiva</option><option>Corretiva</option><option>Inspeção</option><option>Substituição de componente</option></select></div>
+      <div class="field"><label>Problema encontrado</label><textarea id="pm_problema"></textarea></div>
+      <div class="field"><label>Serviço realizado</label><textarea id="pm_servico"></textarea></div>
+      <div class="field"><label>Componente removido (modelo, se houve troca)</label><input id="pm_comp_removido" placeholder="ex: LF-GIRO13YS0300BU"></div>
+      <div class="field"><label>Componente instalado (modelo, se houve troca)</label><input id="pm_comp_instalado" placeholder="ex: LF-GIRO13YS0400BU"></div>
+      <div id="manutMsg"></div>
+      <div style="display:flex;gap:10px">
+        <button type="button" class="btn secondary" onclick="hideManutForm()">Cancelar</button>
+        <button type="button" class="btn" onclick="enviarManutencao()">Enviar para aprovação</button>
+      </div>
+    </form>
+    <div id="manutSucesso" class="hidden">
+      <h2>Enviado ✓</h2>
+      <div class="small">A LumiDNA vai revisar e aprovar essa manutenção. Ela só passa a valer no histórico oficial depois de aprovada.</div>
+    </div>
+  </div>
+
   <div class="footer">Registro técnico permanente da iluminação — LumiDNA</div>
 </div>
 
@@ -47,6 +81,8 @@ function notFoundCard(){
     </div>`;
 }
 
+let assetCode=null;
+
 async function loadAsset(){
   const code=new URLSearchParams(window.location.search).get("c");
   if(!code) return notFoundCard();
@@ -55,6 +91,8 @@ async function loadAsset(){
   if(r.error){content.innerHTML=`<div class="card">Erro ao consultar: ${esc(r.error.message)}</div>`;return}
   const lum=r.data;
   if(!lum || !lum.lumidna_id) return notFoundCard();
+  assetCode=code;
+  document.getElementById("manutBox").classList.remove("hidden");
 
   const statusClassMap={"Ativa":"st-ok","Falha":"st-bad","Em manutenção":"st-warn","Desativada":"st-off"};
   const statusClass = statusClassMap[lum.status]||"st-off";
@@ -113,5 +151,35 @@ async function loadAsset(){
   `;
 }
 loadAsset();
+
+function showManutForm(){
+  document.getElementById("manutBtnWrap").classList.add("hidden");
+  document.getElementById("manutForm").classList.remove("hidden");
+}
+function hideManutForm(){
+  document.getElementById("manutForm").classList.add("hidden");
+  document.getElementById("manutBtnWrap").classList.remove("hidden");
+}
+
+async function enviarManutencao(){
+  const nome=document.getElementById("pm_nome").value.trim();
+  const empresa=document.getElementById("pm_empresa").value.trim();
+  const msgBox=document.getElementById("manutMsg");
+  if(!nome||!empresa){msgBox.innerHTML=`<div class="small" style="color:var(--red)">Preencha seu nome e a empresa/fornecedor.</div>`;return}
+  const p={
+    p_code:assetCode,
+    p_tipo:document.getElementById("pm_tipo").value,
+    p_responsavel:nome,
+    p_empresa:empresa,
+    p_problema:document.getElementById("pm_problema").value.trim()||null,
+    p_servico:document.getElementById("pm_servico").value.trim()||null,
+    p_comp_removido:document.getElementById("pm_comp_removido").value.trim()||null,
+    p_comp_instalado:document.getElementById("pm_comp_instalado").value.trim()||null
+  };
+  const r=await sb.rpc("enviar_manutencao_pendente",p);
+  if(r.error){msgBox.innerHTML=`<div class="small" style="color:var(--red)">Erro ao enviar: ${esc(r.error.message)}</div>`;return}
+  document.getElementById("manutForm").classList.add("hidden");
+  document.getElementById("manutSucesso").classList.remove("hidden");
+}
 </script>
 </body></html>

@@ -207,11 +207,12 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <div class="field"><label>IK</label><input name="ik"></div>
 <div class="field"><label>Data de instalação</label><input type="date" name="data_instalacao"></div>
 </div>
-<div class="small" style="margin-top:14px;font-weight:700">Componentes originais</div>
-<div class="grid3" style="margin-top:8px">
-<div class="field"><label>Driver original</label><input id="driver_original"></div>
-<div class="field"><label>LED original</label><input id="led_original"></div>
-<div class="field"><label>Óptica original</label><input id="optica_original"></div>
+<div class="small" style="margin-top:14px;font-weight:700">Peças instaladas (opcional)</div>
+<div class="small" style="margin-bottom:8px">Preencha só se quiser rastrear o modelo exato de cada peça pra facilitar reposição futura. Deixe em branco se não souber — não é uma pergunta de sim/não.</div>
+<div class="grid3">
+<div class="field"><label>Modelo do driver</label><input id="driver_original" placeholder="ex: MW-LPF40D-700"></div>
+<div class="field"><label>Modelo do LED</label><input id="led_original" placeholder="ex: Cree XPG3"></div>
+<div class="field"><label>Modelo da óptica</label><input id="optica_original" placeholder="ex: 34° padrão"></div>
 </div></section>
 
 <section class="card">
@@ -875,8 +876,11 @@ async function loadPendentes(){
       <div class="grid" style="margin-top:10px">
         <div class="field span2"><label>Problema</label><div class="small">${esc(p.problema)||"—"}</div></div>
         <div class="field span2"><label>Serviço realizado</label><div class="small">${esc(p.servico_realizado)||"—"}</div></div>
-        ${(p.componente_removido||p.componente_instalado)?`<div class="field"><label>Componente removido</label><div class="small">${esc(p.componente_removido)||"—"}</div></div><div class="field"><label>Componente instalado</label><div class="small">${esc(p.componente_instalado)||"—"}</div></div>`:""}
+        ${p.componente_removido?`<div class="field"><label>Componente removido</label><div class="small">${esc(p.componente_removido)}</div></div>`:""}
+        ${p.componente_instalado_tipo?`<div class="field"><label>Componente instalado</label><div class="small">${esc(p.componente_instalado_tipo)}${p.componente_instalado_tipo==="Outro"?` — ${esc(p.componente_instalado)} (${esc(p.componente_instalado_fabricante)})`:""}</div></div>`:""}
+        ${p.componente_instalado_foto_url?`<div class="field span2"><label>Foto enviada</label><a href="${esc(p.componente_instalado_foto_url)}" target="_blank"><img src="${esc(p.componente_instalado_foto_url)}" alt="" style="max-width:160px;border-radius:8px;border:1px solid var(--line)"></a></div>`:""}
       </div>
+      ${p.componente_instalado_tipo==="Outro"?`<div class="alert" style="margin-top:10px">⚠️ Componente fora do catálogo — confira a foto e o fabricante antes de aprovar.</div>`:""}
       <div class="actions" style="margin-top:12px">
         <button type="button" class="primary" onclick="aprovarPendente(${p.id})">✓ Aprovar</button>
         <button type="button" class="secondary" onclick="rejeitarPendente(${p.id})">Rejeitar</button>
@@ -888,10 +892,20 @@ async function aprovarPendente(id){
   const r=await sb.from("manutencoes_pendentes").select("*").eq("id",id).single();
   if(r.error) return msg("Erro: "+r.error.message,false);
   const p=r.data;
-  const ins={luminaria_id:p.luminaria_id,tipo:p.tipo,problema:p.problema,servico_realizado:p.servico_realizado,responsavel:`${p.responsavel} (${p.empresa})`,status:"Concluída",componente_removido:p.componente_removido,componente_instalado:p.componente_instalado};
+  const instaladoDesc = p.componente_instalado_tipo==="Outro" ? `${p.componente_instalado} (${p.componente_instalado_fabricante})` : p.componente_instalado_tipo;
+  const ins={luminaria_id:p.luminaria_id,tipo:p.tipo,problema:p.problema,servico_realizado:p.servico_realizado,responsavel:`${p.responsavel} (${p.empresa})`,status:"Concluída",componente_removido:p.componente_removido,componente_instalado:instaladoDesc};
   const insR=await sb.from("manutencoes").insert(ins);
   if(insR.error) return msg("Erro ao aprovar: "+insR.error.message,false);
-  if(p.componente_removido && p.componente_instalado) await registerFieldEvidence(p.componente_removido,p.componente_instalado);
+
+  if(p.componente_removido && p.componente_instalado_tipo){
+    const compR=await sb.from("componentes").select("id,modelo").eq("luminaria_id",p.luminaria_id).eq("tipo",p.componente_removido).eq("ativo_atual",true).maybeSingle();
+    const modeloAnterior=compR.data?compR.data.modelo:null;
+    const novoModelo = p.componente_instalado_tipo==="Outro" ? p.componente_instalado : (modeloAnterior||p.componente_instalado_tipo);
+    if(compR.data) await sb.from("componentes").update({modelo:novoModelo}).eq("id",compR.data.id);
+    else await sb.from("componentes").insert({luminaria_id:p.luminaria_id,tipo:p.componente_removido,modelo:novoModelo,original:false,ativo_atual:true});
+    if(p.componente_instalado_tipo==="Outro" && modeloAnterior) await registerFieldEvidence(modeloAnterior,p.componente_instalado);
+  }
+
   await sb.from("manutencoes_pendentes").update({status:"Aprovada",revisado_por:currentUserEmail,revisado_em:new Date().toISOString()}).eq("id",id);
   msg("Manutenção aprovada e registrada no histórico oficial da peça.");
   loadPendentes();checkPendentesBadge();

@@ -96,7 +96,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
   <div class="card">
     <h2 style="margin:0 0 12px;font-size:16px">Modelos cadastrados</h2>
     <div class="actions" style="margin-bottom:10px">
-      <input id="modeloSearch" placeholder="Buscar por fabricante, linha, código ou descrição..." style="flex:1">
+      <input id="modeloSearch" placeholder="Buscar por fabricante, linha, código ou descrição..." style="flex:1" oninput="onModeloSearchInput()">
       <button type="button" class="secondary" onclick="loadModelos()">Buscar</button>
     </div>
     <div id="modelosList"><div class="small">Nenhuma busca feita ainda.</div></div>
@@ -104,7 +104,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 
   <div class="card" id="batchCard">
     <h2 style="margin:0 0 12px;font-size:16px">Gerar unidades em lote</h2>
-    <div class="small" style="margin-bottom:10px;display:flex;align-items:center;gap:8px">Modelo selecionado: <b id="batchModeloLabel">nenhum — clique em "Gerar unidades" na lista acima</b><img id="batchModeloFoto" src="" alt="" style="display:none;width:36px;height:36px;object-fit:contain;border:1px solid #eee;border-radius:4px"></div>
+    <div class="small" style="margin-bottom:10px;display:flex;align-items:center;gap:8px">Modelo selecionado: <b id="batchModeloLabel">nenhum — clique em "Usar este modelo" na lista acima</b><img id="batchModeloFoto" src="" alt="" style="display:none;width:36px;height:36px;object-fit:contain;border:1px solid #eee;border-radius:4px"></div>
     <div class="grid3">
       <div class="field"><label>Quantidade</label><input type="number" id="batch_qty" min="1" value="1"></div>
       <div class="field"><label>Número inicial do ID</label><input type="number" id="batch_start" placeholder="selecione um modelo acima"></div>
@@ -112,7 +112,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
       <div class="field"><label>Empreendimento (opcional)</label><input id="batch_empreendimento"></div>
       <div class="field"><label>Edifício (opcional)</label><input id="batch_edificio"></div>
     </div>
-    <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="generateBatch()">Gerar unidades</button></div>
+    <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="generateBatch()" style="font-size:16px;padding:12px 24px">✓ Confirmar e criar as unidades</button></div>
   </div>
 
   <div class="card">
@@ -368,6 +368,12 @@ async function applyModeloToForm(){
   msg("Dados do modelo aplicados no formulário. Clique em SALVAR para gravar.");
 }
 
+let modeloSearchTimer=null;
+function onModeloSearchInput(){
+  clearTimeout(modeloSearchTimer);
+  modeloSearchTimer=setTimeout(loadModelos,300);
+}
+
 async function loadModelos(){
   const term=q("#modeloSearch").value.trim();
   let query=sb.from("modelos").select("*").order("fabricante").order("codigo").limit(500);
@@ -376,7 +382,7 @@ async function loadModelos(){
   const box=q("#modelosList");
   if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
   const rows=r.data||[];
-  box.innerHTML = rows.length ? `<table><tr><th>Foto</th><th>Fabricante</th><th>Linha</th><th>Código</th><th>Descrição</th><th>Potência</th><th>CCT</th><th>Fluxo</th><th>Facho</th><th></th></tr>${rows.map(m=>`<tr><td>${m.imagem_url?`<img src="${esc(m.imagem_url)}" alt="" style="width:44px;height:44px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:`<span class="small" style="color:#bbb">—</span>`}</td><td>${esc(m.fabricante)}</td><td>${esc(m.linha)}</td><td>${esc(m.codigo)}</td><td>${esc(m.descricao)}</td><td>${m.potencia_w??"—"}W</td><td>${m.cct_k??"—"}</td><td>${m.fluxo_lm??"—"}lm</td><td>${m.facho_graus??"—"}°</td><td><button type="button" class="secondary" onclick="selectModeloForBatch(${m.id})">Gerar unidades</button></td></tr>`).join("")}</table>` : "<div class='small'>Nenhum modelo encontrado.</div>";
+  box.innerHTML = rows.length ? `<table><tr><th>Foto</th><th>Fabricante</th><th>Linha</th><th>Código</th><th>Descrição</th><th>Potência</th><th>CCT</th><th>Fluxo</th><th>Facho</th><th></th></tr>${rows.map(m=>`<tr><td>${m.imagem_url?`<img src="${esc(m.imagem_url)}" alt="" style="width:44px;height:44px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:`<span class="small" style="color:#bbb">—</span>`}</td><td>${esc(m.fabricante)}</td><td>${esc(m.linha)}</td><td>${esc(m.codigo)}</td><td>${esc(m.descricao)}</td><td>${m.potencia_w??"—"}W</td><td>${m.cct_k??"—"}</td><td>${m.fluxo_lm??"—"}lm</td><td>${m.facho_graus??"—"}°</td><td><button type="button" class="secondary" onclick="selectModeloForBatch(${m.id})">Usar este modelo ▸</button></td></tr>`).join("")}</table>` : "<div class='small'>Nenhum modelo encontrado.</div>";
 }
 
 async function addModelo(){

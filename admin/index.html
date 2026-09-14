@@ -93,6 +93,10 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
     <span class="ic">🔍</span>
     <span><b>Buscar peça existente</b><small>Encontrar e editar uma luminária já cadastrada</small></span>
   </button>
+  <button type="button" class="bigOption" id="btnAprovacoes" onclick="goScreen('aprovacoes')">
+    <span class="ic">✅</span>
+    <span><b>Aprovações pendentes</b><small id="aprovacoesResumo">Manutenções enviadas por técnicos em campo, aguardando sua confirmação</small></span>
+  </button>
   <div style="text-align:center;margin-top:10px"><a href="#" class="small" onclick="goScreen('catalogo');return false">Catálogo de modelos (cadastro avançado / importar CSV)</a></div>
 </div>
 
@@ -314,6 +318,14 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 </form>
 </div>
 
+<!-- ===== APROVAÇÕES PENDENTES ===== -->
+<div id="screenAprovacoes" class="hidden">
+  <button type="button" class="linkback" onclick="goScreen('home')">‹ Início</button>
+  <h2 style="margin:14px 0 12px">Aprovações pendentes</h2>
+  <div class="small" style="margin-bottom:12px">Manutenções enviadas por técnicos ou fornecedores pela página pública. Nada aqui vira registro oficial até você aprovar.</div>
+  <div id="aprovacoesList"></div>
+</div>
+
 <!-- ===== CATÁLOGO (avançado) ===== -->
 <div id="screenCatalogo" class="hidden">
   <button type="button" class="linkback" onclick="goScreen('home')">‹ Início</button>
@@ -373,15 +385,16 @@ q("#loginForm").onsubmit=async e=>{
 function logout(){sb.auth.signOut()}
 function showLogin(){q("#loginScreen").classList.remove("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.add("hidden")}
 let appInitialized=false;
-function showApp(user){currentUserEmail=user.email;q("#loginScreen").classList.add("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.remove("hidden");q("#userEmail").textContent=user.email;q("#connStatus").textContent="Supabase conectado";checkWarrantyAlerts();populateModeloPicker();if(!appInitialized){appInitialized=true;goScreen("home")}}
+function showApp(user){currentUserEmail=user.email;q("#loginScreen").classList.add("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.remove("hidden");q("#userEmail").textContent=user.email;q("#connStatus").textContent="Supabase conectado";checkWarrantyAlerts();checkPendentesBadge();populateModeloPicker();if(!appInitialized){appInitialized=true;goScreen("home")}}
 
 // ---- Navegação entre telas ----
-const SCREENS=["home","wizard","avulsa","search","detail","catalogo"];
+const SCREENS=["home","wizard","avulsa","search","detail","aprovacoes","catalogo"];
 function goScreen(name){
   SCREENS.forEach(s=>q("#screen"+s[0].toUpperCase()+s.slice(1)).classList.toggle("hidden",s!==name));
   q("#msg").innerHTML="";
   if(name==="wizard") wizStep(1);
   if(name==="catalogo") q("#modelosList").innerHTML="<div class='small'>Digite algo acima pra buscar.</div>";
+  if(name==="aprovacoes") loadPendentes();
 }
 
 // ---- Catálogo de Modelos ----
@@ -834,6 +847,62 @@ async function registerFieldEvidence(modeloOriginal,modeloEquivalente){
   }else{
     await sb.from("equivalentes").insert({componente_origem:"Campo",modelo_original:modeloOriginal,modelo_equivalente:modeloEquivalente,nivel:"Alternativa possível",disponibilidade:"Sob consulta",evidencias_campo:1});
   }
+}
+
+// ---- Aprovações pendentes (manutenção enviada por técnico em campo) ----
+async function checkPendentesBadge(){
+  const r=await sb.from("manutencoes_pendentes").select("id",{count:"exact",head:true}).eq("status","Aguardando aprovação");
+  const n=r.count||0;
+  const resumo=q("#aprovacoesResumo");
+  if(!resumo) return;
+  resumo.textContent = n>0 ? `${n} manutenção(ões) aguardando sua confirmação` : "Manutenções enviadas por técnicos em campo, aguardando sua confirmação";
+}
+
+async function loadPendentes(){
+  const box=q("#aprovacoesList");
+  const r=await sb.from("manutencoes_pendentes").select("*,luminarias(lumidna_id,modelo,cliente)").eq("status","Aguardando aprovação").order("criado_em",{ascending:false});
+  if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
+  const rows=r.data||[];
+  box.innerHTML = rows.length ? rows.map(p=>`
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:12px">
+        <div>
+          <b>${esc(p.luminarias?.lumidna_id)}</b> — ${esc(p.luminarias?.modelo)||"—"} ${p.luminarias?.cliente?"· "+esc(p.luminarias.cliente):""}
+          <div class="small">Enviado por <b>${esc(p.responsavel)}</b> (${esc(p.empresa)}) em ${new Date(p.criado_em).toLocaleString('pt-BR')}</div>
+        </div>
+        <span class="pill">${esc(p.tipo)}</span>
+      </div>
+      <div class="grid" style="margin-top:10px">
+        <div class="field span2"><label>Problema</label><div class="small">${esc(p.problema)||"—"}</div></div>
+        <div class="field span2"><label>Serviço realizado</label><div class="small">${esc(p.servico_realizado)||"—"}</div></div>
+        ${(p.componente_removido||p.componente_instalado)?`<div class="field"><label>Componente removido</label><div class="small">${esc(p.componente_removido)||"—"}</div></div><div class="field"><label>Componente instalado</label><div class="small">${esc(p.componente_instalado)||"—"}</div></div>`:""}
+      </div>
+      <div class="actions" style="margin-top:12px">
+        <button type="button" class="primary" onclick="aprovarPendente(${p.id})">✓ Aprovar</button>
+        <button type="button" class="secondary" onclick="rejeitarPendente(${p.id})">Rejeitar</button>
+      </div>
+    </div>`).join("") : "<div class='small'>Nenhuma aprovação pendente no momento.</div>";
+}
+
+async function aprovarPendente(id){
+  const r=await sb.from("manutencoes_pendentes").select("*").eq("id",id).single();
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  const p=r.data;
+  const ins={luminaria_id:p.luminaria_id,tipo:p.tipo,problema:p.problema,servico_realizado:p.servico_realizado,responsavel:`${p.responsavel} (${p.empresa})`,status:"Concluída",componente_removido:p.componente_removido,componente_instalado:p.componente_instalado};
+  const insR=await sb.from("manutencoes").insert(ins);
+  if(insR.error) return msg("Erro ao aprovar: "+insR.error.message,false);
+  if(p.componente_removido && p.componente_instalado) await registerFieldEvidence(p.componente_removido,p.componente_instalado);
+  await sb.from("manutencoes_pendentes").update({status:"Aprovada",revisado_por:currentUserEmail,revisado_em:new Date().toISOString()}).eq("id",id);
+  msg("Manutenção aprovada e registrada no histórico oficial da peça.");
+  loadPendentes();checkPendentesBadge();
+}
+
+async function rejeitarPendente(id){
+  const motivo=prompt("Motivo da rejeição (opcional):")||null;
+  const r=await sb.from("manutencoes_pendentes").update({status:"Rejeitada",motivo_rejeicao:motivo,revisado_por:currentUserEmail,revisado_em:new Date().toISOString()}).eq("id",id);
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  msg("Envio rejeitado. Os dados oficiais da peça não foram alterados.");
+  loadPendentes();checkPendentesBadge();
 }
 
 async function addReplacement(){const p={componente_origem:q("#rep_comp").value,fabricante_original:norm(q("#rep_fab_orig").value),modelo_original:norm(q("#rep_mod_orig").value),fabricante_equivalente:norm(q("#rep_fab_eq").value),modelo_equivalente:norm(q("#rep_mod_eq").value),especificacao:norm(q("#rep_spec").value),nivel:q("#rep_nivel").value,preco_referencia:norm(q("#rep_preco").value),disponibilidade:q("#rep_disp").value,homologado_por:"LumiDNA"};const r=await sb.from("equivalentes").insert(p);if(r.error)return msg("Erro no equivalente: "+r.error.message,false);loadReplacement();msg("Equivalente adicionado.")}

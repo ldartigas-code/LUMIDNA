@@ -107,7 +107,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
     <div class="small" style="margin-bottom:10px">Modelo selecionado: <b id="batchModeloLabel">nenhum — clique em "Gerar unidades" na lista acima</b></div>
     <div class="grid3">
       <div class="field"><label>Quantidade</label><input type="number" id="batch_qty" min="1" value="1"></div>
-      <div class="field"><label>Número inicial do ID</label><input type="number" id="batch_start" placeholder="ex: 10 → LD-000010"></div>
+      <div class="field"><label>Número inicial do ID</label><input type="number" id="batch_start" placeholder="selecione um modelo acima"></div>
       <div class="field"><label>Cliente (opcional, aplica a todas)</label><input id="batch_cliente"></div>
       <div class="field"><label>Empreendimento (opcional)</label><input id="batch_empreendimento"></div>
       <div class="field"><label>Edifício (opcional)</label><input id="batch_edificio"></div>
@@ -449,11 +449,23 @@ async function importModelosCSV(){
   loadModelos();populateModeloPicker();
 }
 
+function fabCode(fabricante){
+  const letters=(fabricante||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z]/g,"").toUpperCase();
+  return letters.slice(0,3)||"GEN";
+}
+function modelBase(codigo){
+  return (codigo||"").split(".")[0]||codigo||"MODELO";
+}
+function buildLumidnaId(modelo,num){
+  return `LD-${fabCode(modelo.fabricante)}-${modelBase(modelo.codigo)}-${String(num).padStart(6,"0")}`;
+}
+
 async function selectModeloForBatch(id){
   const r=await sb.from("modelos").select("*").eq("id",id).single();
   if(r.error) return msg(r.error.message,false);
   batchModelo=r.data;
   q("#batchModeloLabel").textContent=`${batchModelo.fabricante||""} — ${batchModelo.codigo}`;
+  q("#batch_start").placeholder=`ex: 1 → ${buildLumidnaId(batchModelo,1)}`;
   q("#batchCard").scrollIntoView({behavior:"smooth",block:"start"});
 }
 
@@ -462,7 +474,7 @@ async function generateBatch(){
   const qty=parseInt(q("#batch_qty").value,10);
   const startNum=parseInt(q("#batch_start").value,10);
   if(!qty||qty<1) return msg("Informe uma quantidade válida.",false);
-  if(!startNum||startNum<1) return msg("Informe o número inicial do ID (ex: 10 para gerar LD-000010).",false);
+  if(!startNum||startNum<1) return msg(`Informe o número inicial do ID (ex: 1 para gerar ${buildLumidnaId(batchModelo,1)}).`,false);
   const shared={
     cliente:norm(q("#batch_cliente").value.trim()),
     empreendimento:norm(q("#batch_empreendimento").value.trim()),
@@ -472,7 +484,7 @@ async function generateBatch(){
   for(let i=0;i<qty;i++){
     const num=startNum+i;
     rows.push({
-      lumidna_id:"LD-"+String(num).padStart(6,"0"),
+      lumidna_id:buildLumidnaId(batchModelo,num),
       modelo_id:batchModelo.id, modelo:batchModelo.codigo, fabricante:batchModelo.fabricante,
       potencia_w:batchModelo.potencia_w, cct_k:batchModelo.cct_k, irc:batchModelo.irc,
       fluxo_lm:batchModelo.fluxo_lm, facho_graus:batchModelo.facho_graus,

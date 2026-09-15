@@ -121,6 +121,9 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
       <div class="field"><label>Cliente (opcional)</label><input id="wiz_cliente"></div>
       <div class="field"><label>Obra / Empreendimento</label><input id="wiz_empreendimento"></div>
       <div class="field"><label>Edifício (opcional)</label><input id="wiz_edificio"></div>
+      <div class="field"><label>Tensão da instalação</label><select id="wiz_tensao"><option value="">— selecione —</option><option>127V</option><option>220V</option></select></div>
+      <div class="field"><label>Tem automação?</label><select id="wiz_automacao" onchange="onWizAutomacaoChange()"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
+      <div class="field hidden" id="wiz_protocolo_field"><label>Protocolo</label><select id="wiz_protocolo"><option>DALI</option><option>TRIAC</option><option>0-10V</option></select></div>
     </div>
     <div class="actions" style="margin-top:16px">
       <button type="button" class="primary" onclick="wizIrParaCarrinho()">Próximo</button>
@@ -233,6 +236,9 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <div class="field"><label>IP</label><input name="ip"></div>
 <div class="field"><label>IK</label><input name="ik"></div>
 <div class="field"><label>Data de instalação</label><input type="date" name="data_instalacao"></div>
+<div class="field"><label>Tensão da instalação</label><select name="tensao_instalacao"><option value="">— selecione —</option><option>127V</option><option>220V</option></select></div>
+<div class="field"><label>Tem automação?</label><select id="det_automacao" onchange="onDetAutomacaoChange()"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
+<div class="field hidden" id="det_protocolo_field"><label>Protocolo</label><select name="protocolo_automacao"><option>DALI</option><option>TRIAC</option><option>0-10V</option></select></div>
 </div>
 <div class="small" style="margin-top:14px;font-weight:700">Peças instaladas</div>
 <div class="small" style="margin-bottom:8px">Só muda de "Original" pra um código quando uma troca é enviada pela página pública e aprovada em "Aprovações pendentes". Não dá pra editar aqui direto — isso evita dado digitado errado.</div>
@@ -591,16 +597,25 @@ function wizStep(n){
   if(n===1){
     wizObra=null;wizCarrinho=[];
     q("#wiz_cliente").value="";q("#wiz_empreendimento").value="";q("#wiz_edificio").value="";
+    q("#wiz_tensao").value="";q("#wiz_automacao").value="nao";q("#wiz_protocolo_field").classList.add("hidden");
   }
 }
 
+function onWizAutomacaoChange(){
+  q("#wiz_protocolo_field").classList.toggle("hidden",q("#wiz_automacao").value!=="sim");
+}
+
 function wizIrParaCarrinho(){
+  const temAutomacao=q("#wiz_automacao").value==="sim";
   wizObra={
     cliente:norm(q("#wiz_cliente").value.trim()),
     empreendimento:norm(q("#wiz_empreendimento").value.trim()),
-    edificio:norm(q("#wiz_edificio").value.trim())
+    edificio:norm(q("#wiz_edificio").value.trim()),
+    tensao_instalacao:norm(q("#wiz_tensao").value),
+    automacao:temAutomacao,
+    protocolo_automacao:temAutomacao?q("#wiz_protocolo").value:null
   };
-  q("#wizObraResumo").innerHTML=`Obra: <b>${esc(wizObra.empreendimento)||"—"}</b>${wizObra.cliente?" · "+esc(wizObra.cliente):""}${wizObra.edificio?" · "+esc(wizObra.edificio):""}`;
+  q("#wizObraResumo").innerHTML=`Obra: <b>${esc(wizObra.empreendimento)||"—"}</b>${wizObra.cliente?" · "+esc(wizObra.cliente):""}${wizObra.edificio?" · "+esc(wizObra.edificio):""}${wizObra.tensao_instalacao?" · "+esc(wizObra.tensao_instalacao):""}${temAutomacao?" · Automação "+esc(wizObra.protocolo_automacao):" · Sem automação"}`;
   q("#wizModeloSearch").value="";
   wizFiltrarModelos();
   renderWizCarrinho();
@@ -876,6 +891,8 @@ async function openAsset(data){
   q("#lidInput").value=LID;
   q("#publicLink").value=data.public_code?`${LUMIDNA_SITE_BASE}/ativo/?c=${data.public_code}`:"(salve a luminária para gerar o link)";
   q("#modeloPicker").value=data.modelo_id||"";
+  q("#det_automacao").value=data.automacao?"sim":"nao";
+  q("#det_protocolo_field").classList.toggle("hidden",!data.automacao);
   ["foto_principal_url","foto_instalada_url","foto_etiqueta_url"].forEach(k=>updatePhotoPreview(k,data[k]));
   await Promise.all([loadComponents(),loadWarranties(),loadMaintenance(),loadReplacement(),loadAudit()]);
 }
@@ -930,10 +947,16 @@ async function loadComponents(){
   }).join("");
 }
 
+function onDetAutomacaoChange(){
+  q("#det_protocolo_field").classList.toggle("hidden",q("#det_automacao").value!=="sim");
+}
+
 q("#formLum").onsubmit=async e=>{
   e.preventDefault();
   if(!LID) return msg("Selecione ou crie um ativo primeiro.",false);
   const p={};for(const [k,v] of new FormData(e.target).entries())p[k]=norm(v);delete p.lumidna_id;
+  p.automacao = q("#det_automacao").value==="sim";
+  if(!p.automacao) p.protocolo_automacao=null;
   const r=await sb.from("luminarias").update(p).eq("lumidna_id",LID);
   if(r.error) return msg("Erro: "+r.error.message,false);
   for(const k of Object.keys(p)) await logAudit(k,originalData?originalData[k]:null,p[k]);

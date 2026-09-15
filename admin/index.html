@@ -402,7 +402,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 
 <script src="../assets/supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 const sb=supabase.createClient(LUMIDNA_SUPABASE_URL,LUMIDNA_SUPABASE_KEY);
 let LID=null, luminariaDbId=null, currentUserEmail=null, originalData=null;
@@ -740,17 +740,26 @@ async function wizCriar(){
   q("#wizSteps").innerHTML="";
 }
 
-async function wizImprimirQR(){
+function wizImprimirQR(){
   if(!wizUltimaCriacao.length) return;
   const sheet=q("#printQRSheet");
-  const cells=await Promise.all(wizUltimaCriacao.map(async x=>{
+  sheet.innerHTML="";
+  const grid=document.createElement("div");
+  grid.className="qrGrid";
+  sheet.appendChild(grid);
+  wizUltimaCriacao.forEach(x=>{
     const url=`${LUMIDNA_SITE_BASE}/ativo/?c=${x.public_code}`;
-    const canvas=document.createElement("canvas");
-    await QRCode.toCanvas(canvas,url,{width:140,margin:1});
-    return `<div class="qrItem">${canvas.outerHTML}<b>${esc(x.lumidna_id)}</b></div>`;
-  }));
-  sheet.innerHTML=`<div class="qrGrid">${cells.join("")}</div>`;
-  window.print();
+    const item=document.createElement("div");
+    item.className="qrItem";
+    const qrBox=document.createElement("div");
+    item.appendChild(qrBox);
+    new QRCode(qrBox,{text:url,width:140,height:140});
+    const label=document.createElement("b");
+    label.textContent=x.lumidna_id;
+    item.appendChild(label);
+    grid.appendChild(item);
+  });
+  setTimeout(()=>window.print(),300);
 }
 
 // ---- Alerta de garantias vencendo ----

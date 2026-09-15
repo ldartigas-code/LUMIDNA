@@ -207,13 +207,10 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <div class="field"><label>IK</label><input name="ik"></div>
 <div class="field"><label>Data de instalação</label><input type="date" name="data_instalacao"></div>
 </div>
-<div class="small" style="margin-top:14px;font-weight:700">Peças instaladas (opcional)</div>
-<div class="small" style="margin-bottom:8px">Preencha só se quiser rastrear o modelo exato de cada peça pra facilitar reposição futura. Deixe em branco se não souber — não é uma pergunta de sim/não.</div>
-<div class="grid3">
-<div class="field"><label>Modelo do driver</label><input id="driver_original" placeholder="ex: MW-LPF40D-700"></div>
-<div class="field"><label>Modelo do LED</label><input id="led_original" placeholder="ex: Cree XPG3"></div>
-<div class="field"><label>Modelo da óptica</label><input id="optica_original" placeholder="ex: 34° padrão"></div>
-</div></section>
+<div class="small" style="margin-top:14px;font-weight:700">Peças instaladas</div>
+<div class="small" style="margin-bottom:8px">Só muda de "Original" pra um código quando uma troca é enviada pela página pública e aprovada em "Aprovações pendentes". Não dá pra editar aqui direto — isso evita dado digitado errado.</div>
+<div id="pecasInstaladasView" class="grid3"></div>
+</section>
 
 <section class="card">
 <h2 style="margin:0 0 12px;font-size:16px">Cliente e localização</h2>
@@ -371,7 +368,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const sb=supabase.createClient(LUMIDNA_SUPABASE_URL,LUMIDNA_SUPABASE_KEY);
-let LID=null, luminariaDbId=null, currentUserEmail=null, originalData=null, originalComponents={};
+let LID=null, luminariaDbId=null, currentUserEmail=null, originalData=null;
 const q=s=>document.querySelector(s), qa=s=>[...document.querySelectorAll(s)];
 function esc(s){return (s??"").toString().replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 
@@ -790,16 +787,15 @@ async function loadAudit(){
   q("#histList").innerHTML=(r.data&&r.data.length)?`<table><tr><th>Data/hora</th><th>Usuário</th><th>Campo</th><th>De</th><th>Para</th></tr>${r.data.map(x=>`<tr><td>${new Date(x.criado_em).toLocaleString('pt-BR')}</td><td>${esc(x.usuario_email)}</td><td>${esc(x.campo)}</td><td>${esc(x.valor_anterior)}</td><td>${esc(x.valor_novo)}</td></tr>`).join("")}</table>`:"<div class='small'>Nenhuma alteração registrada ainda.</div>";
 }
 
-async function loadComponents(){const r=await sb.from("componentes").select("*").eq("luminaria_id",luminariaDbId).eq("original",true);originalComponents={};q("#driver_original").value="";q("#led_original").value="";q("#optica_original").value="";(r.data||[]).forEach(c=>{originalComponents[c.tipo]=c.modelo||"";if(c.tipo==="Driver")q("#driver_original").value=c.modelo||"";if(c.tipo==="LED")q("#led_original").value=c.modelo||"";if(c.tipo==="Óptica")q("#optica_original").value=c.modelo||""})}
-async function saveComponent(tipo,modelo){
-  if(!modelo)return;
-  const before=originalComponents[tipo]||"";
-  if(before===modelo) return;
-  const r=await sb.from("componentes").select("id").eq("luminaria_id",luminariaDbId).eq("tipo",tipo).eq("original",true).maybeSingle();
-  if(r.data)await sb.from("componentes").update({modelo,ativo_atual:true}).eq("id",r.data.id);
-  else await sb.from("componentes").insert({luminaria_id:luminariaDbId,tipo,modelo,original:true,ativo_atual:true});
-  await logAudit(`componente_${tipo.toLowerCase()}`,before,modelo);
-  originalComponents[tipo]=modelo;
+async function loadComponents(){
+  const r=await sb.from("componentes").select("*").eq("luminaria_id",luminariaDbId).eq("ativo_atual",true);
+  const byTipo={};(r.data||[]).forEach(c=>byTipo[c.tipo]=c.modelo);
+  const tipos=["Driver","LED","Óptica"];
+  q("#pecasInstaladasView").innerHTML = tipos.map(t=>{
+    const modelo=byTipo[t]||"Original";
+    const revisada=modelo!=="Original";
+    return `<div class="field"><label>${t}</label><div class="${revisada?'pill':'small'}" style="${revisada?'':'padding:8px 0'}">${esc(modelo)}</div></div>`;
+  }).join("");
 }
 
 q("#formLum").onsubmit=async e=>{
@@ -810,9 +806,6 @@ q("#formLum").onsubmit=async e=>{
   if(r.error) return msg("Erro: "+r.error.message,false);
   for(const k of Object.keys(p)) await logAudit(k,originalData?originalData[k]:null,p[k]);
   originalData={...originalData,...p};
-  await saveComponent("Driver",q("#driver_original").value.trim());
-  await saveComponent("LED",q("#led_original").value.trim());
-  await saveComponent("Óptica",q("#optica_original").value.trim());
   await loadAudit();
   msg(LID+" salva no Supabase.");
 };
@@ -877,7 +870,7 @@ async function loadPendentes(){
         <div class="field span2"><label>Problema</label><div class="small">${esc(p.problema)||"—"}</div></div>
         <div class="field span2"><label>Serviço realizado</label><div class="small">${esc(p.servico_realizado)||"—"}</div></div>
         ${p.componente_removido?`<div class="field"><label>Componente removido</label><div class="small">${esc(p.componente_removido)}</div></div>`:""}
-        ${p.componente_instalado_tipo?`<div class="field"><label>Componente instalado</label><div class="small">${esc(p.componente_instalado_tipo)}${p.componente_instalado_tipo==="Outro"?` — ${esc(p.componente_instalado)} (${esc(p.componente_instalado_fabricante)})`:""}</div></div>`:""}
+        ${p.componente_instalado_tipo?`<div class="field"><label>Componente instalado</label><div class="small">${esc(p.componente_instalado_tipo)}${p.componente_instalado_tipo==="Outro"?` — ${esc(p.componente_instalado)} (${esc(p.componente_instalado_fabricante)})`:p.componente_instalado_tipo==="Homologado"?` — ${esc(p.componente_instalado)}`:""}</div></div>`:""}
         ${p.componente_instalado_foto_url?`<div class="field span2"><label>Foto enviada</label><a href="${esc(p.componente_instalado_foto_url)}" target="_blank"><img src="${esc(p.componente_instalado_foto_url)}" alt="" style="max-width:160px;border-radius:8px;border:1px solid var(--line)"></a></div>`:""}
       </div>
       ${p.componente_instalado_tipo==="Outro"?`<div class="alert" style="margin-top:10px">⚠️ Componente fora do catálogo — confira a foto e o fabricante antes de aprovar.</div>`:""}
@@ -892,7 +885,7 @@ async function aprovarPendente(id){
   const r=await sb.from("manutencoes_pendentes").select("*").eq("id",id).single();
   if(r.error) return msg("Erro: "+r.error.message,false);
   const p=r.data;
-  const instaladoDesc = p.componente_instalado_tipo==="Outro" ? `${p.componente_instalado} (${p.componente_instalado_fabricante})` : p.componente_instalado_tipo;
+  const instaladoDesc = p.componente_instalado_tipo==="Outro" ? `${p.componente_instalado_tipo}: ${p.componente_instalado} (${p.componente_instalado_fabricante})` : `${p.componente_instalado_tipo}${p.componente_instalado&&p.componente_instalado!=="Original"?": "+p.componente_instalado:""}`;
   const ins={luminaria_id:p.luminaria_id,tipo:p.tipo,problema:p.problema,servico_realizado:p.servico_realizado,responsavel:`${p.responsavel} (${p.empresa})`,status:"Concluída",componente_removido:p.componente_removido,componente_instalado:instaladoDesc};
   const insR=await sb.from("manutencoes").insert(ins);
   if(insR.error) return msg("Erro ao aprovar: "+insR.error.message,false);
@@ -900,10 +893,10 @@ async function aprovarPendente(id){
   if(p.componente_removido && p.componente_instalado_tipo){
     const compR=await sb.from("componentes").select("id,modelo").eq("luminaria_id",p.luminaria_id).eq("tipo",p.componente_removido).eq("ativo_atual",true).maybeSingle();
     const modeloAnterior=compR.data?compR.data.modelo:null;
-    const novoModelo = p.componente_instalado_tipo==="Outro" ? p.componente_instalado : (modeloAnterior||p.componente_instalado_tipo);
+    const novoModelo=p.componente_instalado||"Original";
     if(compR.data) await sb.from("componentes").update({modelo:novoModelo}).eq("id",compR.data.id);
     else await sb.from("componentes").insert({luminaria_id:p.luminaria_id,tipo:p.componente_removido,modelo:novoModelo,original:false,ativo_atual:true});
-    if(p.componente_instalado_tipo==="Outro" && modeloAnterior) await registerFieldEvidence(modeloAnterior,p.componente_instalado);
+    if((p.componente_instalado_tipo==="Outro"||p.componente_instalado_tipo==="Homologado") && modeloAnterior && modeloAnterior!=="Original") await registerFieldEvidence(modeloAnterior,p.componente_instalado);
   }
 
   await sb.from("manutencoes_pendentes").update({status:"Aprovada",revisado_por:currentUserEmail,revisado_em:new Date().toISOString()}).eq("id",id);

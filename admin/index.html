@@ -239,13 +239,13 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <div class="field">
   <label>Foto instalada</label>
   <input name="foto_instalada_url" placeholder="URL (gerada ao enviar, ou cole uma)">
-  <input type="file" accept="image/*" data-target="foto_instalada_url" onchange="uploadPhoto(event)">
+  <input type="file" accept="image/*" capture="environment" data-target="foto_instalada_url" onchange="uploadPhoto(event)">
   <img class="fotoPreview hidden" data-preview="foto_instalada_url">
 </div>
 <div class="field">
   <label>Foto da etiqueta</label>
   <input name="foto_etiqueta_url" placeholder="URL (gerada ao enviar, ou cole uma)">
-  <input type="file" accept="image/*" data-target="foto_etiqueta_url" onchange="uploadPhoto(event)">
+  <input type="file" accept="image/*" capture="environment" data-target="foto_etiqueta_url" onchange="uploadPhoto(event)">
   <img class="fotoPreview hidden" data-preview="foto_etiqueta_url">
 </div>
 </div></section>

@@ -729,7 +729,7 @@ async function wizCriar(){
       });
     }
   }
-  const r=await sb.from("luminarias").insert(rows).select("lumidna_id,public_code");
+  const r=await sb.from("luminarias").insert(rows).select("lumidna_id,public_code,numero_serie");
   if(r.error) return msg("Erro ao criar o pedido: "+r.error.message,false);
   wizUltimaCriacao=r.data;
   const ids=r.data.map(x=>x.lumidna_id);
@@ -753,10 +753,15 @@ function wizImprimirQR(){
     item.className="qrItem";
     const qrBox=document.createElement("div");
     item.appendChild(qrBox);
-    new QRCode(qrBox,{text:url,width:140,height:140});
+    new QRCode(qrBox,{text:url,width:130,height:130});
     const label=document.createElement("b");
     label.textContent=x.lumidna_id;
     item.appendChild(label);
+    const serie=document.createElement("div");
+    serie.className="small";
+    serie.style.marginTop="4px";
+    serie.textContent = x.numero_serie ? `Nº série: ${x.numero_serie}` : "Nº série: ________________";
+    item.appendChild(serie);
     grid.appendChild(item);
   });
   setTimeout(()=>window.print(),300);

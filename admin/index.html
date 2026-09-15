@@ -38,6 +38,15 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 .wizSteps{display:flex;gap:8px;font-size:13px;color:var(--muted);margin:14px 0 18px}
 .wizSteps b{color:var(--orange)}
 @media(max-width:900px){.grid,.grid3{grid-template-columns:1fr}.span2{grid-column:auto}}
+.qrGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.qrItem{text-align:center;padding:10px;border:1px dashed #ccc;border-radius:8px}
+.qrItem b{display:block;margin-top:6px;font-size:13px}
+@media print{
+  body *{visibility:hidden}
+  #printQRSheet, #printQRSheet *{visibility:visible}
+  #printQRSheet{position:absolute;top:0;left:0;width:100%}
+  #printQRSheet.hidden{display:block!important}
+}
 </style>
 </head>
 <body>
@@ -100,27 +109,42 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
   <div style="text-align:center;margin-top:10px"><a href="#" class="small" onclick="goScreen('catalogo');return false">Catálogo de modelos (cadastro avançado / importar CSV)</a></div>
 </div>
 
-<!-- ===== WIZARD: cadastrar peças novas ===== -->
+<!-- ===== WIZARD: cadastrar peças novas (pedido / carrinho) ===== -->
 <div id="screenWizard" class="hidden">
   <button type="button" class="linkback" onclick="goScreen('home')">‹ Início</button>
   <div class="wizSteps" id="wizSteps"></div>
 
   <div id="wz-1">
-    <h2 style="margin:0 0 12px">1. Qual o modelo?</h2>
-    <input id="wizModeloSearch" placeholder="Digite o nome, fabricante ou código do modelo" oninput="onWizSearchInput()" style="width:100%;margin-bottom:12px">
-    <div id="wizListaModelos"></div>
-    <div class="small" style="margin-top:14px"><a href="#" onclick="goScreen('avulsa');return false">Não achou o modelo? Cadastrar peça avulsa sem modelo</a></div>
-  </div>
-
-  <div id="wz-2" class="hidden">
-    <h2 style="margin:0 0 12px">2. Dados da obra</h2>
-    <div class="alert" id="wizModeloResumo" style="display:flex;align-items:center;gap:10px"></div>
+    <h2 style="margin:0 0 12px">1. Dados da obra</h2>
+    <div class="small" style="margin-bottom:12px">Isso vale pra todas as peças desse pedido — não precisa repetir.</div>
     <div class="grid">
       <div class="field"><label>Cliente (opcional)</label><input id="wiz_cliente"></div>
       <div class="field"><label>Obra / Empreendimento</label><input id="wiz_empreendimento"></div>
       <div class="field"><label>Edifício (opcional)</label><input id="wiz_edificio"></div>
-      <div class="field"><label>Quantas peças?</label><input type="number" id="wiz_qtd" min="1" value="1"></div>
     </div>
+    <div class="actions" style="margin-top:16px">
+      <button type="button" class="primary" onclick="wizIrParaCarrinho()">Próximo</button>
+    </div>
+  </div>
+
+  <div id="wz-2" class="hidden">
+    <h2 style="margin:0 0 12px">2. Montar o pedido</h2>
+    <div class="alert" id="wizObraResumo" style="margin-bottom:16px"></div>
+
+    <input id="wizModeloSearch" placeholder="Digite o nome, fabricante ou código do modelo" oninput="onWizSearchInput()" style="width:100%;margin-bottom:8px">
+    <div id="wizListaModelos"></div>
+    <div class="small" style="margin-top:10px"><a href="#" onclick="goScreen('avulsa');return false">Não achou o modelo? Cadastrar peça avulsa sem modelo</a></div>
+
+    <div class="small" style="margin:16px 0 6px"><a href="#" onclick="toggleWizColar();return false" id="wizColarToggle">Pedido grande? Colar lista (código, quantidade)</a></div>
+    <div id="wizColarBox" class="hidden">
+      <textarea id="wizColarTexto" style="width:100%;min-height:100px" placeholder="2283.AB.N, 50&#10;4781.FE.S, 30&#10;2785.AB.N, 20"></textarea>
+      <div class="actions" style="margin-top:8px"><button type="button" class="secondary" onclick="wizColarProcessar()">Adicionar essas linhas ao pedido</button></div>
+      <div id="wizColarMsg" class="small" style="margin-top:6px"></div>
+    </div>
+
+    <h2 style="margin:20px 0 10px;font-size:16px">Itens do pedido (<span id="wizCarrinhoTotal">0</span> peças)</h2>
+    <div id="wizCarrinhoList"><div class="small">Nenhum item adicionado ainda.</div></div>
+
     <div class="actions" style="margin-top:16px">
       <button type="button" class="secondary" onclick="wizStep(1)">Voltar</button>
       <button type="button" class="primary" onclick="wizRevisar()">Revisar e criar</button>
@@ -128,24 +152,27 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
   </div>
 
   <div id="wz-3" class="hidden">
-    <h2 style="margin:0 0 12px">3. Confirmar</h2>
+    <h2 style="margin:0 0 12px">3. Confirmar pedido</h2>
     <div class="card" id="wizResumo"></div>
     <div class="actions" style="margin-top:16px">
       <button type="button" class="secondary" onclick="wizStep(2)">Voltar</button>
-      <button type="button" class="primary" onclick="wizCriar()" style="font-size:16px;padding:12px 24px">✓ Criar as peças</button>
+      <button type="button" class="primary" onclick="wizCriar()" style="font-size:16px;padding:12px 24px">✓ Criar todo o pedido</button>
     </div>
   </div>
 
   <div id="wz-4" class="hidden" style="text-align:center;padding:24px 0">
     <div style="font-size:40px;color:var(--green)">✓</div>
     <p style="font-weight:700;font-size:18px;margin:12px 0 4px" id="wizSucessoTitulo"></p>
-    <p class="small" id="wizSucessoTexto"></p>
+    <div class="small" id="wizSucessoTexto" style="text-align:left;max-width:420px;margin:0 auto"></div>
     <div class="actions" style="justify-content:center;margin-top:16px">
       <button type="button" class="secondary" onclick="goScreen('home')">Início</button>
-      <button type="button" class="primary" onclick="goScreen('search')">Ver peças criadas</button>
+      <button type="button" class="primary" onclick="wizImprimirQR()">🖨 Imprimir QR de todo o pedido</button>
     </div>
   </div>
 </div>
+
+<!-- ===== IMPRESSÃO DE QR (só aparece no papel) ===== -->
+<div id="printQRSheet" class="hidden"></div>
 
 <!-- ===== AVULSA: cadastro manual sem modelo ===== -->
 <div id="screenAvulsa" class="hidden">
@@ -375,6 +402,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 
 <script src="../assets/supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script>
 const sb=supabase.createClient(LUMIDNA_SUPABASE_URL,LUMIDNA_SUPABASE_KEY);
 let LID=null, luminariaDbId=null, currentUserEmail=null, originalData=null;
@@ -405,7 +433,6 @@ function goScreen(name){
 }
 
 // ---- Catálogo de Modelos ----
-let wizModelo=null;
 
 async function populateModeloPicker(){
   const r=await sb.from("modelos").select("id,fabricante,codigo").order("fabricante").order("codigo").limit(1000);
@@ -555,11 +582,35 @@ function buildLumidnaId(modelo,num){
   return `LD-${fabCode(modelo.fabricante)}-${modelBase(modelo.codigo)}-${String(num).padStart(6,"0")}`;
 }
 
-// ---- Assistente: cadastrar peças novas ----
+// ---- Assistente: cadastrar peças novas (pedido / carrinho) ----
+let wizObra=null, wizCarrinho=[], wizPendingModeloId=null, wizUltimaCriacao=[];
+
 function wizStep(n){
   ["wz-1","wz-2","wz-3","wz-4"].forEach((id,i)=>q("#"+id).classList.toggle("hidden",i!==n-1));
-  q("#wizSteps").innerHTML=["Modelo","Obra","Confirmar"].map((l,i)=>(i===n-1?`<b>${i+1}. ${l}</b>`:`${i+1}. ${l}`)).join("  →  ");
-  if(n===1){wizModelo=null;q("#wizModeloSearch").value="";wizFiltrarModelos()}
+  q("#wizSteps").innerHTML=["Obra","Pedido","Confirmar"].map((l,i)=>(i===n-1?`<b>${i+1}. ${l}</b>`:`${i+1}. ${l}`)).join("  →  ");
+  if(n===1){
+    wizObra=null;wizCarrinho=[];
+    q("#wiz_cliente").value="";q("#wiz_empreendimento").value="";q("#wiz_edificio").value="";
+  }
+}
+
+function wizIrParaCarrinho(){
+  wizObra={
+    cliente:norm(q("#wiz_cliente").value.trim()),
+    empreendimento:norm(q("#wiz_empreendimento").value.trim()),
+    edificio:norm(q("#wiz_edificio").value.trim())
+  };
+  q("#wizObraResumo").innerHTML=`Obra: <b>${esc(wizObra.empreendimento)||"—"}</b>${wizObra.cliente?" · "+esc(wizObra.cliente):""}${wizObra.edificio?" · "+esc(wizObra.edificio):""}`;
+  q("#wizModeloSearch").value="";
+  wizFiltrarModelos();
+  renderWizCarrinho();
+  wizStep(2);
+  if(wizPendingModeloId){const id=wizPendingModeloId;wizPendingModeloId=null;wizAdicionarAoCarrinho(id)}
+}
+
+function startWizardWithModelo(id){
+  wizPendingModeloId=id;
+  goScreen("wizard");
 }
 
 let wizSearchTimer=null;
@@ -573,20 +624,65 @@ async function wizFiltrarModelos(){
   const r=await query;
   if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
   const rows=r.data||[];
-  box.innerHTML=rows.length?rows.map(m=>`<button type="button" class="bigOption" style="padding:10px 14px" onclick="wizEscolherModelo(${m.id})">${m.imagem_url?`<img src="${esc(m.imagem_url)}" alt="" style="width:36px;height:36px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:`<span class="ic" style="font-size:20px">💡</span>`}<span><b style="font-size:14px">${esc(m.fabricante)||"?"} — ${esc(m.codigo)}</b><small>${esc(m.descricao)||""}</small></span></button>`).join(""):"<div class='small'>Nenhum modelo encontrado. Tente outro termo.</div>";
+  box.innerHTML=rows.length?rows.map(m=>`<button type="button" class="bigOption" style="padding:10px 14px" onclick="wizAdicionarAoCarrinho(${m.id})">${m.imagem_url?`<img src="${esc(m.imagem_url)}" alt="" style="width:36px;height:36px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:`<span class="ic" style="font-size:20px">💡</span>`}<span><b style="font-size:14px">${esc(m.fabricante)||"?"} — ${esc(m.codigo)}</b><small>${esc(m.descricao)||""}</small></span></button>`).join(""):"<div class='small'>Nenhum modelo encontrado. Tente outro termo.</div>";
 }
 
-async function wizEscolherModelo(id){
-  const r=await sb.from("modelos").select("*").eq("id",id).single();
+async function wizAdicionarAoCarrinho(modeloId){
+  const existing=wizCarrinho.find(x=>x.modelo.id===modeloId);
+  if(existing){existing.qty++;renderWizCarrinho();return}
+  const r=await sb.from("modelos").select("*").eq("id",modeloId).single();
   if(r.error) return msg(r.error.message,false);
-  wizModelo=r.data;
-  q("#wizModeloResumo").innerHTML=`${wizModelo.imagem_url?`<img src="${esc(wizModelo.imagem_url)}" alt="" style="width:40px;height:40px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:""}<span>Modelo escolhido: <b>${esc(wizModelo.fabricante)||""} — ${esc(wizModelo.codigo)}</b></span>`;
-  wizStep(2);
+  wizCarrinho.push({modelo:r.data,qty:1});
+  renderWizCarrinho();
 }
 
-function startWizardWithModelo(id){
-  goScreen("wizard");
-  wizEscolherModelo(id);
+function wizRemoverItem(idx){wizCarrinho.splice(idx,1);renderWizCarrinho()}
+function wizAtualizarQtd(idx,val){
+  const n=parseInt(val,10);
+  wizCarrinho[idx].qty=(n&&n>0)?n:1;
+  q("#wizCarrinhoTotal").textContent=wizCarrinho.reduce((s,x)=>s+x.qty,0);
+}
+
+function renderWizCarrinho(){
+  const box=q("#wizCarrinhoList");
+  q("#wizCarrinhoTotal").textContent=wizCarrinho.reduce((s,x)=>s+x.qty,0);
+  box.innerHTML = wizCarrinho.length ? wizCarrinho.map((item,idx)=>`
+    <div class="card" style="display:flex;align-items:center;gap:12px;padding:12px 14px">
+      ${item.modelo.imagem_url?`<img src="${esc(item.modelo.imagem_url)}" alt="" style="width:36px;height:36px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:""}
+      <div style="flex:1"><b>${esc(item.modelo.fabricante)||""} — ${esc(item.modelo.codigo)}</b></div>
+      <input type="number" min="1" value="${item.qty}" style="width:80px" onchange="wizAtualizarQtd(${idx},this.value)">
+      <button type="button" class="secondary" onclick="wizRemoverItem(${idx})">Remover</button>
+    </div>`).join("") : "<div class='small'>Nenhum item adicionado ainda.</div>";
+}
+
+function toggleWizColar(){
+  const box=q("#wizColarBox");
+  box.classList.toggle("hidden");
+  q("#wizColarToggle").textContent=box.classList.contains("hidden")?"Pedido grande? Colar lista (código, quantidade)":"Esconder colagem de lista";
+}
+
+async function wizColarProcessar(){
+  const texto=q("#wizColarTexto").value.trim();
+  const msgBox=q("#wizColarMsg");
+  if(!texto) return;
+  const linhas=texto.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  let achados=0, naoAchados=[];
+  for(const linha of linhas){
+    const [codigoRaw,qtdRaw]=linha.split(",").map(s=>s.trim());
+    if(!codigoRaw) continue;
+    const qty=parseInt(qtdRaw,10)||1;
+    const r=await sb.from("modelos").select("*").ilike("codigo",codigoRaw).limit(1);
+    if(r.error||!r.data||!r.data.length){naoAchados.push(codigoRaw);continue}
+    const modelo=r.data[0];
+    const existing=wizCarrinho.find(x=>x.modelo.id===modelo.id);
+    if(existing) existing.qty+=qty; else wizCarrinho.push({modelo,qty});
+    achados++;
+  }
+  renderWizCarrinho();
+  q("#wizColarTexto").value="";
+  msgBox.innerHTML = achados
+    ? `${achados} modelo(s) adicionado(s).${naoAchados.length?` Não encontrado(s): ${naoAchados.map(esc).join(", ")}`:""}`
+    : `Nenhum código reconhecido.${naoAchados.length?` Não encontrado(s): ${naoAchados.map(esc).join(", ")}`:""}`;
 }
 
 function fabCode(fabricante){
@@ -600,48 +696,61 @@ function buildLumidnaId(modelo,num){
   return `LD-${fabCode(modelo.fabricante)}-${modelBase(modelo.codigo)}-${String(num).padStart(6,"0")}`;
 }
 
-let wizNextNum=1, wizQty=1, wizShared=null;
-
 async function wizRevisar(){
-  if(!wizModelo) return msg("Escolha um modelo primeiro.",false);
-  const qty=parseInt(q("#wiz_qtd").value,10);
-  if(!qty||qty<1) return msg("Informe uma quantidade válida.",false);
-  wizShared={
-    cliente:norm(q("#wiz_cliente").value.trim()),
-    empreendimento:norm(q("#wiz_empreendimento").value.trim()),
-    edificio:norm(q("#wiz_edificio").value.trim())
-  };
-  wizQty=qty;
-  const prefix=`LD-${fabCode(wizModelo.fabricante)}-${modelBase(wizModelo.codigo)}-`;
-  const r=await sb.from("luminarias").select("lumidna_id").ilike("lumidna_id",prefix+"%").order("lumidna_id",{ascending:false}).limit(1);
-  if(r.error) return msg("Erro: "+r.error.message,false);
-  const last=r.data&&r.data[0]?parseInt(r.data[0].lumidna_id.slice(prefix.length),10):0;
-  wizNextNum=(last||0)+1;
-  const firstId=buildLumidnaId(wizModelo,wizNextNum), lastId=buildLumidnaId(wizModelo,wizNextNum+qty-1);
-  q("#wizResumo").innerHTML=`<b>${qty}</b> peça(s) do modelo <b>${esc(wizModelo.fabricante)} — ${esc(wizModelo.codigo)}</b>${wizShared.empreendimento?` para <b>${esc(wizShared.empreendimento)}</b>`:""}.<br><br>IDs: <b>${firstId}</b>${qty>1?` até <b>${lastId}</b>`:""}`;
+  if(!wizCarrinho.length) return msg("Adicione pelo menos um modelo ao pedido.",false);
+  let html="";
+  let total=0;
+  for(const item of wizCarrinho){
+    const prefix=`LD-${fabCode(item.modelo.fabricante)}-${modelBase(item.modelo.codigo)}-`;
+    const r=await sb.from("luminarias").select("lumidna_id").ilike("lumidna_id",prefix+"%").order("lumidna_id",{ascending:false}).limit(1);
+    if(r.error) return msg("Erro: "+r.error.message,false);
+    const last=r.data&&r.data[0]?parseInt(r.data[0].lumidna_id.slice(prefix.length),10):0;
+    item.startNum=(last||0)+1;
+    const firstId=buildLumidnaId(item.modelo,item.startNum), lastId=buildLumidnaId(item.modelo,item.startNum+item.qty-1);
+    total+=item.qty;
+    html+=`<div style="margin-bottom:10px"><b>${item.qty}×</b> ${esc(item.modelo.fabricante)} — ${esc(item.modelo.codigo)}<br><span class="small">${firstId}${item.qty>1?" até "+lastId:""}</span></div>`;
+  }
+  q("#wizResumo").innerHTML=`<div class="small" style="margin-bottom:10px">Obra: <b>${esc(wizObra.empreendimento)||"—"}</b>${wizObra.cliente?" · "+esc(wizObra.cliente):""}</div>${html}<div style="margin-top:6px"><b>Total: ${total} peça(s)</b></div>`;
   wizStep(3);
 }
 
 async function wizCriar(){
   const rows=[];
-  for(let i=0;i<wizQty;i++){
-    const num=wizNextNum+i;
-    rows.push({
-      lumidna_id:buildLumidnaId(wizModelo,num),
-      modelo_id:wizModelo.id, modelo:wizModelo.codigo, fabricante:wizModelo.fabricante,
-      potencia_w:wizModelo.potencia_w, cct_k:wizModelo.cct_k, irc:wizModelo.irc,
-      fluxo_lm:wizModelo.fluxo_lm, facho_graus:wizModelo.facho_graus,
-      ip:wizModelo.ip, ik:wizModelo.ik,
-      status:"Ativa", criticidade:"Média", ...wizShared
-    });
+  for(const item of wizCarrinho){
+    for(let i=0;i<item.qty;i++){
+      const num=item.startNum+i;
+      rows.push({
+        lumidna_id:buildLumidnaId(item.modelo,num),
+        modelo_id:item.modelo.id, modelo:item.modelo.codigo, fabricante:item.modelo.fabricante,
+        potencia_w:item.modelo.potencia_w, cct_k:item.modelo.cct_k, irc:item.modelo.irc,
+        fluxo_lm:item.modelo.fluxo_lm, facho_graus:item.modelo.facho_graus,
+        ip:item.modelo.ip, ik:item.modelo.ik,
+        status:"Ativa", criticidade:"Média", ...wizObra
+      });
+    }
   }
-  const r=await sb.from("luminarias").insert(rows).select("lumidna_id");
-  if(r.error) return msg("Erro ao criar as peças: "+r.error.message,false);
+  const r=await sb.from("luminarias").insert(rows).select("lumidna_id,public_code");
+  if(r.error) return msg("Erro ao criar o pedido: "+r.error.message,false);
+  wizUltimaCriacao=r.data;
   const ids=r.data.map(x=>x.lumidna_id);
   q("#wizSucessoTitulo").textContent=`${ids.length} peça(s) criada(s)`;
-  q("#wizSucessoTexto").textContent=ids.length>1?`De ${ids[0]} até ${ids[ids.length-1]}.`:ids[0];
-  ["wz-1","wz-2","wz-3","wz-4"].forEach((id,i)=>q("#"+id).classList.toggle("hidden",i!==3));
+  const porModelo=wizCarrinho.map(item=>`${item.qty}× ${esc(item.modelo.fabricante)} — ${esc(item.modelo.codigo)}`).join("<br>");
+  q("#wizSucessoTexto").innerHTML=`${porModelo}<br><br>De <b>${ids[0]}</b> até <b>${ids[ids.length-1]}</b>.`;
+  wizStep(4);
   q("#wizSteps").innerHTML="";
+}
+
+async function wizImprimirQR(){
+  if(!wizUltimaCriacao.length) return;
+  const sheet=q("#printQRSheet");
+  const cells=await Promise.all(wizUltimaCriacao.map(async x=>{
+    const url=`${LUMIDNA_SITE_BASE}/ativo/?c=${x.public_code}`;
+    const canvas=document.createElement("canvas");
+    await QRCode.toCanvas(canvas,url,{width:140,margin:1});
+    return `<div class="qrItem">${canvas.outerHTML}<b>${esc(x.lumidna_id)}</b></div>`;
+  }));
+  sheet.innerHTML=`<div class="qrGrid">${cells.join("")}</div>`;
+  window.print();
 }
 
 // ---- Alerta de garantias vencendo ----

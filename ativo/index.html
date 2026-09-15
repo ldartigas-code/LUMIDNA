@@ -51,6 +51,9 @@ th{color:var(--muted);font-weight:600}
       <div class="field"><label>Serviço realizado</label><textarea id="pm_servico"></textarea></div>
       <div class="field"><label>Componente removido (se houve troca)</label><select id="pm_comp_removido"><option value="">— não houve troca —</option><option>Luminária inteira</option><option>Driver</option><option>LED</option><option>Óptica</option></select></div>
       <div class="field"><label>Componente instalado</label><select id="pm_comp_instalado_tipo" onchange="onCompInstaladoChange()"><option value="">— não houve troca —</option><option value="Original">Original (igual ao que já tinha)</option><option value="Homologado">Homologado LumiDNA</option><option value="Outro">Outro modelo</option></select></div>
+      <div id="homologadoCompFields" class="hidden">
+        <div class="field"><label>Código do homologado instalado</label><input id="pm_comp_homologado_codigo" placeholder="ex: LF-HOM-0300BU"></div>
+      </div>
       <div id="outroCompFields" class="hidden">
         <div class="field"><label>Qual modelo foi instalado</label><input id="pm_comp_modelo" placeholder="ex: LF-GIRO13YS0400BU"></div>
         <div class="field"><label>Fabricante</label><input id="pm_comp_fabricante"></div>
@@ -173,6 +176,7 @@ function hideManutForm(){
 function onCompInstaladoChange(){
   const v=document.getElementById("pm_comp_instalado_tipo").value;
   document.getElementById("outroCompFields").classList.toggle("hidden", v!=="Outro");
+  document.getElementById("homologadoCompFields").classList.toggle("hidden", v!=="Homologado");
 }
 
 async function enviarManutencao(){
@@ -198,8 +202,14 @@ async function enviarManutencao(){
     const up=await sb.storage.from("evidencias").upload(path,file);
     if(up.error){msgBox.innerHTML=`<div class="small" style="color:var(--red)">Erro ao enviar foto: ${esc(up.error.message)}</div>`;return}
     compFotoUrl=sb.storage.from("evidencias").getPublicUrl(path).data.publicUrl;
-  }else if(compInstaladoTipo==="Original"||compInstaladoTipo==="Homologado"){
-    compModelo=compInstaladoTipo;
+  }else if(compInstaladoTipo==="Homologado"){
+    compModelo=document.getElementById("pm_comp_homologado_codigo").value.trim();
+    if(!compModelo){
+      msgBox.innerHTML=`<div class="small" style="color:var(--red)">Informe o código do homologado instalado.</div>`;
+      return;
+    }
+  }else if(compInstaladoTipo==="Original"){
+    compModelo="Original";
   }
 
   const p={

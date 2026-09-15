@@ -324,6 +324,10 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
   <div class="small" style="margin-bottom:12px">Manutenções enviadas por técnicos ou fornecedores pela página pública. Nada aqui vira registro oficial até você aprovar.</div>
   <div id="aprovacoesList"></div>
 
+  <h2 style="margin:24px 0 12px">Aprovadas recentemente</h2>
+  <div class="small" style="margin-bottom:12px">Use "Gerar e-mail" pra avisar o cliente sobre a manutenção aprovada.</div>
+  <div id="aprovadasList"></div>
+
   <h2 style="margin:24px 0 12px">Rejeitadas recentemente</h2>
   <div class="small" style="margin-bottom:12px">Fica anotado aqui mesmo depois de rejeitado — o componente proposto não foi instalado oficialmente, mas o envio continua registrado. Use "Gerar e-mail" pra avisar o cliente.</div>
   <div id="rejeitadasList"></div>
@@ -397,7 +401,7 @@ function goScreen(name){
   q("#msg").innerHTML="";
   if(name==="wizard") wizStep(1);
   if(name==="catalogo") q("#modelosList").innerHTML="<div class='small'>Digite algo acima pra buscar.</div>";
-  if(name==="aprovacoes"){loadPendentes();loadRejeitadas();}
+  if(name==="aprovacoes"){loadPendentes();loadAprovadas();loadRejeitadas();}
 }
 
 // ---- Catálogo de Modelos ----
@@ -906,7 +910,7 @@ async function aprovarPendente(id){
 
   await sb.from("manutencoes_pendentes").update({status:"Aprovada",revisado_por:currentUserEmail,revisado_em:new Date().toISOString()}).eq("id",id);
   msg("Manutenção aprovada e registrada no histórico oficial da peça.");
-  loadPendentes();checkPendentesBadge();
+  loadPendentes();loadAprovadas();checkPendentesBadge();
 }
 
 async function rejeitarPendente(id){
@@ -917,49 +921,64 @@ async function rejeitarPendente(id){
   loadPendentes();loadRejeitadas();checkPendentesBadge();
 }
 
+function renderDecididaCard(p,tipo){
+  const cor=tipo==="Aprovada"?{bg:"#e9f7ee",fg:"#257944"}:{bg:"#fdecec",fg:"#a33"};
+  return `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:12px">
+        <div>
+          <b>${esc(p.luminarias?.lumidna_id)}</b> — ${esc(p.luminarias?.modelo)||"—"} ${p.luminarias?.cliente?"· "+esc(p.luminarias.cliente):""}
+          <div class="small">Enviado por <b>${esc(p.responsavel)}</b> (${esc(p.empresa)}) em ${new Date(p.criado_em).toLocaleString('pt-BR')} — ${tipo.toLowerCase()} em ${p.revisado_em?new Date(p.revisado_em).toLocaleString('pt-BR'):"—"}</div>
+          ${p.motivo_rejeicao?`<div class="small">Motivo: ${esc(p.motivo_rejeicao)}</div>`:""}
+        </div>
+        <span class="pill" style="background:${cor.bg};color:${cor.fg}">${tipo}</span>
+      </div>
+      <div class="grid" style="margin-top:10px">
+        ${p.componente_removido?`<div class="field"><label>Componente removido</label><div class="small">${esc(p.componente_removido)}</div></div>`:""}
+        ${p.componente_instalado_tipo?`<div class="field"><label>Componente instalado${tipo==="Rejeitada"?" (proposto)":""}</label><div class="small">${esc(p.componente_instalado_tipo)}${p.componente_instalado?" — "+esc(p.componente_instalado):""}</div></div>`:""}
+      </div>
+      <div class="actions" style="margin-top:12px">
+        <button type="button" class="secondary" onclick="gerarEmailManutencao(${p.id})">✉ Gerar e-mail pro cliente</button>
+      </div>
+    </div>`;
+}
+
+async function loadAprovadas(){
+  const box=q("#aprovadasList");
+  const r=await sb.from("manutencoes_pendentes").select("*,luminarias(lumidna_id,modelo,cliente,cliente_email)").eq("status","Aprovada").order("revisado_em",{ascending:false}).limit(30);
+  if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
+  const rows=r.data||[];
+  box.innerHTML = rows.length ? rows.map(p=>renderDecididaCard(p,"Aprovada")).join("") : "<div class='small'>Nenhuma aprovação registrada ainda.</div>";
+}
+
 async function loadRejeitadas(){
   const box=q("#rejeitadasList");
   const r=await sb.from("manutencoes_pendentes").select("*,luminarias(lumidna_id,modelo,cliente,cliente_email)").eq("status","Rejeitada").order("revisado_em",{ascending:false}).limit(30);
   if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
   const rows=r.data||[];
-  box.innerHTML = rows.length ? rows.map(p=>`
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:start;gap:12px">
-        <div>
-          <b>${esc(p.luminarias?.lumidna_id)}</b> — ${esc(p.luminarias?.modelo)||"—"} ${p.luminarias?.cliente?"· "+esc(p.luminarias.cliente):""}
-          <div class="small">Enviado por <b>${esc(p.responsavel)}</b> (${esc(p.empresa)}) em ${new Date(p.criado_em).toLocaleString('pt-BR')} — rejeitado em ${p.revisado_em?new Date(p.revisado_em).toLocaleString('pt-BR'):"—"}</div>
-          ${p.motivo_rejeicao?`<div class="small">Motivo: ${esc(p.motivo_rejeicao)}</div>`:""}
-        </div>
-        <span class="pill" style="background:#fdecec;color:#a33">Rejeitada</span>
-      </div>
-      <div class="grid" style="margin-top:10px">
-        ${p.componente_removido?`<div class="field"><label>Componente removido</label><div class="small">${esc(p.componente_removido)}</div></div>`:""}
-        ${p.componente_instalado_tipo?`<div class="field"><label>Componente instalado (proposto)</label><div class="small">${esc(p.componente_instalado_tipo)}${p.componente_instalado?" — "+esc(p.componente_instalado):""}</div></div>`:""}
-      </div>
-      <div class="actions" style="margin-top:12px">
-        <button type="button" class="secondary" onclick="gerarEmailRejeicao(${p.id})">✉ Gerar e-mail pro cliente</button>
-      </div>
-    </div>`).join("") : "<div class='small'>Nenhuma rejeição registrada ainda.</div>";
+  box.innerHTML = rows.length ? rows.map(p=>renderDecididaCard(p,"Rejeitada")).join("") : "<div class='small'>Nenhuma rejeição registrada ainda.</div>";
 }
 
-function gerarEmailRejeicao(id){
+function gerarEmailManutencao(id){
   sb.from("manutencoes_pendentes").select("*,luminarias(lumidna_id,cliente,cliente_email,empreendimento,edificio)").eq("id",id).single().then(r=>{
     if(r.error) return msg("Erro: "+r.error.message,false);
     const p=r.data;
     const lum=p.luminarias||{};
-    const assunto=`LumiDNA — alteração NÃO aprovada na luminária ${lum.lumidna_id||""}`;
+    const local=lum.empreendimento?" ("+lum.empreendimento+(lum.edificio?" — "+lum.edificio:"")+")":"";
+    const aprovado=p.status==="Aprovada";
+    const assunto=`LumiDNA — manutenção ${aprovado?"aprovada":"NÃO aprovada"} na luminária ${lum.lumidna_id||""}`;
     const corpo=`Prezado(a) ${lum.cliente||"cliente"},
 
-Foi enviado um pedido de manutenção para a luminária ${lum.lumidna_id||""}${lum.empreendimento?" ("+lum.empreendimento+(lum.edificio?" — "+lum.edificio:"")+")":""}, mas a LumiDNA NÃO aprovou a alteração proposta.
+${aprovado
+  ? `Foi realizada e aprovada pela LumiDNA uma manutenção na luminária ${lum.lumidna_id||""}${local}. A alteração já consta no histórico oficial da peça.`
+  : `Foi enviado um pedido de manutenção para a luminária ${lum.lumidna_id||""}${local}, mas a LumiDNA NÃO aprovou a alteração proposta.`}
 
-Detalhes do que foi enviado:
+Detalhes do envio:
 - Enviado por: ${p.responsavel||"—"} (${p.empresa||"—"})
 - Data do envio: ${new Date(p.criado_em).toLocaleString('pt-BR')}
 - Componente removido: ${p.componente_removido||"—"}
-- Componente proposto para instalação: ${p.componente_instalado_tipo||"—"}${p.componente_instalado?" — "+p.componente_instalado:""}
-- Motivo da não aprovação: ${p.motivo_rejeicao||"não homologado / não avaliado como equivalente seguro"}
-
-Recomendamos verificar a situação atual dessa luminária e, se necessário, entrar em contato com a LumiDNA antes de qualquer nova intervenção.
+- Componente ${aprovado?"instalado":"proposto para instalação"}: ${p.componente_instalado_tipo||"—"}${p.componente_instalado?" — "+p.componente_instalado:""}
+${aprovado?"":`- Motivo da não aprovação: ${p.motivo_rejeicao||"não homologado / não avaliado como equivalente seguro"}\n\nRecomendamos verificar a situação atual dessa luminária e, se necessário, entrar em contato com a LumiDNA antes de qualquer nova intervenção.`}
 
 Atenciosamente,
 LumiDNA`;

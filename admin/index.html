@@ -94,6 +94,10 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 
 <!-- ===== HOME ===== -->
 <div id="screenHome">
+  <button type="button" class="bigOption" onclick="goScreen('obras')">
+    <span class="ic">📁</span>
+    <span><b>Obras</b><small>Ver cada obra separadamente: peças, aprovações e alertas dela</small></span>
+  </button>
   <button type="button" class="bigOption" onclick="goScreen('wizard')">
     <span class="ic">➕</span>
     <span><b>Cadastrar peças novas</b><small>Gerar uma ou várias luminárias para uma obra</small></span>
@@ -109,24 +113,67 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
   <div style="text-align:center;margin-top:10px"><a href="#" class="small" onclick="goScreen('catalogo');return false">Catálogo de modelos (cadastro avançado / importar CSV)</a></div>
 </div>
 
+<!-- ===== OBRAS: lista ===== -->
+<div id="screenObras" class="hidden">
+  <button type="button" class="linkback" onclick="goScreen('home')">‹ Início</button>
+  <h2 style="margin:14px 0 12px">Obras</h2>
+  <input id="obrasSearch" placeholder="Buscar por nome da obra ou cliente" oninput="onObrasSearchInput()" style="width:100%;margin-bottom:12px">
+  <div id="obrasList"></div>
+  <div class="card" style="margin-top:16px">
+    <h2 style="margin:0 0 12px;font-size:16px">+ Nova obra</h2>
+    <div class="grid">
+      <div class="field"><label>Nome da obra / empreendimento</label><input id="obra_nome"></div>
+      <div class="field"><label>Cliente (opcional)</label><input id="obra_cliente"></div>
+      <div class="field"><label>Tensão da instalação</label><select id="obra_tensao"><option value="">— selecione —</option><option>127V</option><option>220V</option></select></div>
+      <div class="field"><label>Tem automação?</label><select id="obra_automacao" onchange="onNovaObraAutomacaoChange()"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
+      <div class="field hidden" id="obra_protocolo_field"><label>Protocolo</label><select id="obra_protocolo"><option>DALI</option><option>TRIAC</option><option>0-10V</option></select></div>
+    </div>
+    <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="criarObra()">Criar obra</button></div>
+  </div>
+</div>
+
+<!-- ===== OBRA: detalhe ===== -->
+<div id="screenObraDetalhe" class="hidden">
+  <button type="button" class="linkback" onclick="goScreen('obras')">‹ Obras</button>
+  <div class="card" id="obraDetalheHeader" style="margin-top:14px"></div>
+  <div class="actions" style="margin:16px 0"><button type="button" class="primary" onclick="cadastrarMaisNestaObra()" style="font-size:16px;padding:12px 24px">➕ Cadastrar mais peças nesta obra</button></div>
+  <h2 style="margin:20px 0 10px;font-size:16px">Peças desta obra</h2>
+  <div id="obraPecasList"></div>
+  <h2 style="margin:20px 0 10px;font-size:16px">Aprovações pendentes desta obra</h2>
+  <div id="obraPendentesList"></div>
+</div>
+
 <!-- ===== WIZARD: cadastrar peças novas (pedido / carrinho) ===== -->
 <div id="screenWizard" class="hidden">
   <button type="button" class="linkback" onclick="goScreen('home')">‹ Início</button>
   <div class="wizSteps" id="wizSteps"></div>
 
   <div id="wz-1">
-    <h2 style="margin:0 0 12px">1. Dados da obra</h2>
-    <div class="small" style="margin-bottom:12px">Isso vale pra todas as peças desse pedido — não precisa repetir.</div>
-    <div class="grid">
-      <div class="field"><label>Cliente (opcional)</label><input id="wiz_cliente"></div>
-      <div class="field"><label>Obra / Empreendimento</label><input id="wiz_empreendimento"></div>
-      <div class="field"><label>Edifício (opcional)</label><input id="wiz_edificio"></div>
-      <div class="field"><label>Tensão da instalação</label><select id="wiz_tensao"><option value="">— selecione —</option><option>127V</option><option>220V</option></select></div>
-      <div class="field"><label>Tem automação?</label><select id="wiz_automacao" onchange="onWizAutomacaoChange()"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
-      <div class="field hidden" id="wiz_protocolo_field"><label>Protocolo</label><select id="wiz_protocolo"><option>DALI</option><option>TRIAC</option><option>0-10V</option></select></div>
+    <h2 style="margin:0 0 12px">1. Qual obra?</h2>
+
+    <div id="wizObraBusca">
+      <input id="wizObraSearch" placeholder="Buscar obra pelo nome ou cliente" oninput="onWizObraSearchInput()" style="width:100%;margin-bottom:10px">
+      <div id="wizObraLista"></div>
+      <div class="small" style="margin-top:10px"><a href="#" onclick="toggleWizNovaObra();return false" id="wizNovaObraToggle">+ Criar nova obra</a></div>
+      <div id="wizNovaObraFields" class="hidden" style="margin-top:12px">
+        <div class="grid">
+          <div class="field"><label>Nome da obra / empreendimento</label><input id="wiz_empreendimento"></div>
+          <div class="field"><label>Cliente (opcional)</label><input id="wiz_cliente"></div>
+          <div class="field"><label>Tensão da instalação</label><select id="wiz_tensao"><option value="">— selecione —</option><option>127V</option><option>220V</option></select></div>
+          <div class="field"><label>Tem automação?</label><select id="wiz_automacao" onchange="onWizAutomacaoChange()"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
+          <div class="field hidden" id="wiz_protocolo_field"><label>Protocolo</label><select id="wiz_protocolo"><option>DALI</option><option>TRIAC</option><option>0-10V</option></select></div>
+        </div>
+        <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="wizCriarNovaObra()">Criar e usar esta obra</button></div>
+      </div>
     </div>
-    <div class="actions" style="margin-top:16px">
-      <button type="button" class="primary" onclick="wizIrParaCarrinho()">Próximo</button>
+
+    <div id="wizObraEscolhida" class="hidden">
+      <div class="alert" id="wizObraEscolhidaResumo"></div>
+      <div class="small" style="margin-bottom:10px"><a href="#" onclick="wizTrocarObra();return false">trocar obra</a></div>
+      <div class="field"><label>Edifício (opcional — pode mudar dentro da mesma obra)</label><input id="wiz_edificio"></div>
+      <div class="actions" style="margin-top:16px">
+        <button type="button" class="primary" onclick="wizIrParaCarrinho()">Próximo</button>
+      </div>
     </div>
   </div>
 
@@ -169,6 +216,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
     <div class="small" id="wizSucessoTexto" style="text-align:left;max-width:420px;margin:0 auto"></div>
     <div class="actions" style="justify-content:center;margin-top:16px">
       <button type="button" class="secondary" onclick="goScreen('home')">Início</button>
+      <button type="button" class="secondary" onclick="abrirObra(wizObraId)">‹ Voltar pra obra</button>
       <button type="button" class="primary" onclick="wizImprimirQR()">🖨 Imprimir QR de todo o pedido</button>
     </div>
   </div>
@@ -429,13 +477,14 @@ let appInitialized=false;
 function showApp(user){currentUserEmail=user.email;q("#loginScreen").classList.add("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.remove("hidden");q("#userEmail").textContent=user.email;q("#connStatus").textContent="Supabase conectado";checkWarrantyAlerts();checkPendentesBadge();populateModeloPicker();if(!appInitialized){appInitialized=true;goScreen("home")}}
 
 // ---- Navegação entre telas ----
-const SCREENS=["home","wizard","avulsa","search","detail","aprovacoes","catalogo"];
+const SCREENS=["home","obras","obraDetalhe","wizard","avulsa","search","detail","aprovacoes","catalogo"];
 function goScreen(name){
   SCREENS.forEach(s=>q("#screen"+s[0].toUpperCase()+s.slice(1)).classList.toggle("hidden",s!==name));
   q("#msg").innerHTML="";
-  if(name==="wizard") wizStep(1);
+  if(name==="wizard" && !wizPularParaCarrinho) wizStep(1);
   if(name==="catalogo") q("#modelosList").innerHTML="<div class='small'>Digite algo acima pra buscar.</div>";
   if(name==="aprovacoes"){loadPendentes();loadAprovadas();loadRejeitadas();}
+  if(name==="obras"){q("#obrasSearch").value="";loadObras();}
 }
 
 // ---- Catálogo de Modelos ----
@@ -589,15 +638,20 @@ function buildLumidnaId(modelo,num){
 }
 
 // ---- Assistente: cadastrar peças novas (pedido / carrinho) ----
-let wizObra=null, wizCarrinho=[], wizPendingModeloId=null, wizUltimaCriacao=[];
+let wizObra=null, wizObraId=null, wizCarrinho=[], wizPendingModeloId=null, wizUltimaCriacao=[], wizPularParaCarrinho=false;
 
 function wizStep(n){
   ["wz-1","wz-2","wz-3","wz-4"].forEach((id,i)=>q("#"+id).classList.toggle("hidden",i!==n-1));
   q("#wizSteps").innerHTML=["Obra","Pedido","Confirmar"].map((l,i)=>(i===n-1?`<b>${i+1}. ${l}</b>`:`${i+1}. ${l}`)).join("  →  ");
   if(n===1){
-    wizObra=null;wizCarrinho=[];
+    wizObra=null;wizObraId=null;wizCarrinho=[];
+    q("#wizObraSearch").value="";
+    q("#wizObraBusca").classList.remove("hidden");
+    q("#wizObraEscolhida").classList.add("hidden");
+    q("#wizNovaObraFields").classList.add("hidden");
     q("#wiz_cliente").value="";q("#wiz_empreendimento").value="";q("#wiz_edificio").value="";
     q("#wiz_tensao").value="";q("#wiz_automacao").value="nao";q("#wiz_protocolo_field").classList.add("hidden");
+    wizFiltrarObras();
   }
 }
 
@@ -605,22 +659,70 @@ function onWizAutomacaoChange(){
   q("#wiz_protocolo_field").classList.toggle("hidden",q("#wiz_automacao").value!=="sim");
 }
 
-function wizIrParaCarrinho(){
+let wizObraSearchTimer=null;
+function onWizObraSearchInput(){clearTimeout(wizObraSearchTimer);wizObraSearchTimer=setTimeout(wizFiltrarObras,300)}
+
+async function wizFiltrarObras(){
+  const term=q("#wizObraSearch").value.trim();
+  const box=q("#wizObraLista");
+  let query=sb.from("obras").select("*").order("nome").limit(20);
+  if(term) query=query.or(`nome.ilike.%${term}%,cliente.ilike.%${term}%`);
+  const r=await query;
+  if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
+  const rows=r.data||[];
+  box.innerHTML=rows.length?rows.map(o=>`<button type="button" class="bigOption" style="padding:10px 14px" onclick="wizEscolherObraExistente(${o.id})"><span class="ic" style="font-size:20px">📁</span><span><b style="font-size:14px">${esc(o.nome)}</b><small>${esc(o.cliente)||""}</small></span></button>`).join(""):"<div class='small'>Nenhuma obra encontrada. Crie uma nova abaixo.</div>";
+}
+
+function toggleWizNovaObra(){
+  q("#wizNovaObraFields").classList.toggle("hidden");
+}
+
+function montarResumoObra(){
+  const temAuto=wizObra.automacao;
+  q("#wizObraEscolhidaResumo").innerHTML=`Obra: <b>${esc(wizObra.empreendimento)}</b>${wizObra.cliente?" · "+esc(wizObra.cliente):""}${wizObra.tensao_instalacao?" · "+esc(wizObra.tensao_instalacao):""}${temAuto?" · Automação "+esc(wizObra.protocolo_automacao):" · Sem automação"}`;
+  q("#wizObraBusca").classList.add("hidden");
+  q("#wizObraEscolhida").classList.remove("hidden");
+}
+
+async function wizEscolherObraExistente(id){
+  const r=await sb.from("obras").select("*").eq("id",id).single();
+  if(r.error) return msg(r.error.message,false);
+  const o=r.data;
+  wizObraId=o.id;
+  wizObra={cliente:o.cliente,empreendimento:o.nome,edificio:null,tensao_instalacao:o.tensao_instalacao,automacao:o.automacao,protocolo_automacao:o.protocolo_automacao};
+  montarResumoObra();
+}
+
+async function wizCriarNovaObra(){
+  const nome=q("#wiz_empreendimento").value.trim();
+  if(!nome) return msg("Informe o nome da obra.",false);
   const temAutomacao=q("#wiz_automacao").value==="sim";
-  wizObra={
-    cliente:norm(q("#wiz_cliente").value.trim()),
-    empreendimento:norm(q("#wiz_empreendimento").value.trim()),
-    edificio:norm(q("#wiz_edificio").value.trim()),
-    tensao_instalacao:norm(q("#wiz_tensao").value),
-    automacao:temAutomacao,
-    protocolo_automacao:temAutomacao?q("#wiz_protocolo").value:null
-  };
-  q("#wizObraResumo").innerHTML=`Obra: <b>${esc(wizObra.empreendimento)||"—"}</b>${wizObra.cliente?" · "+esc(wizObra.cliente):""}${wizObra.edificio?" · "+esc(wizObra.edificio):""}${wizObra.tensao_instalacao?" · "+esc(wizObra.tensao_instalacao):""}${temAutomacao?" · Automação "+esc(wizObra.protocolo_automacao):" · Sem automação"}`;
+  const p={nome,cliente:norm(q("#wiz_cliente").value.trim()),tensao_instalacao:norm(q("#wiz_tensao").value),automacao:temAutomacao,protocolo_automacao:temAutomacao?q("#wiz_protocolo").value:null};
+  const r=await sb.from("obras").insert(p).select().single();
+  if(r.error) return msg("Erro ao criar obra: "+r.error.message,false);
+  wizObraId=r.data.id;
+  wizObra={cliente:r.data.cliente,empreendimento:r.data.nome,edificio:null,tensao_instalacao:r.data.tensao_instalacao,automacao:r.data.automacao,protocolo_automacao:r.data.protocolo_automacao};
+  montarResumoObra();
+}
+
+function wizTrocarObra(){
+  wizObraId=null;wizObra=null;
+  q("#wizObraBusca").classList.remove("hidden");
+  q("#wizObraEscolhida").classList.add("hidden");
+  wizFiltrarObras();
+}
+
+function wizEntrarNoCarrinho(){
   q("#wizModeloSearch").value="";
   wizFiltrarModelos();
   renderWizCarrinho();
   wizStep(2);
   if(wizPendingModeloId){const id=wizPendingModeloId;wizPendingModeloId=null;wizAdicionarAoCarrinho(id)}
+}
+
+function wizIrParaCarrinho(){
+  wizObra.edificio=norm(q("#wiz_edificio").value.trim());
+  wizEntrarNoCarrinho();
 }
 
 function startWizardWithModelo(id){
@@ -740,7 +842,7 @@ async function wizCriar(){
         potencia_w:item.modelo.potencia_w, cct_k:item.modelo.cct_k, irc:item.modelo.irc,
         fluxo_lm:item.modelo.fluxo_lm, facho_graus:item.modelo.facho_graus,
         ip:item.modelo.ip, ik:item.modelo.ik,
-        status:"Ativa", criticidade:"Média", ...wizObra
+        status:"Ativa", criticidade:"Média", obra_id:wizObraId, ...wizObra
       });
     }
   }
@@ -996,6 +1098,79 @@ async function registerFieldEvidence(modeloOriginal,modeloEquivalente){
   }else{
     await sb.from("equivalentes").insert({componente_origem:"Campo",modelo_original:modeloOriginal,modelo_equivalente:modeloEquivalente,nivel:"Alternativa possível",disponibilidade:"Sob consulta",evidencias_campo:1});
   }
+}
+
+// ---- Obras ----
+let obraAtual=null;
+let obrasSearchTimer=null;
+function onObrasSearchInput(){clearTimeout(obrasSearchTimer);obrasSearchTimer=setTimeout(loadObras,300)}
+
+function onNovaObraAutomacaoChange(){
+  q("#obra_protocolo_field").classList.toggle("hidden",q("#obra_automacao").value!=="sim");
+}
+
+async function loadObras(){
+  const term=q("#obrasSearch").value.trim();
+  const box=q("#obrasList");
+  let query=sb.from("obras").select("*,luminarias(count)").order("nome");
+  if(term) query=query.or(`nome.ilike.%${term}%,cliente.ilike.%${term}%`);
+  const r=await query;
+  if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
+  const rows=r.data||[];
+  box.innerHTML=rows.length?rows.map(o=>`<button type="button" class="bigOption" onclick="abrirObra(${o.id})"><span class="ic">📁</span><span><b style="font-size:15px">${esc(o.nome)}</b><small>${esc(o.cliente)||"—"} · ${o.luminarias?.[0]?.count??0} peça(s)</small></span></button>`).join(""):"<div class='small'>Nenhuma obra cadastrada ainda.</div>";
+}
+
+async function criarObra(){
+  const nome=q("#obra_nome").value.trim();
+  if(!nome) return msg("Informe o nome da obra.",false);
+  const temAutomacao=q("#obra_automacao").value==="sim";
+  const p={nome,cliente:norm(q("#obra_cliente").value.trim()),tensao_instalacao:norm(q("#obra_tensao").value),automacao:temAutomacao,protocolo_automacao:temAutomacao?q("#obra_protocolo").value:null};
+  const r=await sb.from("obras").insert(p).select().single();
+  if(r.error) return msg("Erro ao criar obra: "+r.error.message,false);
+  q("#obra_nome").value="";q("#obra_cliente").value="";q("#obra_tensao").value="";q("#obra_automacao").value="nao";q("#obra_protocolo_field").classList.add("hidden");
+  msg("Obra criada.");
+  abrirObra(r.data.id);
+}
+
+async function abrirObra(id){
+  if(!id) return goScreen("obras");
+  const r=await sb.from("obras").select("*").eq("id",id).single();
+  if(r.error) return msg(r.error.message,false);
+  obraAtual=r.data;
+  goScreen("obraDetalhe");
+  q("#obraDetalheHeader").innerHTML=`<h2 style="margin:0 0 8px">${esc(obraAtual.nome)}</h2><div class="small">${obraAtual.cliente?"Cliente: "+esc(obraAtual.cliente)+" · ":""}${obraAtual.tensao_instalacao?"Tensão: "+esc(obraAtual.tensao_instalacao)+" · ":""}${obraAtual.automacao?"Automação: "+esc(obraAtual.protocolo_automacao):"Sem automação"}</div>`;
+  loadObraPecas();
+  loadObraPendentes();
+}
+
+function cadastrarMaisNestaObra(){
+  if(!obraAtual) return;
+  wizObraId=obraAtual.id;
+  wizObra={cliente:obraAtual.cliente,empreendimento:obraAtual.nome,edificio:null,tensao_instalacao:obraAtual.tensao_instalacao,automacao:obraAtual.automacao,protocolo_automacao:obraAtual.protocolo_automacao};
+  wizPularParaCarrinho=true;
+  goScreen("wizard");
+  wizPularParaCarrinho=false;
+  wizEntrarNoCarrinho();
+}
+
+async function loadObraPecas(){
+  const box=q("#obraPecasList");
+  const r=await sb.from("luminarias").select("lumidna_id,modelo,fabricante,status,edificio,andar,ambiente,posicao").eq("obra_id",obraAtual.id).order("lumidna_id").limit(200);
+  if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
+  const rows=r.data||[];
+  if(!rows.length){box.innerHTML="<div class='small'>Nenhuma peça cadastrada nesta obra ainda.</div>";return}
+  box.innerHTML=`<table><tr><th>ID</th><th>Modelo</th><th>Local</th><th>Status</th><th></th></tr>${rows.map(x=>{
+    const local=[x.edificio,x.andar,x.ambiente,x.posicao].filter(Boolean).join(" / ");
+    return `<tr><td>${esc(x.lumidna_id)}</td><td>${esc(x.modelo)||"—"}</td><td>${esc(local)||"—"}</td><td>${esc(x.status)||"—"}</td><td><button type="button" class="secondary" onclick="loadById('${x.lumidna_id}')">Abrir</button></td></tr>`;
+  }).join("")}</table>`;
+}
+
+async function loadObraPendentes(){
+  const box=q("#obraPendentesList");
+  const r=await sb.from("manutencoes_pendentes").select("*,luminarias!inner(lumidna_id,modelo,cliente,obra_id)").eq("status","Aguardando aprovação").eq("luminarias.obra_id",obraAtual.id).order("criado_em",{ascending:false});
+  if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
+  const rows=r.data||[];
+  box.innerHTML=rows.length?rows.map(p=>`<div class="card"><b>${esc(p.luminarias?.lumidna_id)}</b> — enviado por ${esc(p.responsavel)} (${esc(p.empresa)})<div class="actions" style="margin-top:8px"><button type="button" class="secondary" onclick="goScreen('aprovacoes')">Ver em Aprovações pendentes</button></div></div>`).join("") : "<div class='small'>Nenhuma aprovação pendente nesta obra.</div>";
 }
 
 // ---- Aprovações pendentes (manutenção enviada por técnico em campo) ----

@@ -49,10 +49,10 @@ th{color:var(--muted);font-weight:600}
       <div class="field"><label>Tipo</label><select id="pm_tipo"><option>Preventiva</option><option>Corretiva</option><option>Inspeção</option><option>Substituição de componente</option></select></div>
       <div class="field"><label>Problema encontrado</label><textarea id="pm_problema"></textarea></div>
       <div class="field"><label>Serviço realizado</label><textarea id="pm_servico"></textarea></div>
-      <div class="field"><label>Componente removido (se houve troca)</label><select id="pm_comp_removido"><option value="">— não houve troca —</option><option>Luminária inteira</option><option>Driver</option><option>LED</option><option>Óptica</option></select></div>
+      <div class="field"><label>Componente removido (se houve troca)</label><select id="pm_comp_removido" onchange="onCompRemovidoChange()"><option value="">— não houve troca —</option><option>Luminária inteira</option><option>Driver</option><option>LED</option><option>Óptica</option></select></div>
       <div class="field"><label>Componente instalado</label><select id="pm_comp_instalado_tipo" onchange="onCompInstaladoChange()"><option value="">— não houve troca —</option><option value="Original">Original (igual ao que já tinha)</option><option value="Homologado">Homologado LumiDNA</option><option value="Outro">Outro modelo</option></select></div>
       <div id="homologadoCompFields" class="hidden">
-        <div class="field"><label>Código do homologado instalado</label><input id="pm_comp_homologado_codigo" placeholder="ex: LF-HOM-0300BU"></div>
+        <div class="field"><label>Qual homologado foi instalado</label><select id="pm_comp_homologado_codigo"><option value="">— selecione o componente removido acima —</option></select></div>
       </div>
       <div id="outroCompFields" class="hidden">
         <div class="field"><label>Qual modelo foi instalado</label><input id="pm_comp_modelo" placeholder="ex: LF-GIRO13YS0400BU"></div>
@@ -177,6 +177,27 @@ function onCompInstaladoChange(){
   const v=document.getElementById("pm_comp_instalado_tipo").value;
   document.getElementById("outroCompFields").classList.toggle("hidden", v!=="Outro");
   document.getElementById("homologadoCompFields").classList.toggle("hidden", v!=="Homologado");
+  if(v==="Homologado") carregarHomologados();
+}
+
+function onCompRemovidoChange(){
+  if(document.getElementById("pm_comp_instalado_tipo").value==="Homologado") carregarHomologados();
+}
+
+async function carregarHomologados(){
+  const componente=document.getElementById("pm_comp_removido").value;
+  const sel=document.getElementById("pm_comp_homologado_codigo");
+  if(!componente||(componente!=="Driver"&&componente!=="LED")){
+    sel.innerHTML=`<option value="">— selecione "Driver" ou "LED" em Componente removido acima —</option>`;
+    return;
+  }
+  sel.innerHTML=`<option value="">Carregando...</option>`;
+  const r=await sb.rpc("listar_homologados",{p_componente:componente});
+  if(r.error){sel.innerHTML=`<option value="">Erro ao carregar</option>`;return}
+  const rows=r.data||[];
+  sel.innerHTML = rows.length
+    ? `<option value="">— selecione —</option>`+rows.map(x=>`<option value="${esc(x.modelo_equivalente)}">${esc(x.modelo_equivalente)}${x.fabricante_equivalente?" — "+esc(x.fabricante_equivalente):""}</option>`).join("")
+    : `<option value="">Nenhum homologado cadastrado pra ${esc(componente)} — escolha "Outro modelo" acima</option>`;
 }
 
 async function enviarManutencao(){

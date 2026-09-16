@@ -217,17 +217,27 @@ function wizImprimirQR(){
     const url=`${LUMIDNA_SITE_BASE}/ativo/?c=${x.public_code}`;
     const item=document.createElement("div");
     item.className="qrItem";
+
+    const logo=document.createElement("div");
+    logo.className="qrLogo";
+    logo.innerHTML=`Lumi<span>DNA</span>`;
+    item.appendChild(logo);
+
+    const nfc=document.createElement("div");
+    nfc.className="qrNfc";
+    nfc.innerHTML=`📶 Aproxime o celular`;
+    item.appendChild(nfc);
+
     const qrBox=document.createElement("div");
+    qrBox.className="qrCode";
     item.appendChild(qrBox);
-    new QRCode(qrBox,{text:url,width:130,height:130});
-    const label=document.createElement("b");
-    label.textContent=x.lumidna_id;
-    item.appendChild(label);
-    const serie=document.createElement("div");
-    serie.className="small";
-    serie.style.marginTop="4px";
-    serie.textContent = x.numero_serie ? `Nº série: ${x.numero_serie}` : "Nº série: ________________";
-    item.appendChild(serie);
+    new QRCode(qrBox,{text:url,width:120,height:120,correctLevel:QRCode.CorrectLevel.M});
+
+    const id=document.createElement("div");
+    id.className="qrId";
+    id.textContent=x.lumidna_id;
+    item.appendChild(id);
+
     grid.appendChild(item);
   });
   setTimeout(()=>window.print(),300);

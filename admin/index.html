@@ -999,7 +999,7 @@ sb.auth.onAuthStateChange((event,session)=>{
 });
 sb.auth.getSession().then(({data:{session}})=>{session?showApp(session.user):showLogin()});
 
-function msg(t,ok=true){q("#msg").innerHTML=`<div class="${ok?"success":"alert"}">${t}</div>`}
+function msg(t,ok=true){q("#msg").innerHTML=`<div class="${ok?"success":"alert"}">${t}</div>`;q("#msg").scrollIntoView({behavior:"smooth",block:"center"})}
 function norm(v){return v===""?null:v}
 
 // ---- Busca de luminárias ----

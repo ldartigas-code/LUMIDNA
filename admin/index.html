@@ -38,9 +38,14 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 .wizSteps{display:flex;gap:8px;font-size:13px;color:var(--muted);margin:14px 0 18px}
 .wizSteps b{color:var(--orange)}
 @media(max-width:900px){.grid,.grid3{grid-template-columns:1fr}.span2{grid-column:auto}}
-.qrGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-.qrItem{text-align:center;padding:10px;border:1px dashed #ccc;border-radius:8px}
-.qrItem b{display:block;margin-top:6px;font-size:13px}
+.qrGrid{display:grid;grid-template-columns:repeat(auto-fill,25mm);gap:4mm}
+.qrItem{width:25mm;height:25mm;box-sizing:border-box;padding:1.5mm;border:1px solid #999;border-radius:1mm;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:space-between;background:#fff;page-break-inside:avoid}
+.qrItem .qrLogo{font-size:2.6mm;font-weight:800;line-height:1;color:var(--text)}
+.qrItem .qrLogo span{color:var(--orange)}
+.qrItem .qrNfc{font-size:1.7mm;color:var(--muted);display:flex;align-items:center;gap:0.5mm;line-height:1}
+.qrItem .qrCode{width:12mm;height:12mm}
+.qrItem .qrCode img,.qrItem .qrCode canvas{width:100%!important;height:100%!important}
+.qrItem .qrId{font-size:2mm;font-weight:700;line-height:1;word-break:break-all}
 @media print{
   body *{visibility:hidden}
   #printQRSheet, #printQRSheet *{visibility:visible}

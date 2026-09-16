@@ -192,8 +192,8 @@ function onCompRemovidoChange(){
 async function carregarHomologados(){
   const componente=document.getElementById("pm_comp_removido").value;
   const sel=document.getElementById("pm_comp_homologado_codigo");
-  if(!componente||(componente!=="Driver"&&componente!=="LED")){
-    sel.innerHTML=`<option value="">— selecione "Driver" ou "LED" em Componente removido acima —</option>`;
+  if(!componente||(componente!=="Driver"&&componente!=="LED"&&componente!=="Óptica")){
+    sel.innerHTML=`<option value="">— selecione "Driver", "LED" ou "Óptica" em Componente removido acima —</option>`;
     return;
   }
   sel.innerHTML=`<option value="">Carregando...</option>`;

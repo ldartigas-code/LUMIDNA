@@ -169,10 +169,9 @@ async function wizRevisar(){
   let total=0;
   for(const item of wizCarrinho){
     const prefix=`LD-${fabCode(item.modelo.fabricante)}-${modelBase(item.modelo.codigo)}-`;
-    const r=await sb.from("luminarias").select("lumidna_id").ilike("lumidna_id",prefix+"%").order("lumidna_id",{ascending:false}).limit(1);
-    if(r.error) return msg("Erro: "+r.error.message,false);
-    const last=r.data&&r.data[0]?parseInt(r.data[0].lumidna_id.slice(prefix.length),10):0;
-    item.startNum=(last||0)+1;
+    const r=await sb.rpc("reservar_numeros",{p_prefix:prefix,p_qtd:item.qty});
+    if(r.error) return msg("Erro ao reservar numeração: "+r.error.message,false);
+    item.startNum=r.data;
     const firstId=buildLumidnaId(item.modelo,item.startNum), lastId=buildLumidnaId(item.modelo,item.startNum+item.qty-1);
     total+=item.qty;
     html+=`<div style="margin-bottom:10px"><b>${item.qty}×</b> ${esc(item.modelo.fabricante)} — ${esc(item.modelo.codigo)}<br><span class="small">${firstId}${item.qty>1?" até "+lastId:""}</span></div>`;

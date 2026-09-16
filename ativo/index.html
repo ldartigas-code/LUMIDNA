@@ -223,6 +223,15 @@ async function enviarManutencao(){
       msgBox.innerHTML=`<div class="small" style="color:var(--red)">Pra componente "Outro", informe modelo, fabricante e a foto.</div>`;
       return;
     }
+    if(!file.type.startsWith("image/")){
+      msgBox.innerHTML=`<div class="small" style="color:var(--red)">O arquivo precisa ser uma foto (imagem).</div>`;
+      return;
+    }
+    const MAX_FOTO_BYTES=8*1024*1024;
+    if(file.size>MAX_FOTO_BYTES){
+      msgBox.innerHTML=`<div class="small" style="color:var(--red)">Foto muito grande (máx. 8MB). Tire outra foto ou reduza o tamanho.</div>`;
+      return;
+    }
     msgBox.innerHTML=`<div class="small">Enviando foto...</div>`;
     const path=`${assetCode}/${Date.now()}_${file.name}`.replace(/\s+/g,"_");
     const up=await sb.storage.from("evidencias").upload(path,file);

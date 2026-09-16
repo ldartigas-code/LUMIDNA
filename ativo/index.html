@@ -91,6 +91,7 @@ function notFoundCard(){
 }
 
 let assetCode=null;
+let currentLum=null;
 
 async function loadAsset(){
   const code=new URLSearchParams(window.location.search).get("c");
@@ -101,6 +102,7 @@ async function loadAsset(){
   const lum=r.data;
   if(!lum || !lum.lumidna_id) return notFoundCard();
   assetCode=code;
+  currentLum=lum;
   document.getElementById("manutBox").classList.remove("hidden");
 
   const statusClassMap={"Ativa":"st-ok","Falha":"st-bad","Em manutenção":"st-warn","Desativada":"st-off"};
@@ -195,7 +197,7 @@ async function carregarHomologados(){
     return;
   }
   sel.innerHTML=`<option value="">Carregando...</option>`;
-  const r=await sb.rpc("listar_homologados",{p_componente:componente});
+  const r=await sb.rpc("listar_homologados",{p_componente:componente,p_modelo_codigo:currentLum?.modelo||null});
   if(r.error){sel.innerHTML=`<option value="">Erro ao carregar</option>`;return}
   const rows=r.data||[];
   sel.innerHTML = rows.length

@@ -140,7 +140,25 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <div id="screenObraDetalhe" class="hidden">
   <button type="button" class="linkback" onclick="goScreen('obras')">‹ Obras</button>
   <div class="card" id="obraDetalheHeader" style="margin-top:14px"></div>
-  <div class="actions" style="margin:16px 0"><button type="button" class="primary" onclick="cadastrarMaisNestaObra()" style="font-size:16px;padding:12px 24px">➕ Cadastrar mais peças nesta obra</button></div>
+  <div class="card hidden" id="editarObraCard">
+    <h2 style="margin:0 0 12px;font-size:16px">Editar obra</h2>
+    <div class="grid">
+      <div class="field"><label>Nome da obra / empreendimento</label><input id="eo_nome"></div>
+      <div class="field"><label>Cliente (opcional)</label><input id="eo_cliente"></div>
+      <div class="field"><label>Tensão da instalação</label><select id="eo_tensao"><option value="">— selecione —</option><option>127V</option><option>220V</option></select></div>
+      <div class="field"><label>Tem automação?</label><select id="eo_automacao" onchange="onEditarObraAutomacaoChange()"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
+      <div class="field hidden" id="eo_protocolo_field"><label>Protocolo</label><select id="eo_protocolo"><option>DALI</option><option>TRIAC</option><option>0-10V</option></select></div>
+    </div>
+    <label class="small" style="display:flex;align-items:center;gap:8px;margin:4px 0 12px"><input type="checkbox" id="eo_aplicar_pecas"> Também atualizar tensão/automação nas peças já cadastradas nesta obra</label>
+    <div class="actions" style="margin-top:12px">
+      <button type="button" class="secondary" onclick="fecharEdicaoObra()">Cancelar</button>
+      <button type="button" class="primary" onclick="salvarEdicaoObra()">Salvar alterações</button>
+    </div>
+  </div>
+  <div class="actions" style="margin:16px 0">
+    <button type="button" class="primary" onclick="cadastrarMaisNestaObra()" style="font-size:16px;padding:12px 24px">➕ Cadastrar mais peças nesta obra</button>
+    <button type="button" class="secondary" onclick="abrirEdicaoObra()" style="font-size:16px;padding:12px 24px">✏️ Editar obra</button>
+  </div>
   <h2 style="margin:20px 0 10px;font-size:16px">Peças desta obra</h2>
   <div id="obraPecasList"></div>
   <h2 style="margin:20px 0 10px;font-size:16px">Aprovações pendentes desta obra</h2>
@@ -1230,6 +1248,45 @@ async function abrirObra(id){
   q("#obraDetalheHeader").innerHTML=`<h2 style="margin:0 0 8px">${esc(obraAtual.nome)}</h2><div class="small">${obraAtual.cliente?"Cliente: "+esc(obraAtual.cliente)+" · ":""}${obraAtual.tensao_instalacao?"Tensão: "+esc(obraAtual.tensao_instalacao)+" · ":""}${obraAtual.automacao?"Automação: "+esc(obraAtual.protocolo_automacao):"Sem automação"}</div>`;
   loadObraPecas();
   loadObraPendentes();
+}
+
+function abrirEdicaoObra(){
+  if(!obraAtual) return;
+  q("#eo_nome").value=obraAtual.nome||"";
+  q("#eo_cliente").value=obraAtual.cliente||"";
+  q("#eo_tensao").value=obraAtual.tensao_instalacao||"";
+  q("#eo_automacao").value=obraAtual.automacao?"sim":"nao";
+  q("#eo_protocolo").value=obraAtual.protocolo_automacao||"DALI";
+  onEditarObraAutomacaoChange();
+  q("#editarObraCard").classList.remove("hidden");
+}
+function fecharEdicaoObra(){
+  q("#editarObraCard").classList.add("hidden");
+}
+function onEditarObraAutomacaoChange(){
+  q("#eo_protocolo_field").classList.toggle("hidden", q("#eo_automacao").value!=="sim");
+}
+async function salvarEdicaoObra(){
+  const nome=q("#eo_nome").value.trim();
+  if(!nome) return msg("Informe o nome da obra.",false);
+  const temAutomacao=q("#eo_automacao").value==="sim";
+  const p={
+    nome, cliente:norm(q("#eo_cliente").value.trim()),
+    tensao_instalacao:norm(q("#eo_tensao").value),
+    automacao:temAutomacao,
+    protocolo_automacao:temAutomacao?q("#eo_protocolo").value:null
+  };
+  const r=await sb.from("obras").update(p).eq("id",obraAtual.id);
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  if(q("#eo_aplicar_pecas").checked){
+    const r2=await sb.from("luminarias").update({
+      tensao_instalacao:p.tensao_instalacao, automacao:p.automacao, protocolo_automacao:p.protocolo_automacao
+    }).eq("obra_id",obraAtual.id);
+    if(r2.error) return msg("Obra atualizada, mas houve erro ao aplicar nas peças: "+r2.error.message,false);
+  }
+  fecharEdicaoObra();
+  msg("Obra atualizada.");
+  abrirObra(obraAtual.id);
 }
 
 function cadastrarMaisNestaObra(){

@@ -525,7 +525,7 @@ function goScreen(name){
 // ---- Catálogo de Modelos ----
 
 async function populateModeloPicker(){
-  const r=await sb.from("modelos").select("id,fabricante,codigo").order("fabricante").order("codigo").limit(1000);
+  const r=await sb.from("modelos").select("id,fabricante,codigo").order("fabricante").order("codigo").limit(5000);
   const sel=q("#modeloPicker");
   if(!sel) return;
   const current=sel.value;
@@ -560,7 +560,7 @@ function onModeloSearchInput(){
 
 async function loadModelos(){
   const term=q("#modeloSearch").value.trim();
-  let query=sb.from("modelos").select("*").order("fabricante").order("codigo").limit(500);
+  let query=sb.from("modelos").select("*").order("fabricante").order("codigo").limit(2000);
   if(term) query=query.or(`fabricante.ilike.%${term}%,linha.ilike.%${term}%,codigo.ilike.%${term}%,descricao.ilike.%${term}%`);
   const r=await query;
   const box=q("#modelosList");
@@ -754,7 +754,7 @@ function onWizObraSearchInput(){clearTimeout(wizObraSearchTimer);wizObraSearchTi
 async function wizFiltrarObras(){
   const term=q("#wizObraSearch").value.trim();
   const box=q("#wizObraLista");
-  let query=sb.from("obras").select("*").order("nome").limit(20);
+  let query=sb.from("obras").select("*").order("nome").limit(300);
   if(term) query=query.or(`nome.ilike.%${term}%,cliente.ilike.%${term}%`);
   const r=await query;
   if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
@@ -825,7 +825,7 @@ function onWizSearchInput(){clearTimeout(wizSearchTimer);wizSearchTimer=setTimeo
 async function wizFiltrarModelos(){
   const term=q("#wizModeloSearch").value.trim();
   const box=q("#wizListaModelos");
-  let query=sb.from("modelos").select("*").order("fabricante").order("codigo").limit(30);
+  let query=sb.from("modelos").select("*").order("fabricante").order("codigo").limit(100);
   if(term) query=query.or(`fabricante.ilike.%${term}%,linha.ilike.%${term}%,codigo.ilike.%${term}%,descricao.ilike.%${term}%`);
   const r=await query;
   if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
@@ -1016,7 +1016,7 @@ async function searchAssets(){
   const termo=q("#f_busca").value.trim();
   const fab=q("#f_fabricante").value.trim(), mod=q("#f_modelo").value.trim(), loc=q("#f_local").value.trim();
   if(!termo&&!fab&&!mod&&!loc){q("#searchResults").innerHTML="";return}
-  let query=sb.from("luminarias").select("id,lumidna_id,modelo,fabricante,cliente,empreendimento,edificio,andar,ambiente,posicao,status").order("lumidna_id").limit(100);
+  let query=sb.from("luminarias").select("id,lumidna_id,modelo,fabricante,cliente,empreendimento,edificio,andar,ambiente,posicao,status").order("lumidna_id").limit(1000);
   if(termo) query=query.or(`lumidna_id.ilike.%${termo}%,modelo.ilike.%${termo}%,fabricante.ilike.%${termo}%,cliente.ilike.%${termo}%,empreendimento.ilike.%${termo}%,edificio.ilike.%${termo}%`);
   if(fab) query=query.ilike("fabricante",`%${fab}%`);
   if(mod) query=query.ilike("modelo",`%${mod}%`);
@@ -1123,7 +1123,7 @@ async function logAudit(campo,before,after){
   await sb.from("auditoria").insert({luminaria_id:luminariaDbId,tabela:"luminarias",campo,valor_anterior:String(b),valor_novo:String(a),usuario_email:currentUserEmail});
 }
 async function loadAudit(){
-  const r=await sb.from("auditoria").select("*").eq("luminaria_id",luminariaDbId).order("criado_em",{ascending:false}).limit(100);
+  const r=await sb.from("auditoria").select("*").eq("luminaria_id",luminariaDbId).order("criado_em",{ascending:false}).limit(500);
   q("#histList").innerHTML=(r.data&&r.data.length)?`<table><tr><th>Data/hora</th><th>Usuário</th><th>Campo</th><th>De</th><th>Para</th></tr>${r.data.map(x=>`<tr><td>${new Date(x.criado_em).toLocaleString('pt-BR')}</td><td>${esc(x.usuario_email)}</td><td>${esc(x.campo)}</td><td>${esc(x.valor_anterior)}</td><td>${esc(x.valor_novo)}</td></tr>`).join("")}</table>`:"<div class='small'>Nenhuma alteração registrada ainda.</div>";
 }
 
@@ -1244,7 +1244,7 @@ function cadastrarMaisNestaObra(){
 
 async function loadObraPecas(){
   const box=q("#obraPecasList");
-  const r=await sb.from("luminarias").select("lumidna_id,modelo,fabricante,status,edificio,andar,ambiente,posicao").eq("obra_id",obraAtual.id).order("lumidna_id").limit(200);
+  const r=await sb.from("luminarias").select("lumidna_id,modelo,fabricante,status,edificio,andar,ambiente,posicao").eq("obra_id",obraAtual.id).order("lumidna_id").limit(2000);
   if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
   const rows=r.data||[];
   if(!rows.length){box.innerHTML="<div class='small'>Nenhuma peça cadastrada nesta obra ainda.</div>";return}
@@ -1355,7 +1355,7 @@ function renderDecididaCard(p,tipo){
 
 async function loadAprovadas(){
   const box=q("#aprovadasList");
-  const r=await sb.from("manutencoes_pendentes").select("*,luminarias(lumidna_id,modelo,cliente,cliente_email)").eq("status","Aprovada").order("revisado_em",{ascending:false}).limit(30);
+  const r=await sb.from("manutencoes_pendentes").select("*,luminarias(lumidna_id,modelo,cliente,cliente_email)").eq("status","Aprovada").order("revisado_em",{ascending:false}).limit(300);
   if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
   const rows=r.data||[];
   box.innerHTML = rows.length ? rows.map(p=>renderDecididaCard(p,"Aprovada")).join("") : "<div class='small'>Nenhuma aprovação registrada ainda.</div>";
@@ -1363,7 +1363,7 @@ async function loadAprovadas(){
 
 async function loadRejeitadas(){
   const box=q("#rejeitadasList");
-  const r=await sb.from("manutencoes_pendentes").select("*,luminarias(lumidna_id,modelo,cliente,cliente_email)").eq("status","Rejeitada").order("revisado_em",{ascending:false}).limit(30);
+  const r=await sb.from("manutencoes_pendentes").select("*,luminarias(lumidna_id,modelo,cliente,cliente_email)").eq("status","Rejeitada").order("revisado_em",{ascending:false}).limit(300);
   if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
   const rows=r.data||[];
   box.innerHTML = rows.length ? rows.map(p=>renderDecididaCard(p,"Rejeitada")).join("") : "<div class='small'>Nenhuma rejeição registrada ainda.</div>";

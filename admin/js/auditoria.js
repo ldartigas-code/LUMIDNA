@@ -18,6 +18,30 @@ async function loadComponents(){
     const revisada=modelo!=="Original";
     return `<div class="field"><label>${t}</label><div class="${revisada?'pill':'small'}" style="${revisada?'':'padding:8px 0'}">${esc(modelo)}</div></div>`;
   }).join("");
+  await mostrarDicaSpecsRetrofit(byTipo.LED);
+}
+
+// Em modelos Retrofit, potência/CCT/fluxo/facho ficam vazios na própria
+// luminária de propósito — quem carrega esse dado é a lâmpada instalada
+// (tabela componentes -> equivalentes), pra não duplicar informação que
+// desatualiza quando a lâmpada é trocada. Isso deixa os campos "Dados
+// técnicos" parecendo zerados, então aqui só mostramos o valor real da
+// lâmpada como dica (placeholder), sem preencher o campo de verdade.
+async function mostrarDicaSpecsRetrofit(modeloLed){
+  const hint=q("#specsRetrofitHint");
+  const campos={potencia_w:"input[name=potencia_w]",cct_k:"input[name=cct_k]",fluxo_lm:"input[name=fluxo_lm]",facho_graus:"input[name=facho_graus]"};
+  Object.values(campos).forEach(sel=>{ const el=q(sel); if(el) el.placeholder=""; });
+  if(!hint) return;
+  hint.textContent="";
+  if(!modeloLed||modeloLed==="Original") return;
+  const eqR=await sb.from("equivalentes").select("potencia_w,cct_k,fluxo_lm,facho_graus").eq("modelo_equivalente",modeloLed).eq("componente_origem","LED").maybeSingle();
+  if(!eqR.data) return;
+  const d=eqR.data;
+  Object.entries(campos).forEach(([campo,sel])=>{
+    const el=q(sel);
+    if(el && !el.value && d[campo]!=null) el.placeholder=String(d[campo]);
+  });
+  hint.innerHTML=`Campos vazios abaixo? Essa luminária é Retrofit — o valor real vem da lâmpada instalada (<b>${esc(modeloLed)}</b>) e já aparece assim mesmo na página pública. Só preencha aqui se quiser sobrescrever manualmente.`;
 }
 
 function onDetAutomacaoChange(){

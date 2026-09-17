@@ -1,4 +1,49 @@
 // ---- Catálogo de Componentes (Driver / LED / Óptica) ----
+let compModelosTodos=[];
+let compModelosSelecionados=new Set();
+
+async function carregarModelosParaCompat(){
+  const r=await sb.from("modelos").select("id,fabricante,codigo,linha").order("fabricante").order("codigo").limit(2000);
+  compModelosTodos=r.data||[];
+  renderCompModelosLista();
+}
+
+let compModelosBuscaTimer=null;
+function onCompModelosBuscaInput(){clearTimeout(compModelosBuscaTimer);compModelosBuscaTimer=setTimeout(renderCompModelosLista,200)}
+
+function renderCompModelosLista(){
+  const box=q("#comp_modelos_lista");
+  if(!box) return;
+  const termo=(q("#comp_modelos_busca").value||"").toLowerCase().trim();
+  const filtrados=termo ? compModelosTodos.filter(m=>
+    (m.fabricante||"").toLowerCase().includes(termo) || (m.codigo||"").toLowerCase().includes(termo) || (m.linha||"").toLowerCase().includes(termo)
+  ) : compModelosTodos;
+  const lista=filtrados.slice(0,150);
+  box.innerHTML = lista.length ? lista.map(m=>{
+    const checked=compModelosSelecionados.has(m.codigo)?"checked":"";
+    return `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer"><input type="checkbox" value="${esc(m.codigo)}" ${checked} onchange="toggleCompModelo('${esc(m.codigo)}',this.checked)"> <span>${esc(m.fabricante)||"?"} — ${esc(m.codigo)}${m.linha?" ("+esc(m.linha)+")":""}</span></label>`;
+  }).join("") : "<div class='small'>Nenhum modelo encontrado. Cadastre o modelo primeiro em \"Cadastrar modelo novo\".</div>";
+  if(!compModelosTodos.length) box.innerHTML="<div class='small'>Carregando modelos...</div>";
+}
+
+function toggleCompModelo(codigo,checked){
+  if(checked) compModelosSelecionados.add(codigo); else compModelosSelecionados.delete(codigo);
+  atualizarResumoCompModelos();
+}
+
+function atualizarResumoCompModelos(){
+  const n=compModelosSelecionados.size;
+  q("#comp_modelos_selecionados").innerHTML = n
+    ? `<b>${n} modelo(s) selecionado(s)</b> — <a href="#" onclick="limparCompModelos();return false">limpar seleção</a>`
+    : "Nenhum selecionado = compatível com qualquer modelo.";
+}
+
+function limparCompModelos(){
+  compModelosSelecionados.clear();
+  renderCompModelosLista();
+  atualizarResumoCompModelos();
+}
+
 function onCompTipoChange(){
   const tipo=q("#comp_tipo").value;
   q("#comp_potencia_field").classList.toggle("hidden", tipo==="Óptica");
@@ -32,7 +77,7 @@ async function addComponenteCatalogo(){
   const p={
     componente_origem:tipo,
     modelo_equivalente:codigo,
-    modelo_original:norm(q("#comp_modelos_compat").value.trim()),
+    modelo_original:compModelosSelecionados.size?[...compModelosSelecionados].join(", "):null,
     fabricante_equivalente:norm(q("#comp_fabricante").value.trim()),
     potencia_w:tipo!=="Óptica"&&q("#comp_potencia").value?Number(q("#comp_potencia").value):null,
     corrente_ma:tipo==="Driver"&&q("#comp_corrente").value?Number(q("#comp_corrente").value):null,
@@ -47,7 +92,8 @@ async function addComponenteCatalogo(){
   };
   const r=await sb.from("equivalentes").insert(p);
   if(r.error) return msg("Erro: "+r.error.message,false);
-  q("#comp_fabricante").value="";q("#comp_codigo").value="";q("#comp_modelos_compat").value="";q("#comp_potencia").value="";q("#comp_corrente").value="";q("#comp_cct").value="";q("#comp_fluxo").value="";q("#comp_facho").value="";q("#comp_obs").value="";
+  q("#comp_fabricante").value="";q("#comp_codigo").value="";q("#comp_potencia").value="";q("#comp_corrente").value="";q("#comp_cct").value="";q("#comp_fluxo").value="";q("#comp_facho").value="";q("#comp_obs").value="";
+  limparCompModelos();
   msg("Componente salvo no catálogo.");
   loadComponentesCatalogo();
 }

@@ -46,11 +46,22 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 .qrItem .qrCode{width:12mm;height:12mm}
 .qrItem .qrCode img,.qrItem .qrCode canvas{width:100%!important;height:100%!important}
 .qrItem .qrId{font-size:2mm;font-weight:700;line-height:1;word-break:break-all}
+.relatorio{max-width:800px;font-family:Inter,Segoe UI,Arial,sans-serif;color:var(--text)}
+.relatorio h1{font-size:20px;margin:0 0 4px}
+.relatorio .sub{color:var(--muted);margin-bottom:16px;font-size:13px}
+.relatorio table{width:100%;border-collapse:collapse;margin-bottom:16px}
+.relatorio th,.relatorio td{padding:8px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}
+.relatorio th{background:#fafbfc}
+.relatorio .totais{background:#fff7f0;border-left:4px solid var(--orange);padding:12px 14px;border-radius:8px;margin-bottom:16px;font-size:14px}
+.relatorio img{max-width:120px;border-radius:6px;border:1px solid var(--line);margin:2px}
 @media print{
   body *{visibility:hidden}
   #printQRSheet, #printQRSheet *{visibility:visible}
   #printQRSheet{position:absolute;top:0;left:0;width:100%}
   #printQRSheet.hidden{display:block!important}
+  #printRelatorio, #printRelatorio *{visibility:visible}
+  #printRelatorio{position:absolute;top:0;left:0;width:100%}
+  #printRelatorio.hidden{display:block!important}
 }
 </style>
 </head>
@@ -172,6 +183,20 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
   <div id="obraPecasList"></div>
   <h2 style="margin:20px 0 10px;font-size:16px">Aprovações pendentes desta obra</h2>
   <div id="obraPendentesList"></div>
+
+  <div class="card" style="margin-top:20px">
+    <h2 style="margin:0 0 12px;font-size:16px">📄 Relatório da obra</h2>
+    <div class="small" style="margin-bottom:12px">Resumo de manutenções desta obra num período — quantas peças foram mexidas, o que foi trocado, e o valor de referência investido.</div>
+    <div class="actions" style="margin-bottom:12px">
+      <button type="button" class="secondary" onclick="wizPeriodoRapido('semana')">Esta semana</button>
+      <button type="button" class="secondary" onclick="wizPeriodoRapido('mes')">Este mês</button>
+    </div>
+    <div class="grid">
+      <div class="field"><label>De</label><input type="date" id="rel_obra_de"></div>
+      <div class="field"><label>Até</label><input type="date" id="rel_obra_ate"></div>
+    </div>
+    <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="gerarRelatorioObra()">Gerar relatório</button></div>
+  </div>
 </div>
 
 <!-- ===== WIZARD: cadastrar peças novas (pedido / carrinho) ===== -->
@@ -255,6 +280,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 
 <!-- ===== IMPRESSÃO DE QR (só aparece no papel) ===== -->
 <div id="printQRSheet" class="hidden"></div>
+<div id="printRelatorio" class="hidden"></div>
 
 <!-- ===== AVULSA: cadastro manual sem modelo ===== -->
 <div id="screenAvulsa" class="hidden">
@@ -399,6 +425,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <div class="small" style="margin-top:8px">Preenchendo os dois campos de componente, o LumiDNA registra automaticamente essa troca como evidência de campo no catálogo de equivalentes.</div>
 <div class="actions" style="margin-top:12px"><button type="button" class="secondary" onclick="addMaintenance()">Registrar manutenção</button></div>
 <div id="manList" style="margin-top:14px"></div>
+<div class="actions" style="margin-top:12px"><button type="button" class="secondary" onclick="gerarRelatorioPeca()">📄 Ver relatório desta peça</button></div>
 </section>
 
 <section class="card">
@@ -540,4 +567,5 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <script src="js/obras.js"></script>
 <script src="js/aprovacoes.js"></script>
 <script src="js/reposicao.js"></script>
+<script src="js/relatorios.js"></script>
 </body></html>

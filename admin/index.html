@@ -130,11 +130,14 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
     <span class="ic">📦</span>
     <span><b>Peças pra comprar</b><small id="reposicaoResumo">Pedidos de reposição reportados pela página pública, antes da manutenção</small></span>
   </button>
-  <div style="text-align:center;margin-top:10px">
-    <a href="#" class="small" onclick="goScreen('catalogo');return false">Catálogo de modelos (cadastro avançado / importar CSV)</a>
-    &nbsp;·&nbsp;
-    <a href="#" class="small" onclick="goScreen('componentes');return false">Catálogo de componentes (Driver / LED / Óptica)</a>
-  </div>
+  <button type="button" class="bigOption" onclick="goScreen('catalogo')">
+    <span class="ic">💡</span>
+    <span><b>Cadastrar modelo novo</b><small>Peça independente pra usar em obras futuras — sem precisar vincular a nenhuma obra agora. Também importa catálogo em CSV.</small></span>
+  </button>
+  <button type="button" class="bigOption" onclick="goScreen('componentes')">
+    <span class="ic">🔧</span>
+    <span><b>Cadastrar componente novo</b><small>Driver, LED ou Óptica homologado — independente, pra ficar disponível no catálogo.</small></span>
+  </button>
 </div>
 
 <!-- ===== OBRAS: lista ===== -->

@@ -331,6 +331,30 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 </div></section>
 
 <section class="card">
+<h2 style="margin:0 0 12px;font-size:16px">📷 Fotos</h2>
+<div class="alert">Envie a foto direto do celular ou computador. Também aceita colar uma URL pública manualmente.</div>
+<div class="grid">
+<div class="field">
+  <label>Foto principal</label>
+  <input name="foto_principal_url" placeholder="URL (gerada ao enviar, ou cole uma)">
+  <input type="file" accept="image/*" data-target="foto_principal_url" onchange="uploadPhoto(event)">
+  <img class="fotoPreview hidden" data-preview="foto_principal_url">
+</div>
+<div class="field">
+  <label>Foto instalada</label>
+  <input name="foto_instalada_url" placeholder="URL (gerada ao enviar, ou cole uma)">
+  <input type="file" accept="image/*" capture="environment" data-target="foto_instalada_url" onchange="uploadPhoto(event)">
+  <img class="fotoPreview hidden" data-preview="foto_instalada_url">
+</div>
+<div class="field">
+  <label>Foto da etiqueta</label>
+  <input name="foto_etiqueta_url" placeholder="URL (gerada ao enviar, ou cole uma)">
+  <input type="file" accept="image/*" capture="environment" data-target="foto_etiqueta_url" onchange="uploadPhoto(event)">
+  <img class="fotoPreview hidden" data-preview="foto_etiqueta_url">
+</div>
+</div></section>
+
+<section class="card">
 <h2 style="margin:0 0 12px;font-size:16px">Dados técnicos</h2>
 <div class="small" id="specsRetrofitHint" style="margin-bottom:10px"></div>
 <div class="grid3">
@@ -361,30 +385,6 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <div class="field"><label>Andar</label><input name="andar"></div>
 <div class="field"><label>Ambiente</label><input name="ambiente"></div>
 <div class="field"><label>Posição</label><input name="posicao"></div>
-</div></section>
-
-<section class="card">
-<h2 style="margin:0 0 12px;font-size:16px">Fotos</h2>
-<div class="alert">Envie a foto direto do celular ou computador. Também aceita colar uma URL pública manualmente.</div>
-<div class="grid">
-<div class="field">
-  <label>Foto principal</label>
-  <input name="foto_principal_url" placeholder="URL (gerada ao enviar, ou cole uma)">
-  <input type="file" accept="image/*" data-target="foto_principal_url" onchange="uploadPhoto(event)">
-  <img class="fotoPreview hidden" data-preview="foto_principal_url">
-</div>
-<div class="field">
-  <label>Foto instalada</label>
-  <input name="foto_instalada_url" placeholder="URL (gerada ao enviar, ou cole uma)">
-  <input type="file" accept="image/*" capture="environment" data-target="foto_instalada_url" onchange="uploadPhoto(event)">
-  <img class="fotoPreview hidden" data-preview="foto_instalada_url">
-</div>
-<div class="field">
-  <label>Foto da etiqueta</label>
-  <input name="foto_etiqueta_url" placeholder="URL (gerada ao enviar, ou cole uma)">
-  <input type="file" accept="image/*" capture="environment" data-target="foto_etiqueta_url" onchange="uploadPhoto(event)">
-  <img class="fotoPreview hidden" data-preview="foto_etiqueta_url">
-</div>
 </div></section>
 
 <section class="card">

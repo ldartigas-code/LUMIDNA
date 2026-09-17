@@ -14,13 +14,13 @@ q("#loginForm").onsubmit=async e=>{
 function logout(){sb.auth.signOut()}
 function showLogin(){q("#loginScreen").classList.remove("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.add("hidden")}
 let appInitialized=false;
-function showApp(user){currentUserEmail=user.email;q("#loginScreen").classList.add("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.remove("hidden");q("#userEmail").textContent=user.email;q("#connStatus").textContent="Supabase conectado";checkWarrantyAlerts();checkPendentesBadge();populateModeloPicker();if(!appInitialized){appInitialized=true;goScreen("home")}}
+function showApp(user){currentUserEmail=user.email;q("#loginScreen").classList.add("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.remove("hidden");q("#userEmail").textContent=user.email;q("#connStatus").textContent="Supabase conectado";checkWarrantyAlerts();checkPendentesBadge();checkReposicaoBadge();populateModeloPicker();if(!appInitialized){appInitialized=true;goScreen("home")}}
 
 // ---- Navegação entre telas ----
 // Cada troca de tela vira uma entrada no histórico do navegador, senão o
 // botão "voltar" do celular não tem pra onde voltar dentro do app e acaba
 // saindo direto do site.
-const SCREENS=["home","obras","obraDetalhe","wizard","avulsa","search","detail","aprovacoes","catalogo","componentes"];
+const SCREENS=["home","obras","obraDetalhe","wizard","avulsa","search","detail","aprovacoes","catalogo","componentes","reposicao"];
 function renderScreen(name){
   if(!SCREENS.includes(name)) name="home";
   SCREENS.forEach(s=>q("#screen"+s[0].toUpperCase()+s.slice(1)).classList.toggle("hidden",s!==name));
@@ -28,6 +28,7 @@ function renderScreen(name){
   if(name==="wizard" && !wizPularParaCarrinho) wizStep(1);
   if(name==="catalogo") q("#modelosList").innerHTML="<div class='small'>Digite algo acima pra buscar.</div>";
   if(name==="aprovacoes"){loadPendentes();loadAprovadas();loadRejeitadas();}
+  if(name==="reposicao"){loadReposicoes();loadReposicoesResolvidas();}
   if(name==="obras"){q("#obrasSearch").value="";loadObras();}
   if(name==="componentes"){q("#compSearch").value="";q("#compList").innerHTML="<div class='small'>Digite algo acima pra buscar.</div>";onCompTipoChange();}
 }

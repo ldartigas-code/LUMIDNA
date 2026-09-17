@@ -19,9 +19,9 @@ async function loadComponentesCatalogo(){
   const r=await query;
   if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
   const rows=r.data||[];
-  box.innerHTML = rows.length ? `<table><tr><th>Tipo</th><th>Fabricante</th><th>Código</th><th>Specs</th><th>Nível</th></tr>${rows.map(c=>{
+  box.innerHTML = rows.length ? `<table><tr><th>Tipo</th><th>Fabricante</th><th>Código</th><th>Specs</th><th>Nível</th><th>Modelos compatíveis</th></tr>${rows.map(c=>{
     const specs=[c.potencia_w?c.potencia_w+"W":"",c.corrente_ma?c.corrente_ma+"mA":"",c.cct_k?c.cct_k+"K":"",c.fluxo_lm?c.fluxo_lm+"lm":"",c.facho_graus?c.facho_graus+"°":""].filter(Boolean).join(" · ");
-    return `<tr><td>${esc(c.componente_origem)}</td><td>${esc(c.fabricante_equivalente)||"—"}</td><td>${esc(c.modelo_equivalente)}</td><td>${specs||"—"}</td><td>${esc(c.nivel)||"—"}</td></tr>`;
+    return `<tr><td>${esc(c.componente_origem)}</td><td>${esc(c.fabricante_equivalente)||"—"}</td><td>${esc(c.modelo_equivalente)}</td><td>${specs||"—"}</td><td>${esc(c.nivel)||"—"}</td><td>${esc(c.modelo_original)||"— qualquer modelo —"}</td></tr>`;
   }).join("")}</table>` : "<div class='small'>Nenhum componente encontrado.</div>";
 }
 
@@ -32,6 +32,7 @@ async function addComponenteCatalogo(){
   const p={
     componente_origem:tipo,
     modelo_equivalente:codigo,
+    modelo_original:norm(q("#comp_modelos_compat").value.trim()),
     fabricante_equivalente:norm(q("#comp_fabricante").value.trim()),
     potencia_w:tipo!=="Óptica"&&q("#comp_potencia").value?Number(q("#comp_potencia").value):null,
     corrente_ma:tipo==="Driver"&&q("#comp_corrente").value?Number(q("#comp_corrente").value):null,
@@ -46,7 +47,7 @@ async function addComponenteCatalogo(){
   };
   const r=await sb.from("equivalentes").insert(p);
   if(r.error) return msg("Erro: "+r.error.message,false);
-  q("#comp_fabricante").value="";q("#comp_codigo").value="";q("#comp_potencia").value="";q("#comp_corrente").value="";q("#comp_cct").value="";q("#comp_fluxo").value="";q("#comp_facho").value="";q("#comp_obs").value="";
+  q("#comp_fabricante").value="";q("#comp_codigo").value="";q("#comp_modelos_compat").value="";q("#comp_potencia").value="";q("#comp_corrente").value="";q("#comp_cct").value="";q("#comp_fluxo").value="";q("#comp_facho").value="";q("#comp_obs").value="";
   msg("Componente salvo no catálogo.");
   loadComponentesCatalogo();
 }

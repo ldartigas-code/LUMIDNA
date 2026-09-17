@@ -31,6 +31,7 @@ function renderScreen(name){
   if(name==="reposicao"){loadReposicoes();loadReposicoesResolvidas();}
   if(name==="obras"){q("#obrasSearch").value="";loadObras();}
   if(name==="componentes"){q("#compSearch").value="";q("#compList").innerHTML="<div class='small'>Digite algo acima pra buscar.</div>";onCompTipoChange();}
+  if(name==="home"){checkPendentesBadge();checkReposicaoBadge();}
 }
 function goScreen(name){
   if(!SCREENS.includes(name)) name="home";

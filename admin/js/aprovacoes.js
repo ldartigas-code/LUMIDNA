@@ -4,7 +4,7 @@ async function checkPendentesBadge(){
   const n=r.count||0;
   const resumo=q("#aprovacoesResumo");
   if(!resumo) return;
-  resumo.textContent = n>0 ? `${n} manutenção(ões) aguardando sua confirmação` : "Manutenções enviadas por técnicos em campo, aguardando sua confirmação";
+  resumo.innerHTML = n>0 ? `<b style="color:var(--red)">${n} manutenção(ões) aguardando sua confirmação</b>` : "Manutenções enviadas por técnicos em campo, aguardando sua confirmação";
 }
 
 async function loadPendentes(){

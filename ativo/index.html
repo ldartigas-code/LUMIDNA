@@ -37,6 +37,43 @@ th{color:var(--muted);font-weight:600}
     <div class="card small">Carregando ativo…</div>
   </div>
 
+  <div id="problemaBox" class="card hidden">
+    <div id="problemaBtnWrap">
+      <button type="button" class="btn" style="background:var(--amber,#c98a12)" onclick="showProblemaForm()">⚠️ Reportar problema</button>
+      <div class="small" style="margin-top:8px">Percebeu que essa luminária parou de funcionar direito, mas ainda não trocou nada? Use isto pra já saber qual peça comprar, antes de chamar a manutenção.</div>
+    </div>
+    <form id="problemaForm" class="hidden" onsubmit="return false">
+      <h2>Reportar problema</h2>
+      <div class="field">
+        <label>O que está acontecendo?</label>
+        <select id="pb_sintoma" onchange="onSintomaChange()">
+          <option value="">— selecione —</option>
+          <option>Não acende</option>
+          <option>Pisca / instável</option>
+          <option>Luz fraca</option>
+          <option>Mudou de cor</option>
+          <option>Esquentando demais</option>
+          <option>Não sei dizer</option>
+        </select>
+      </div>
+      <div id="pb_recomendacao"></div>
+      <div id="pb_solicitanteFields" class="hidden">
+        <div class="field"><label>Seu nome</label><input id="pb_nome"></div>
+        <div class="field"><label>Contato (telefone/e-mail, opcional)</label><input id="pb_contato"></div>
+      </div>
+      <div id="problemaMsg"></div>
+      <div id="pb_actions" class="hidden" style="display:flex;gap:10px">
+        <button type="button" class="btn secondary" onclick="hideProblemaForm()">Cancelar</button>
+        <button type="button" class="btn" onclick="enviarProblema()">Registrar pedido de reposição</button>
+      </div>
+    </form>
+    <div id="problemaSucesso" class="hidden">
+      <h2>Pedido registrado ✓</h2>
+      <div class="small">Encaminhe a peça recomendada acima pra sua equipe de compras. Quando a troca for feita de verdade, use o "Registrar manutenção" abaixo pra fechar o histórico.</div>
+      <button type="button" class="btn secondary" style="margin-top:12px" onclick="hideProblemaForm()">Fechar</button>
+    </div>
+  </div>
+
   <div id="manutBox" class="card hidden">
     <div id="manutBtnWrap">
       <button type="button" class="btn" onclick="showManutForm()">Registrar manutenção</button>
@@ -104,6 +141,7 @@ async function loadAsset(){
   assetCode=code;
   currentLum=lum;
   document.getElementById("manutBox").classList.remove("hidden");
+  document.getElementById("problemaBox").classList.remove("hidden");
 
   const statusClassMap={"Ativa":"st-ok","Falha":"st-bad","Em manutenção":"st-warn","Desativada":"st-off"};
   const statusClass = statusClassMap[lum.status]||"st-off";
@@ -177,6 +215,86 @@ function showManutForm(){
 function hideManutForm(){
   document.getElementById("manutForm").classList.add("hidden");
   document.getElementById("manutBtnWrap").classList.remove("hidden");
+}
+
+// ---- Reportar problema (diagnóstico + recomendação, antes da manutenção) ----
+const SINTOMA_COMPONENTE = {
+  "Não acende": "Driver",
+  "Pisca / instável": "Driver",
+  "Luz fraca": "LED",
+  "Mudou de cor": "LED",
+  "Esquentando demais": "Driver",
+  "Não sei dizer": null
+};
+let pbRecomendacaoAtual=null;
+
+function showProblemaForm(){
+  document.getElementById("problemaBtnWrap").classList.add("hidden");
+  document.getElementById("problemaForm").classList.remove("hidden");
+}
+function hideProblemaForm(){
+  document.getElementById("problemaForm").classList.add("hidden");
+  document.getElementById("problemaSucesso").classList.add("hidden");
+  document.getElementById("problemaBtnWrap").classList.remove("hidden");
+  document.getElementById("pb_sintoma").value="";
+  document.getElementById("pb_recomendacao").innerHTML="";
+  document.getElementById("pb_solicitanteFields").classList.add("hidden");
+  document.getElementById("pb_actions").classList.add("hidden");
+  document.getElementById("problemaMsg").innerHTML="";
+  pbRecomendacaoAtual=null;
+}
+
+async function onSintomaChange(){
+  const sintoma=document.getElementById("pb_sintoma").value;
+  const box=document.getElementById("pb_recomendacao");
+  if(!sintoma){ box.innerHTML=""; document.getElementById("pb_solicitanteFields").classList.add("hidden"); document.getElementById("pb_actions").classList.add("hidden"); return; }
+  box.innerHTML=`<div class="small">Buscando peça recomendada...</div>`;
+  const componente=SINTOMA_COMPONENTE[sintoma];
+  const modeloCodigo=currentLum?.modelo||null;
+  const componentesParaChecar = componente ? [componente] : ["Driver","LED"];
+  let recomendacoes=[];
+  for(const comp of componentesParaChecar){
+    const r=await sb.rpc("listar_homologados",{p_componente:comp,p_modelo_codigo:modeloCodigo});
+    if(!r.error && r.data && r.data.length) recomendacoes.push({componente:comp, opcoes:r.data});
+  }
+  if(!recomendacoes.length){
+    box.innerHTML=`<div class="alert">Nenhuma peça homologada cadastrada ainda pra esse caso. Registre a manutenção normalmente quando for trocar.</div>`;
+    pbRecomendacaoAtual={sintoma,componente,peca:null};
+  }else{
+    box.innerHTML = recomendacoes.map(rec=>{
+      const top=rec.opcoes[0];
+      const outras=rec.opcoes.length-1;
+      return `<div class="alert" style="border-left-color:var(--amber,#c98a12);background:#fff8ec">
+        <b>Provável causa: ${esc(rec.componente)}</b><br>
+        Peça recomendada: <b>${esc(top.modelo_equivalente)}</b>${top.fabricante_equivalente?" — "+esc(top.fabricante_equivalente):""}${top.especificacao?`<br><span class="small">${esc(top.especificacao)}</span>`:""}
+        ${outras>0?`<div class="small" style="margin-top:4px">+ ${outras} outra(s) opção(ões) compatível(eis) no catálogo homologado</div>`:""}
+      </div>`;
+    }).join("");
+    pbRecomendacaoAtual={sintoma,componente,peca:recomendacoes[0].opcoes[0]};
+  }
+  document.getElementById("pb_solicitanteFields").classList.remove("hidden");
+  document.getElementById("pb_actions").classList.remove("hidden");
+}
+
+async function enviarProblema(){
+  const msgBox=document.getElementById("problemaMsg");
+  const sintoma=document.getElementById("pb_sintoma").value;
+  if(!sintoma){ msgBox.innerHTML=`<div class="small" style="color:var(--red)">Selecione o que está acontecendo.</div>`; return; }
+  const nome=document.getElementById("pb_nome").value.trim();
+  const contato=document.getElementById("pb_contato").value.trim();
+  const p={
+    p_code:assetCode,
+    p_sintoma:sintoma,
+    p_componente_sugerido:pbRecomendacaoAtual?pbRecomendacaoAtual.componente:null,
+    p_peca_fabricante:pbRecomendacaoAtual&&pbRecomendacaoAtual.peca?pbRecomendacaoAtual.peca.fabricante_equivalente:null,
+    p_peca_modelo:pbRecomendacaoAtual&&pbRecomendacaoAtual.peca?pbRecomendacaoAtual.peca.modelo_equivalente:null,
+    p_solicitante_nome:nome||null,
+    p_solicitante_contato:contato||null
+  };
+  const r=await sb.rpc("reportar_problema",p);
+  if(r.error){ msgBox.innerHTML=`<div class="small" style="color:var(--red)">Erro ao registrar: ${esc(r.error.message)}</div>`; return; }
+  document.getElementById("problemaForm").classList.add("hidden");
+  document.getElementById("problemaSucesso").classList.remove("hidden");
 }
 function onCompInstaladoChange(){
   const v=document.getElementById("pm_comp_instalado_tipo").value;

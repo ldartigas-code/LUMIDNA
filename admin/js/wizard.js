@@ -125,12 +125,45 @@ function renderWizCarrinho(){
   const box=q("#wizCarrinhoList");
   q("#wizCarrinhoTotal").textContent=wizCarrinho.reduce((s,x)=>s+x.qty,0);
   box.innerHTML = wizCarrinho.length ? wizCarrinho.map((item,idx)=>`
-    <div class="card" style="display:flex;align-items:center;gap:12px;padding:12px 14px">
-      ${item.modelo.imagem_url?`<img src="${esc(item.modelo.imagem_url)}" alt="" style="width:36px;height:36px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:""}
-      <div style="flex:1"><b>${esc(item.modelo.fabricante)||""} — ${esc(item.modelo.codigo)}</b></div>
-      <input type="number" min="1" value="${item.qty}" style="width:80px" onchange="wizAtualizarQtd(${idx},this.value)">
-      <button type="button" class="secondary" onclick="wizRemoverItem(${idx})">Remover</button>
+    <div class="card" style="padding:12px 14px">
+      <div style="display:flex;align-items:center;gap:12px">
+        ${item.modelo.imagem_url?`<img src="${esc(item.modelo.imagem_url)}" alt="" style="width:36px;height:36px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:""}
+        <div style="flex:1"><b>${esc(item.modelo.fabricante)||""} — ${esc(item.modelo.codigo)}</b>${item.modelo.tipo_montagem==="Retrofit"?` <span class="pill" style="background:#edf3ff;color:#355fa8">Retrofit</span>`:""}</div>
+        <input type="number" min="1" value="${item.qty}" style="width:80px" onchange="wizAtualizarQtd(${idx},this.value)">
+        <button type="button" class="secondary" onclick="wizRemoverItem(${idx})">Remover</button>
+      </div>
+      ${item.modelo.tipo_montagem==="Retrofit"?`
+      <div class="field" style="margin-top:10px">
+        <label>Lâmpada instalada (opcional — preenche potência/CCT/fluxo automaticamente)</label>
+        <select id="wizLampada${idx}" onchange="wizEscolherLampada(${idx},this.value)">
+          <option value="">Carregando lâmpadas compatíveis...</option>
+        </select>
+      </div>`:""}
     </div>`).join("") : "<div class='small'>Nenhum item adicionado ainda.</div>";
+  wizCarrinho.forEach((item,idx)=>{ if(item.modelo.tipo_montagem==="Retrofit") carregarLampadasDoItem(idx); });
+}
+
+async function carregarLampadasDoItem(idx){
+  const item=wizCarrinho[idx];
+  if(!item) return;
+  const sel=q(`#wizLampada${idx}`);
+  if(!sel) return;
+  const r=await sb.rpc("listar_homologados",{p_componente:"LED",p_modelo_codigo:item.modelo.codigo});
+  if(!q(`#wizLampada${idx}`)) return; // carrinho pode ter mudado enquanto carregava
+  const rows=r.error?[]:(r.data||[]);
+  const atual=item.lampada?item.lampada.modelo_equivalente:"";
+  sel.innerHTML = `<option value="">— nenhuma / definir depois —</option>` +
+    rows.map(x=>`<option value="${esc(x.modelo_equivalente)}">${esc(x.modelo_equivalente)}${x.fabricante_equivalente?" — "+esc(x.fabricante_equivalente):""}${x.especificacao?" ("+esc(x.especificacao)+")":""}</option>`).join("");
+  sel.value=atual;
+}
+
+function wizEscolherLampada(idx,codigo){
+  const item=wizCarrinho[idx];
+  if(!item) return;
+  if(!codigo){ item.lampada=null; return; }
+  const sel=q(`#wizLampada${idx}`);
+  const opt=sel&&sel.querySelector(`option[value="${CSS.escape(codigo)}"]`);
+  item.lampada={modelo_equivalente:codigo, especificacao:opt?opt.textContent:codigo};
 }
 
 function toggleWizColar(){
@@ -174,7 +207,7 @@ async function wizRevisar(){
     item.startNum=r.data;
     const firstId=buildLumidnaId(item.modelo,item.startNum), lastId=buildLumidnaId(item.modelo,item.startNum+item.qty-1);
     total+=item.qty;
-    html+=`<div style="margin-bottom:10px"><b>${item.qty}×</b> ${esc(item.modelo.fabricante)} — ${esc(item.modelo.codigo)}<br><span class="small">${firstId}${item.qty>1?" até "+lastId:""}</span></div>`;
+    html+=`<div style="margin-bottom:10px"><b>${item.qty}×</b> ${esc(item.modelo.fabricante)} — ${esc(item.modelo.codigo)}<br><span class="small">${firstId}${item.qty>1?" até "+lastId:""}</span>${item.lampada?`<br><span class="small">Lâmpada: ${esc(item.lampada.especificacao||item.lampada.modelo_equivalente)}</span>`:""}</div>`;
   }
   q("#wizResumo").innerHTML=`<div class="small" style="margin-bottom:10px">Obra: <b>${esc(wizObra.empreendimento)||"—"}</b>${wizObra.cliente?" · "+esc(wizObra.cliente):""}</div>${html}<div style="margin-top:6px"><b>Total: ${total} peça(s)</b></div>`;
   wizStep(3);
@@ -195,9 +228,29 @@ async function wizCriar(){
       });
     }
   }
-  const r=await sb.from("luminarias").insert(rows).select("lumidna_id,public_code,numero_serie");
+  const r=await sb.from("luminarias").insert(rows).select("id,lumidna_id,public_code,numero_serie");
   if(r.error) return msg("Erro ao criar o pedido: "+r.error.message,false);
   wizUltimaCriacao=r.data;
+
+  // Pra modelos Retrofit onde foi escolhida a lâmpada, já grava ela como
+  // componente LED instalado desde a criação — em vez de duplicar
+  // potência/CCT/fluxo na luminária, a página pública busca esses dados
+  // direto do catálogo de componentes (permanecem complementares, não
+  // unidos: se a lâmpada for trocada depois, o histórico de manutenção
+  // continua sendo a fonte da verdade).
+  let offset=0;
+  const componenteRows=[];
+  for(const item of wizCarrinho){
+    const idsDoItem=r.data.slice(offset,offset+item.qty);
+    offset+=item.qty;
+    if(item.lampada&&item.lampada.modelo_equivalente){
+      idsDoItem.forEach(l=>componenteRows.push({luminaria_id:l.id,tipo:"LED",modelo:item.lampada.modelo_equivalente,original:false,ativo_atual:true}));
+    }
+  }
+  if(componenteRows.length){
+    const rc=await sb.from("componentes").insert(componenteRows);
+    if(rc.error) msg("Peças criadas, mas houve erro ao gravar a lâmpada instalada: "+rc.error.message,false);
+  }
   const ids=r.data.map(x=>x.lumidna_id);
   q("#wizSucessoTitulo").textContent=`${ids.length} peça(s) criada(s)`;
   const porModelo=wizCarrinho.map(item=>`${item.qty}× ${esc(item.modelo.fabricante)} — ${esc(item.modelo.codigo)}`).join("<br>");

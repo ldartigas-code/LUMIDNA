@@ -537,10 +537,12 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 
   <div class="card">
     <h2 style="margin:0 0 12px;font-size:16px">Cadastrar componente</h2>
+    <div class="alert">Preenchendo "Modelos compatíveis", esse componente já aparece sozinho como opção homologada assim que essa luminária for usada numa obra — no cadastro (lâmpada de Retrofit), no "Reportar problema" e em "Peças pra comprar". Deixe em branco se for compatível com qualquer modelo, ou se ainda não souber.</div>
     <div class="grid3">
       <div class="field"><label>Tipo</label><select id="comp_tipo" onchange="onCompTipoChange()"><option>Driver</option><option>LED</option><option>Óptica</option></select></div>
       <div class="field"><label>Fabricante</label><input id="comp_fabricante"></div>
       <div class="field"><label>Código / Modelo</label><input id="comp_codigo"></div>
+      <div class="field span2"><label>Modelos compatíveis (opcional)</label><input id="comp_modelos_compat" placeholder="ex: 4744, 4712, 4713 — códigos das luminárias que aceitam este componente, separados por vírgula"></div>
       <div class="field" id="comp_potencia_field"><label>Potência (W)</label><input type="number" step="0.01" id="comp_potencia"></div>
       <div class="field hidden" id="comp_corrente_field"><label>Corrente (mA)</label><input type="number" step="0.1" id="comp_corrente"></div>
       <div class="field hidden" id="comp_cct_field"><label>CCT (K)</label><input type="number" id="comp_cct"></div>

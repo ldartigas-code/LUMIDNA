@@ -28,6 +28,12 @@ th{color:var(--muted);font-weight:600}
 .field input,.field select,.field textarea{border:1px solid var(--line);border-radius:9px;padding:10px 11px;font-family:inherit;font-size:14px}
 .field textarea{min-height:70px;resize:vertical}
 .hidden{display:none!important}
+details.card{padding:0}
+details.card>summary{list-style:none;cursor:pointer;padding:18px 20px;font-size:15px;color:#39424b;display:flex;justify-content:space-between;align-items:center}
+details.card>summary::-webkit-details-marker{display:none}
+details.card>summary::after{content:"▾";color:var(--muted);font-size:12px;margin-left:8px;transition:transform .15s}
+details.card[open]>summary::after{transform:rotate(180deg)}
+.details-body{padding:0 20px 20px}
 </style>
 </head>
 <body>
@@ -160,51 +166,57 @@ async function loadAsset(){
       <h1>${esc(lum.lumidna_id)}</h1>
       <div class="sub">${esc(lum.modelo||"Modelo não informado")} ${lum.fabricante?"— "+esc(lum.fabricante):""}</div>
       <div class="grid">
-        <div class="k">Potência</div><div>${lum.potencia_w??"—"} W</div>
-        <div class="k">CCT</div><div>${lum.cct_k??"—"} K</div>
-        <div class="k">IRC</div><div>${lum.irc??"—"}</div>
-        <div class="k">Fluxo</div><div>${lum.fluxo_lm??"—"} lm</div>
-        <div class="k">Facho</div><div>${lum.facho_graus??"—"}°</div>
-        <div class="k">IP / IK</div><div>${lum.ip??"—"} / ${lum.ik??"—"}</div>
-        <div class="k">Tensão</div><div>${lum.tensao_instalacao??"—"}</div>
-        <div class="k">Automação</div><div>${lum.automacao?`Sim — ${esc(lum.protocolo_automacao)}`:"Não"}</div>
-        <div class="k">Montagem</div><div>${lum.tipo_montagem??"—"}</div>
+        <div class="k">⚡ Potência</div><div>${lum.potencia_w??"—"} W</div>
+        <div class="k">🌡️ CCT</div><div>${lum.cct_k??"—"} K</div>
+        <div class="k">🎨 IRC</div><div>${lum.irc??"—"}</div>
+        <div class="k">💡 Fluxo</div><div>${lum.fluxo_lm??"—"} lm</div>
+        <div class="k">📐 Facho</div><div>${lum.facho_graus??"—"}°</div>
+        <div class="k">🛡️ IP / IK</div><div>${lum.ip??"—"} / ${lum.ik??"—"}</div>
+        <div class="k">🔌 Tensão</div><div>${lum.tensao_instalacao??"—"}</div>
+        <div class="k">🤖 Automação</div><div>${lum.automacao?`Sim — ${esc(lum.protocolo_automacao)}`:"Não"}</div>
+        <div class="k">🔧 Montagem</div><div>${lum.tipo_montagem??"—"}</div>
       </div>
     </div>
 
     <div class="card">
-      <h2>Localização atual</h2>
+      <h2>📍 Localização atual</h2>
       <div class="grid">
-        <div class="k">Cliente</div><div>${esc(lum.cliente)||"—"}</div>
-        <div class="k">Empreendimento</div><div>${esc(lum.empreendimento)||"—"}</div>
-        <div class="k">Edifício</div><div>${esc(lum.edificio)||"—"}</div>
-        <div class="k">Andar</div><div>${esc(lum.andar)||"—"}</div>
-        <div class="k">Ambiente</div><div>${esc(lum.ambiente)||"—"}</div>
-        <div class="k">Posição</div><div>${esc(lum.posicao)||"—"}</div>
-        ${(lum.quadro_eletrico||lum.circuito_disjuntor)?`<div class="k">Quadro elétrico</div><div>${esc(lum.quadro_eletrico)||"—"}</div><div class="k">Circuito</div><div>${esc(lum.circuito_disjuntor)||"—"}</div>`:""}
+        <div class="k">🏢 Cliente</div><div>${esc(lum.cliente)||"—"}</div>
+        <div class="k">🏗️ Empreendimento</div><div>${esc(lum.empreendimento)||"—"}</div>
+        <div class="k">🏬 Edifício</div><div>${esc(lum.edificio)||"—"}</div>
+        <div class="k">🔢 Andar</div><div>${esc(lum.andar)||"—"}</div>
+        <div class="k">📦 Ambiente</div><div>${esc(lum.ambiente)||"—"}</div>
+        <div class="k">📍 Posição</div><div>${esc(lum.posicao)||"—"}</div>
+        ${(lum.quadro_eletrico||lum.circuito_disjuntor)?`<div class="k">⚡ Quadro elétrico</div><div>${esc(lum.quadro_eletrico)||"—"}</div><div class="k">🔌 Circuito</div><div>${esc(lum.circuito_disjuntor)||"—"}</div>`:""}
       </div>
     </div>
 
     <div class="card">
-      <h2>Peças instaladas</h2>
+      <h2>🔧 Peças instaladas</h2>
       <div class="small" style="margin-bottom:8px">Driver, LED e óptica atualmente nesta luminária.</div>
       ${compList.length?`<table><tr><th>Tipo</th><th>Modelo</th></tr>${compList.map(c=>`<tr><td>${esc(c.tipo)}</td><td>${esc(c.modelo)||"—"}</td></tr>`).join("")}</table>`:`<div class="small">Nenhuma peça registrada ainda.</div>`}
     </div>
 
-    <div class="card">
-      <h2>Garantias</h2>
-      ${warranties.length?`<table><tr><th>Tipo</th><th>Status</th><th>Fim</th></tr>${warranties.map(x=>`<tr><td>${esc(x.tipo)}</td><td>${esc(x.status)}</td><td>${esc(x.fim)||"—"}</td></tr>`).join("")}</table>`:`<div class="small">Nenhuma garantia registrada.</div>`}
-    </div>
+    <details class="card">
+      <summary>🛡️ Garantias</summary>
+      <div class="details-body">
+        ${warranties.length?`<table><tr><th>Tipo</th><th>Status</th><th>Fim</th></tr>${warranties.map(x=>`<tr><td>${esc(x.tipo)}</td><td>${esc(x.status)}</td><td>${esc(x.fim)||"—"}</td></tr>`).join("")}</table>`:`<div class="small">Nenhuma garantia registrada.</div>`}
+      </div>
+    </details>
 
-    <div class="card">
-      <h2>Manutenções recentes</h2>
-      ${maint.length?`<table><tr><th>Data</th><th>Tipo</th><th>Status</th></tr>${maint.map(x=>`<tr><td>${esc(x.data)||"—"}</td><td>${esc(x.tipo)}</td><td>${esc(x.status)}</td></tr>`).join("")}</table>`:`<div class="small">Nenhuma manutenção registrada.</div>`}
-    </div>
+    <details class="card">
+      <summary>🛠️ Manutenções recentes</summary>
+      <div class="details-body">
+        ${maint.length?`<table><tr><th>Data</th><th>Tipo</th><th>Status</th></tr>${maint.map(x=>`<tr><td>${esc(x.data)||"—"}</td><td>${esc(x.tipo)}</td><td>${esc(x.status)}</td></tr>`).join("")}</table>`:`<div class="small">Nenhuma manutenção registrada.</div>`}
+      </div>
+    </details>
 
-    <div class="card">
-      <h2>Equivalentes compatíveis verificados</h2>
-      ${equivs.length?`<table><tr><th>Origem</th><th>Equivalente</th><th>Nível</th><th>Preço ref.</th><th>Evidências</th></tr>${equivs.map(x=>`<tr><td>${esc(x.modelo_original)}</td><td>${esc(x.modelo_equivalente)}</td><td>${esc(x.nivel)}</td><td>${x.preco_referencia??"—"}</td><td>${x.evidencias_campo??0}</td></tr>`).join("")}</table>`:`<div class="small">Nenhum equivalente compatível verificado para os componentes atuais.</div>`}
-    </div>
+    <details class="card">
+      <summary>✅ Equivalentes compatíveis verificados</summary>
+      <div class="details-body">
+        ${equivs.length?`<table><tr><th>Origem</th><th>Equivalente</th><th>Nível</th><th>Preço ref.</th><th>Evidências</th></tr>${equivs.map(x=>`<tr><td>${esc(x.modelo_original)}</td><td>${esc(x.modelo_equivalente)}</td><td>${esc(x.nivel)}</td><td>${x.preco_referencia??"—"}</td><td>${x.evidencias_campo??0}</td></tr>`).join("")}</table>`:`<div class="small">Nenhum equivalente compatível verificado para os componentes atuais.</div>`}
+      </div>
+    </details>
   `;
 }
 loadAsset();

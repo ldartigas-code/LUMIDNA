@@ -87,15 +87,15 @@ th{color:var(--muted);font-weight:600}
       <div class="field"><label>Problema encontrado</label><textarea id="pm_problema"></textarea></div>
       <div class="field"><label>Serviço realizado</label><textarea id="pm_servico"></textarea></div>
       <div class="field"><label>Componente removido (se houve troca)</label><select id="pm_comp_removido" onchange="onCompRemovidoChange()"><option value="">— não houve troca —</option><option>Luminária inteira</option><option>Driver</option><option>LED</option><option>Óptica</option></select></div>
-      <div class="field"><label>Componente instalado</label><select id="pm_comp_instalado_tipo" onchange="onCompInstaladoChange()"><option value="">— não houve troca —</option><option value="Original">Original (igual ao que já tinha)</option><option value="Homologado">Homologado LumiDNA</option><option value="Outro">Outro modelo</option></select></div>
+      <div class="field"><label>Componente instalado</label><select id="pm_comp_instalado_tipo" onchange="onCompInstaladoChange()"><option value="">— não houve troca —</option><option value="Original">Original (igual ao que já tinha)</option><option value="Homologado">Compatível Verificado</option><option value="Outro">Outro modelo</option></select></div>
       <div id="homologadoCompFields" class="hidden">
-        <div class="field"><label>Qual homologado foi instalado</label><select id="pm_comp_homologado_codigo"><option value="">— selecione o componente removido acima —</option></select></div>
+        <div class="field"><label>Qual peça compatível verificada foi instalada</label><select id="pm_comp_homologado_codigo"><option value="">— selecione o componente removido acima —</option></select></div>
       </div>
       <div id="outroCompFields" class="hidden">
         <div class="field"><label>Qual modelo foi instalado</label><input id="pm_comp_modelo" placeholder="ex: LF-GIRO13YS0400BU"></div>
         <div class="field"><label>Fabricante</label><input id="pm_comp_fabricante"></div>
         <div class="field"><label>Foto do componente instalado</label><input type="file" accept="image/*" capture="environment" id="pm_comp_foto"></div>
-        <div class="small">Como não é original nem homologado, a LumiDNA precisa da foto e do fabricante pra avaliar antes de aprovar.</div>
+        <div class="small">Como não é original nem uma peça compatível verificada, a LumiDNA precisa da foto e do fabricante pra avaliar antes de aprovar.</div>
       </div>
       <div id="manutMsg"></div>
       <div style="display:flex;gap:10px">
@@ -202,8 +202,8 @@ async function loadAsset(){
     </div>
 
     <div class="card">
-      <h2>Equivalentes homologados LumiDNA</h2>
-      ${equivs.length?`<table><tr><th>Origem</th><th>Equivalente</th><th>Nível</th><th>Preço ref.</th><th>Evidências</th></tr>${equivs.map(x=>`<tr><td>${esc(x.modelo_original)}</td><td>${esc(x.modelo_equivalente)}</td><td>${esc(x.nivel)}</td><td>${x.preco_referencia??"—"}</td><td>${x.evidencias_campo??0}</td></tr>`).join("")}</table>`:`<div class="small">Nenhum equivalente homologado para os componentes atuais.</div>`}
+      <h2>Equivalentes compatíveis verificados</h2>
+      ${equivs.length?`<table><tr><th>Origem</th><th>Equivalente</th><th>Nível</th><th>Preço ref.</th><th>Evidências</th></tr>${equivs.map(x=>`<tr><td>${esc(x.modelo_original)}</td><td>${esc(x.modelo_equivalente)}</td><td>${esc(x.nivel)}</td><td>${x.preco_referencia??"—"}</td><td>${x.evidencias_campo??0}</td></tr>`).join("")}</table>`:`<div class="small">Nenhum equivalente compatível verificado para os componentes atuais.</div>`}
     </div>
   `;
 }
@@ -259,7 +259,7 @@ async function onSintomaChange(){
     if(!r.error && r.data && r.data.length) recomendacoes.push({componente:comp, opcoes:r.data});
   }
   if(!recomendacoes.length){
-    box.innerHTML=`<div class="alert">Nenhuma peça homologada cadastrada ainda pra esse caso. Registre a manutenção normalmente quando for trocar.</div>`;
+    box.innerHTML=`<div class="alert">Nenhuma peça compatível verificada cadastrada ainda pra esse caso. Registre a manutenção normalmente quando for trocar.</div>`;
     pbRecomendacaoAtual={sintoma,componente,peca:null};
   }else{
     box.innerHTML = recomendacoes.map(rec=>{
@@ -268,7 +268,7 @@ async function onSintomaChange(){
       return `<div class="alert" style="border-left-color:var(--amber,#c98a12);background:#fff8ec">
         <b>Provável causa: ${esc(rec.componente)}</b><br>
         Peça recomendada: <b>${esc(top.modelo_equivalente)}</b>${top.fabricante_equivalente?" — "+esc(top.fabricante_equivalente):""}${top.especificacao?`<br><span class="small">${esc(top.especificacao)}</span>`:""}
-        ${outras>0?`<div class="small" style="margin-top:4px">+ ${outras} outra(s) opção(ões) compatível(eis) no catálogo homologado</div>`:""}
+        ${outras>0?`<div class="small" style="margin-top:4px">+ ${outras} outra(s) opção(ões) compatível(eis) verificada(s)</div>`:""}
       </div>`;
     }).join("");
     pbRecomendacaoAtual={sintoma,componente,peca:recomendacoes[0].opcoes[0]};
@@ -321,7 +321,7 @@ async function carregarHomologados(){
   const rows=r.data||[];
   sel.innerHTML = rows.length
     ? `<option value="">— selecione —</option>`+rows.map(x=>`<option value="${esc(x.modelo_equivalente)}">${esc(x.modelo_equivalente)}${x.fabricante_equivalente?" — "+esc(x.fabricante_equivalente):""}</option>`).join("")
-    : `<option value="">Nenhum homologado cadastrado pra ${esc(componente)} — escolha "Outro modelo" acima</option>`;
+    : `<option value="">Nenhuma peça compatível verificada cadastrada pra ${esc(componente)} — escolha "Outro modelo" acima</option>`;
 }
 
 async function enviarManutencao(){
@@ -359,7 +359,7 @@ async function enviarManutencao(){
   }else if(compInstaladoTipo==="Homologado"){
     compModelo=document.getElementById("pm_comp_homologado_codigo").value.trim();
     if(!compModelo){
-      msgBox.innerHTML=`<div class="small" style="color:var(--red)">Informe o código do homologado instalado.</div>`;
+      msgBox.innerHTML=`<div class="small" style="color:var(--red)">Informe o código da peça compatível verificada instalada.</div>`;
       return;
     }
   }else if(compInstaladoTipo==="Original"){

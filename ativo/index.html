@@ -181,6 +181,7 @@ async function loadAsset(){
         <div class="k">Andar</div><div>${esc(lum.andar)||"—"}</div>
         <div class="k">Ambiente</div><div>${esc(lum.ambiente)||"—"}</div>
         <div class="k">Posição</div><div>${esc(lum.posicao)||"—"}</div>
+        ${(lum.quadro_eletrico||lum.circuito_disjuntor)?`<div class="k">Quadro elétrico</div><div>${esc(lum.quadro_eletrico)||"—"}</div><div class="k">Circuito</div><div>${esc(lum.circuito_disjuntor)||"—"}</div>`:""}
       </div>
     </div>
 

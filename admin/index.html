@@ -136,7 +136,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
   </button>
   <button type="button" class="bigOption" onclick="goScreen('componentes')">
     <span class="ic">🔧</span>
-    <span><b>Cadastrar componente novo</b><small>Driver, LED ou Óptica homologado — independente, pra ficar disponível no catálogo.</small></span>
+    <span><b>Cadastrar componente novo</b><small>Driver, LED ou Óptica compatível verificado — independente, pra ficar disponível no catálogo.</small></span>
   </button>
 </div>
 
@@ -443,7 +443,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <div class="field"><label>Modelo original</label><input id="rep_mod_orig"></div>
 <div class="field"><label>Fabricante equivalente</label><input id="rep_fab_eq"></div>
 <div class="field"><label>Modelo equivalente</label><input id="rep_mod_eq"></div>
-<div class="field"><label>Nível</label><select id="rep_nivel"><option>Homologado LumiDNA</option><option>Alternativa possível</option></select></div>
+<div class="field"><label>Nível</label><select id="rep_nivel"><option>Compatível Verificado</option><option>Alternativa possível</option></select></div>
 <div class="field"><label>Preço referência</label><input type="number" step="0.01" id="rep_preco"></div>
 <div class="field"><label>Disponibilidade</label><input id="rep_disp" value="Sob consulta"></div>
 <div class="field"><label>Especificação</label><input id="rep_spec"></div>
@@ -482,7 +482,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <div id="screenReposicao" class="hidden">
   <button type="button" class="linkback" onclick="goScreen('home')">‹ Início</button>
   <h2 style="margin:14px 0 12px">Peças pra comprar</h2>
-  <div class="small" style="margin-bottom:12px">Pedidos de reposição relatados pela página pública, antes de qualquer troca acontecer — a peça recomendada já é a homologada certa pra cada luminária. Depois de comprar, marque como resolvido; quando a troca for feita de verdade, ela é confirmada em "Registrar manutenção" / "Aprovações pendentes".</div>
+  <div class="small" style="margin-bottom:12px">Pedidos de reposição relatados pela página pública, antes de qualquer troca acontecer — a peça recomendada já é a compatível verificada certa pra cada luminária. Depois de comprar, marque como resolvido; quando a troca for feita de verdade, ela é confirmada em "Registrar manutenção" / "Aprovações pendentes".</div>
   <div id="reposicaoList"></div>
 
   <h2 style="margin:24px 0 12px">Já compradas / resolvidas</h2>
@@ -539,7 +539,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 
   <div class="card">
     <h2 style="margin:0 0 12px;font-size:16px">Cadastrar componente</h2>
-    <div class="alert">Preenchendo "Modelos compatíveis", esse componente já aparece sozinho como opção homologada assim que essa luminária for usada numa obra — no cadastro (lâmpada de Retrofit), no "Reportar problema" e em "Peças pra comprar". Deixe em branco se for compatível com qualquer modelo, ou se ainda não souber.</div>
+    <div class="alert">Preenchendo "Modelos compatíveis", esse componente já aparece sozinho como opção compatível verificada assim que essa luminária for usada numa obra — no cadastro (lâmpada de Retrofit), no "Reportar problema" e em "Peças pra comprar". Deixe em branco se for compatível com qualquer modelo, ou se ainda não souber.</div>
     <div class="grid3">
       <div class="field"><label>Tipo</label><select id="comp_tipo" onchange="onCompTipoChange()"><option>Driver</option><option>LED</option><option>Óptica</option></select></div>
       <div class="field"><label>Fabricante</label><input id="comp_fabricante"></div>
@@ -555,7 +555,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
       <div class="field hidden" id="comp_cct_field"><label>CCT (K)</label><input type="number" id="comp_cct"></div>
       <div class="field hidden" id="comp_fluxo_field"><label>Fluxo (lm)</label><input type="number" step="0.1" id="comp_fluxo"></div>
       <div class="field hidden" id="comp_facho_field"><label>Facho (graus)</label><input type="number" step="0.1" id="comp_facho"></div>
-      <div class="field"><label>Nível</label><select id="comp_nivel"><option>Homologado LumiDNA</option><option>Alternativa possível</option></select></div>
+      <div class="field"><label>Nível</label><select id="comp_nivel"><option>Compatível Verificado</option><option>Alternativa possível</option></select></div>
       <div class="field"><label>Preço referência</label><input type="number" step="0.01" id="comp_preco"></div>
       <div class="field"><label>Disponibilidade</label><input id="comp_disp" value="Sob consulta"></div>
       <div class="field span2"><label>Observações / especificação</label><input id="comp_obs"></div>

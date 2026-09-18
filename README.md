@@ -50,7 +50,9 @@ assets/supabase-config.js    → URL e chave pública do Supabase (compartilhada
 ## Principais funcionalidades
 
 - **Obras** — cada projeto/local é uma entidade própria (tensão, automação,
-  cliente), com sua lista de peças e aprovações pendentes.
+  cliente e e-mail do cliente), com sua lista de peças e aprovações pendentes.
+  Ao editar a obra, dá pra aplicar nome, cliente, e-mail, tensão e automação
+  nas peças já cadastradas (o e-mail só é aplicado se estiver preenchido).
 - **Cadastro em lote (wizard)** — escolhe a obra, monta um "pedido" com vários
   modelos e quantidades, e o sistema gera os IDs (`LD-FAB-MODELO-000001`) e o
   QR de cada peça de uma vez. A numeração é reservada de forma atômica no
@@ -59,7 +61,12 @@ assets/supabase-config.js    → URL e chave pública do Supabase (compartilhada
 - **Catálogo de modelos** — luminárias (Retrofit ou COB), com importação em
   massa por CSV.
 - **Catálogo de componentes** — Driver/LED/Óptica com compatibilidade
-  verificada pela LumiDNA, com preço de referência.
+  verificada pela LumiDNA, com preço de referência. É o único lugar onde peças
+  compatíveis são cadastradas; a tela de cada peça só lista as que servem pra
+  ela.
+- **Peça avulsa** — para peça sem modelo no catálogo. O ID é gerado pela
+  mesma numeração atômica do cadastro em lote (`LD-AVU-000001`, `000002`...),
+  nunca digitado à mão, para não colidir com a numeração automática.
 - **Modelos Retrofit** — no cadastro, já dá pra escolher qual lâmpada
   compatível verificada foi instalada; potência/CCT/fluxo aparecem sozinhos (o dado mora
   na lâmpada, não é duplicado na luminária — se a lâmpada for trocada depois,
@@ -74,13 +81,18 @@ assets/supabase-config.js    → URL e chave pública do Supabase (compartilhada
   falha relata o sintoma (sem precisar saber nada técnico) e o sistema já
   sugere o componente provável e a peça compatível verificada certa pra
   aquele modelo. É uma sugestão, não um diagnóstico técnico — o profissional
-  em campo confirma a causa real antes de instalar.
+  em campo confirma a causa real antes de instalar. Esse aviso também aparece
+  na própria página pública, junto de um alerta de segurança (cheiro de
+  queimado, faísca ou fiação aquecida: desligar o circuito e chamar um
+  profissional sem esperar a compra).
 - **Peças pra comprar** — cada "Reportar problema" vira um pedido de
   reposição, com preço de referência, opção de trocar por outra peça
   compatível verificada, e botão pra gerar e-mail de compra.
 - **Registrar manutenção** — enviado pela página pública, fica pendente até o
   Admin aprovar em "Aprovações pendentes"; só depois disso vira histórico
-  oficial da peça.
+  oficial da peça. Registrada direto pelo Admin (na tela da peça), a troca de
+  Driver/LED/Óptica também atualiza "Peças instaladas" e o histórico de
+  alterações, igual à aprovação — os dois caminhos deixam a peça no mesmo estado.
 - **Relatórios** — relatório de manutenções de uma peça (linha do tempo com
   fotos) e relatório de uma obra por período (quantas peças mexidas, o que
   foi trocado, valor de referência investido).

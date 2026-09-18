@@ -57,10 +57,10 @@ async function loadById(id){
 }
 
 async function createNew(){
-  const id=q("#lidInput").value.trim().toUpperCase();
-  if(!id) return msg("Informe um ID para o novo ativo.",false);
-  const existing=await sb.from("luminarias").select("id").eq("lumidna_id",id).maybeSingle();
-  if(existing.data) return msg("Já existe um ativo com esse ID. Busque por ele acima.",false);
+  const prefix="LD-AVU-";
+  const n=await sb.rpc("reservar_numeros",{p_prefix:prefix,p_qtd:1});
+  if(n.error) return msg("Erro ao reservar numeração: "+n.error.message,false);
+  const id=prefix+String(n.data).padStart(6,"0");
   const c=await sb.from("luminarias").insert({lumidna_id:id,status:"Ativa",criticidade:"Média"}).select().single();
   if(c.error) return msg("Erro ao criar: "+c.error.message,false);
   q("#formLum").reset();
@@ -75,7 +75,6 @@ async function openAsset(data){
   q("#formLum").classList.remove("hidden");
   fill(data);
   q("input[name=lumidna_id]").value=LID;
-  q("#lidInput").value=LID;
   q("#publicLink").value=data.public_code?`${LUMIDNA_SITE_BASE}/ativo/?c=${data.public_code}`:"(salve a luminária para gerar o link)";
   q("#modeloPicker").value=data.modelo_id||"";
   q("#det_automacao").value=data.automacao?"sim":"nao";

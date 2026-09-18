@@ -22,10 +22,10 @@ async function criarObra(){
   const nome=q("#obra_nome").value.trim();
   if(!nome) return msg("Informe o nome da obra.",false);
   const temAutomacao=q("#obra_automacao").value==="sim";
-  const p={nome,cliente:norm(q("#obra_cliente").value.trim()),tensao_instalacao:norm(q("#obra_tensao").value),automacao:temAutomacao,protocolo_automacao:temAutomacao?q("#obra_protocolo").value:null};
+  const p={nome,cliente:norm(q("#obra_cliente").value.trim()),cliente_email:norm(q("#obra_cliente_email").value.trim()),tensao_instalacao:norm(q("#obra_tensao").value),automacao:temAutomacao,protocolo_automacao:temAutomacao?q("#obra_protocolo").value:null};
   const r=await sb.from("obras").insert(p).select().single();
   if(r.error) return msg("Erro ao criar obra: "+r.error.message,false);
-  q("#obra_nome").value="";q("#obra_cliente").value="";q("#obra_tensao").value="";q("#obra_automacao").value="nao";q("#obra_protocolo_field").classList.add("hidden");
+  q("#obra_nome").value="";q("#obra_cliente").value="";q("#obra_cliente_email").value="";q("#obra_tensao").value="";q("#obra_automacao").value="nao";q("#obra_protocolo_field").classList.add("hidden");
   msg("Obra criada.");
   abrirObra(r.data.id);
 }
@@ -45,6 +45,8 @@ function abrirEdicaoObra(){
   if(!obraAtual) return;
   q("#eo_nome").value=obraAtual.nome||"";
   q("#eo_cliente").value=obraAtual.cliente||"";
+  q("#eo_cliente_email").value=obraAtual.cliente_email||"";
+  q("#eo_aplicar_pecas").checked=true;
   q("#eo_tensao").value=obraAtual.tensao_instalacao||"";
   q("#eo_automacao").value=obraAtual.automacao?"sim":"nao";
   q("#eo_protocolo").value=obraAtual.protocolo_automacao||"DALI";
@@ -63,6 +65,7 @@ async function salvarEdicaoObra(){
   const temAutomacao=q("#eo_automacao").value==="sim";
   const p={
     nome, cliente:norm(q("#eo_cliente").value.trim()),
+    cliente_email:norm(q("#eo_cliente_email").value.trim()),
     tensao_instalacao:norm(q("#eo_tensao").value),
     automacao:temAutomacao,
     protocolo_automacao:temAutomacao?q("#eo_protocolo").value:null
@@ -70,9 +73,12 @@ async function salvarEdicaoObra(){
   const r=await sb.from("obras").update(p).eq("id",obraAtual.id);
   if(r.error) return msg("Erro: "+r.error.message,false);
   if(q("#eo_aplicar_pecas").checked){
-    const r2=await sb.from("luminarias").update({
+    const nasPecas={
+      empreendimento:p.nome, cliente:p.cliente,
       tensao_instalacao:p.tensao_instalacao, automacao:p.automacao, protocolo_automacao:p.protocolo_automacao
-    }).eq("obra_id",obraAtual.id);
+    };
+    if(p.cliente_email) nasPecas.cliente_email=p.cliente_email;
+    const r2=await sb.from("luminarias").update(nasPecas).eq("obra_id",obraAtual.id);
     if(r2.error) return msg("Obra atualizada, mas houve erro ao aplicar nas peças: "+r2.error.message,false);
   }
   fecharEdicaoObra();
@@ -83,7 +89,7 @@ async function salvarEdicaoObra(){
 function cadastrarMaisNestaObra(){
   if(!obraAtual) return;
   wizObraId=obraAtual.id;
-  wizObra={cliente:obraAtual.cliente,empreendimento:obraAtual.nome,edificio:null,tensao_instalacao:obraAtual.tensao_instalacao,automacao:obraAtual.automacao,protocolo_automacao:obraAtual.protocolo_automacao};
+  wizObra=wizObraDe(obraAtual);
   wizPularParaCarrinho=true;
   goScreen("wizard");
   wizPularParaCarrinho=false;

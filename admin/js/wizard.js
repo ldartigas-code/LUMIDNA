@@ -10,10 +10,14 @@ function wizStep(n){
     q("#wizObraBusca").classList.remove("hidden");
     q("#wizObraEscolhida").classList.add("hidden");
     q("#wizNovaObraFields").classList.add("hidden");
-    q("#wiz_cliente").value="";q("#wiz_empreendimento").value="";q("#wiz_edificio").value="";
+    q("#wiz_cliente").value="";q("#wiz_cliente_email").value="";q("#wiz_empreendimento").value="";q("#wiz_edificio").value="";
     q("#wiz_tensao").value="";q("#wiz_automacao").value="nao";q("#wiz_protocolo_field").classList.add("hidden");
     wizFiltrarObras();
   }
+}
+
+function wizObraDe(o){
+  return {cliente:o.cliente,cliente_email:o.cliente_email,empreendimento:o.nome,edificio:null,tensao_instalacao:o.tensao_instalacao,automacao:o.automacao,protocolo_automacao:o.protocolo_automacao};
 }
 
 function onWizAutomacaoChange(){
@@ -50,7 +54,7 @@ async function wizEscolherObraExistente(id){
   if(r.error) return msg(r.error.message,false);
   const o=r.data;
   wizObraId=o.id;
-  wizObra={cliente:o.cliente,empreendimento:o.nome,edificio:null,tensao_instalacao:o.tensao_instalacao,automacao:o.automacao,protocolo_automacao:o.protocolo_automacao};
+  wizObra=wizObraDe(o);
   montarResumoObra();
 }
 
@@ -58,11 +62,11 @@ async function wizCriarNovaObra(){
   const nome=q("#wiz_empreendimento").value.trim();
   if(!nome) return msg("Informe o nome da obra.",false);
   const temAutomacao=q("#wiz_automacao").value==="sim";
-  const p={nome,cliente:norm(q("#wiz_cliente").value.trim()),tensao_instalacao:norm(q("#wiz_tensao").value),automacao:temAutomacao,protocolo_automacao:temAutomacao?q("#wiz_protocolo").value:null};
+  const p={nome,cliente:norm(q("#wiz_cliente").value.trim()),cliente_email:norm(q("#wiz_cliente_email").value.trim()),tensao_instalacao:norm(q("#wiz_tensao").value),automacao:temAutomacao,protocolo_automacao:temAutomacao?q("#wiz_protocolo").value:null};
   const r=await sb.from("obras").insert(p).select().single();
   if(r.error) return msg("Erro ao criar obra: "+r.error.message,false);
   wizObraId=r.data.id;
-  wizObra={cliente:r.data.cliente,empreendimento:r.data.nome,edificio:null,tensao_instalacao:r.data.tensao_instalacao,automacao:r.data.automacao,protocolo_automacao:r.data.protocolo_automacao};
+  wizObra=wizObraDe(r.data);
   montarResumoObra();
 }
 

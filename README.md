@@ -11,7 +11,7 @@ admin/index.html            → Admin: login + cadastro/edição/manutenção de
 admin/js/*.js                → JS do Admin, separado por assunto:
   core.js                      autenticação, navegação entre telas, helpers
   catalogo-modelos.js          Catálogo de modelos de luminária (importação CSV)
-  catalogo-componentes.js      Catálogo de componentes homologados (Driver/LED/Óptica)
+  catalogo-componentes.js      Catálogo de componentes compatíveis verificados (Driver/LED/Óptica)
   wizard.js                    cadastro em lote (carrinho, numeração, etiqueta)
   dashboard.js                 alerta de garantias vencendo
   busca.js                     busca e tela de detalhe de uma peça
@@ -58,24 +58,26 @@ assets/supabase-config.js    → URL e chave pública do Supabase (compartilhada
   simultâneos).
 - **Catálogo de modelos** — luminárias (Retrofit ou COB), com importação em
   massa por CSV.
-- **Catálogo de componentes** — Driver/LED/Óptica homologados pela LumiDNA,
-  com preço de referência.
+- **Catálogo de componentes** — Driver/LED/Óptica com compatibilidade
+  verificada pela LumiDNA, com preço de referência.
 - **Modelos Retrofit** — no cadastro, já dá pra escolher qual lâmpada
-  homologada foi instalada; potência/CCT/fluxo aparecem sozinhos (o dado mora
+  compatível verificada foi instalada; potência/CCT/fluxo aparecem sozinhos (o dado mora
   na lâmpada, não é duplicado na luminária — se a lâmpada for trocada depois,
   a informação exibida acompanha a troca).
 - **Etiqueta com QR code** — gerada na hora do cadastro, com logo, QR e o ID
   como identificador; pronta pra imprimir ou mandar pra um fabricante de
   etiquetas NFC.
 - **Página pública (`ativo`)** — mostra dados técnicos, localização, peças
-  instaladas, garantias, manutenções e equivalentes homologados de uma peça,
-  a partir do link/QR/NFC.
+  instaladas, garantias, manutenções e equivalentes compatíveis verificados de
+  uma peça, a partir do link/QR/NFC.
 - **Reportar problema** — antes de qualquer manutenção, quem percebe uma
   falha relata o sintoma (sem precisar saber nada técnico) e o sistema já
-  sugere o componente provável e a peça homologada certa pra aquele modelo.
+  sugere o componente provável e a peça compatível verificada certa pra
+  aquele modelo. É uma sugestão, não um diagnóstico técnico — o profissional
+  em campo confirma a causa real antes de instalar.
 - **Peças pra comprar** — cada "Reportar problema" vira um pedido de
   reposição, com preço de referência, opção de trocar por outra peça
-  homologada compatível, e botão pra gerar e-mail de compra.
+  compatível verificada, e botão pra gerar e-mail de compra.
 - **Registrar manutenção** — enviado pela página pública, fica pendente até o
   Admin aprovar em "Aprovações pendentes"; só depois disso vira histórico
   oficial da peça.

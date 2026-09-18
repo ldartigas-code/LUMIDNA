@@ -67,7 +67,7 @@ async function loadReposicoesResolvidas(){
   box.innerHTML = rows.length ? rows.map(p=>renderReposicaoCard(p,true,precos[p.peca_recomendada_modelo])).join("") : "<div class='small'>Nenhuma compra resolvida ainda.</div>";
 }
 
-// Popula o <select> de peças homologadas compatíveis com o modelo da
+// Popula o <select> de peças compatíveis verificadas com o modelo da
 // luminária (mesma lista que já aparece pro técnico na página pública),
 // deixando o Admin trocar por outra opção antes de mandar comprar.
 async function preencherOpcoesReposicao(p){
@@ -92,7 +92,7 @@ async function preencherOpcoesReposicao(p){
         const preco=fmtPreco(precos[o.modelo_equivalente]);
         return `<option value="${esc(o.modelo_equivalente)}" data-fab="${esc(o.fabricante_equivalente||"")}">${esc(o.modelo_equivalente)}${o.fabricante_equivalente?" — "+esc(o.fabricante_equivalente):""}${preco?" — "+preco:""}</option>`;
       }).join("")
-    : `<option value="">— nenhuma peça homologada compatível cadastrada —</option>`;
+    : `<option value="">— nenhuma peça compatível verificada cadastrada —</option>`;
   sel.value=p.peca_recomendada_modelo||"";
 }
 
@@ -127,7 +127,7 @@ A luminária ${lum.lumidna_id||""}${local?" ("+local+")":""} apresentou o seguin
 
 - Sintoma relatado: ${p.sintoma||"—"}
 - Componente indicado: ${p.componente_sugerido||"a confirmar"}
-- Peça homologada recomendada: ${p.peca_recomendada_modelo||"a definir"}${p.peca_recomendada_fabricante?" — "+p.peca_recomendada_fabricante:""}
+- Peça compatível verificada recomendada: ${p.peca_recomendada_modelo||"a definir"}${p.peca_recomendada_fabricante?" — "+p.peca_recomendada_fabricante:""}
 - Valor de referência: ${preco||"consultar"}
 
 Por favor, providenciar a compra da peça acima antes do técnico ir a campo.

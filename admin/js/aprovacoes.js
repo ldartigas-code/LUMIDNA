@@ -1,4 +1,6 @@
 // ---- Aprovações pendentes (manutenção enviada por técnico em campo) ----
+function labelCompTipo(tipo){return tipo==="Homologado"?"Compatível Verificado":tipo}
+
 async function checkPendentesBadge(){
   const r=await sb.from("manutencoes_pendentes").select("id",{count:"exact",head:true}).eq("status","Aguardando aprovação");
   const n=r.count||0;
@@ -25,7 +27,7 @@ async function loadPendentes(){
         <div class="field span2"><label>Problema</label><div class="small">${esc(p.problema)||"—"}</div></div>
         <div class="field span2"><label>Serviço realizado</label><div class="small">${esc(p.servico_realizado)||"—"}</div></div>
         ${p.componente_removido?`<div class="field"><label>Componente removido</label><div class="small">${esc(p.componente_removido)}</div></div>`:""}
-        ${p.componente_instalado_tipo?`<div class="field"><label>Componente instalado</label><div class="small">${esc(p.componente_instalado_tipo)}${p.componente_instalado_tipo==="Outro"?` — ${esc(p.componente_instalado)} (${esc(p.componente_instalado_fabricante)})`:p.componente_instalado_tipo==="Homologado"?` — ${esc(p.componente_instalado)}`:""}</div></div>`:""}
+        ${p.componente_instalado_tipo?`<div class="field"><label>Componente instalado</label><div class="small">${esc(labelCompTipo(p.componente_instalado_tipo))}${p.componente_instalado_tipo==="Outro"?` — ${esc(p.componente_instalado)} (${esc(p.componente_instalado_fabricante)})`:p.componente_instalado_tipo==="Homologado"?` — ${esc(p.componente_instalado)}`:""}</div></div>`:""}
         ${p.componente_instalado_foto_url?`<div class="field span2"><label>Foto enviada</label><a href="${esc(p.componente_instalado_foto_url)}" target="_blank"><img src="${esc(p.componente_instalado_foto_url)}" alt="" style="max-width:160px;border-radius:8px;border:1px solid var(--line)"></a></div>`:""}
       </div>
       ${p.componente_instalado_tipo==="Outro"?`<div class="alert" style="margin-top:10px">⚠️ Componente fora do catálogo — confira a foto e o fabricante antes de aprovar.</div>`:""}
@@ -81,7 +83,7 @@ function renderDecididaCard(p,tipo){
       </div>
       <div class="grid" style="margin-top:10px">
         ${p.componente_removido?`<div class="field"><label>Componente removido</label><div class="small">${esc(p.componente_removido)}</div></div>`:""}
-        ${p.componente_instalado_tipo?`<div class="field"><label>Componente instalado${tipo==="Rejeitada"?" (proposto)":""}</label><div class="small">${esc(p.componente_instalado_tipo)}${p.componente_instalado?" — "+esc(p.componente_instalado):""}</div></div>`:""}
+        ${p.componente_instalado_tipo?`<div class="field"><label>Componente instalado${tipo==="Rejeitada"?" (proposto)":""}</label><div class="small">${esc(labelCompTipo(p.componente_instalado_tipo))}${p.componente_instalado?" — "+esc(p.componente_instalado):""}</div></div>`:""}
       </div>
       <div class="actions" style="margin-top:12px">
         <button type="button" class="secondary" onclick="gerarEmailManutencao(${p.id})">✉ Gerar e-mail pro cliente</button>
@@ -123,8 +125,8 @@ Detalhes do envio:
 - Enviado por: ${p.responsavel||"—"} (${p.empresa||"—"})
 - Data do envio: ${new Date(p.criado_em).toLocaleString('pt-BR')}
 - Componente removido: ${p.componente_removido||"—"}
-- Componente ${aprovado?"instalado":"proposto para instalação"}: ${p.componente_instalado_tipo||"—"}${p.componente_instalado?" — "+p.componente_instalado:""}
-${aprovado?"":`- Motivo da não aprovação: ${p.motivo_rejeicao||"não homologado / não avaliado como equivalente seguro"}\n\nRecomendamos verificar a situação atual dessa luminária e, se necessário, entrar em contato com a LumiDNA antes de qualquer nova intervenção.`}
+- Componente ${aprovado?"instalado":"proposto para instalação"}: ${(p.componente_instalado_tipo==="Homologado"?"Compatível Verificado":p.componente_instalado_tipo)||"—"}${p.componente_instalado?" — "+p.componente_instalado:""}
+${aprovado?"":`- Motivo da não aprovação: ${p.motivo_rejeicao||"não verificado como equivalente seguro"}\n\nRecomendamos verificar a situação atual dessa luminária e, se necessário, entrar em contato com a LumiDNA antes de qualquer nova intervenção.`}
 
 Atenciosamente,
 LumiDNA`;

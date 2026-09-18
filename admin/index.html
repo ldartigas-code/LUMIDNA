@@ -151,6 +151,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
     <div class="grid">
       <div class="field"><label>Nome da obra / empreendimento</label><input id="obra_nome"></div>
       <div class="field"><label>Cliente (opcional)</label><input id="obra_cliente"></div>
+      <div class="field"><label>E-mail do cliente (opcional)</label><input type="email" id="obra_cliente_email" placeholder="pra avisos de manutenção não aprovada"></div>
       <div class="field"><label>Tensão da instalação</label><select id="obra_tensao"><option value="">— selecione —</option><option>127V</option><option>220V</option></select></div>
       <div class="field"><label>Tem automação?</label><select id="obra_automacao" onchange="onNovaObraAutomacaoChange()"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
       <div class="field hidden" id="obra_protocolo_field"><label>Protocolo</label><select id="obra_protocolo"><option>DALI</option><option>TRIAC</option><option>0-10V</option></select></div>
@@ -168,11 +169,12 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
     <div class="grid">
       <div class="field"><label>Nome da obra / empreendimento</label><input id="eo_nome"></div>
       <div class="field"><label>Cliente (opcional)</label><input id="eo_cliente"></div>
+      <div class="field"><label>E-mail do cliente (opcional)</label><input type="email" id="eo_cliente_email" placeholder="pra avisos de manutenção não aprovada"></div>
       <div class="field"><label>Tensão da instalação</label><select id="eo_tensao"><option value="">— selecione —</option><option>127V</option><option>220V</option></select></div>
       <div class="field"><label>Tem automação?</label><select id="eo_automacao" onchange="onEditarObraAutomacaoChange()"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
       <div class="field hidden" id="eo_protocolo_field"><label>Protocolo</label><select id="eo_protocolo"><option>DALI</option><option>TRIAC</option><option>0-10V</option></select></div>
     </div>
-    <label class="small" style="display:flex;align-items:center;gap:8px;margin:4px 0 12px"><input type="checkbox" id="eo_aplicar_pecas"> Também atualizar tensão/automação nas peças já cadastradas nesta obra</label>
+    <label class="small" style="display:flex;align-items:center;gap:8px;margin:4px 0 12px"><input type="checkbox" id="eo_aplicar_pecas" checked> Também atualizar nome, cliente, e-mail (se preenchido), tensão e automação nas peças já cadastradas nesta obra</label>
     <div class="actions" style="margin-top:12px">
       <button type="button" class="secondary" onclick="fecharEdicaoObra()">Cancelar</button>
       <button type="button" class="primary" onclick="salvarEdicaoObra()">Salvar alterações</button>
@@ -218,6 +220,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
         <div class="grid">
           <div class="field"><label>Nome da obra / empreendimento</label><input id="wiz_empreendimento"></div>
           <div class="field"><label>Cliente (opcional)</label><input id="wiz_cliente"></div>
+          <div class="field"><label>E-mail do cliente (opcional)</label><input type="email" id="wiz_cliente_email" placeholder="pra avisos de manutenção não aprovada"></div>
           <div class="field"><label>Tensão da instalação</label><select id="wiz_tensao"><option value="">— selecione —</option><option>127V</option><option>220V</option></select></div>
           <div class="field"><label>Tem automação?</label><select id="wiz_automacao" onchange="onWizAutomacaoChange()"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
           <div class="field hidden" id="wiz_protocolo_field"><label>Protocolo</label><select id="wiz_protocolo"><option>DALI</option><option>TRIAC</option><option>0-10V</option></select></div>
@@ -289,9 +292,8 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <div id="screenAvulsa" class="hidden">
   <button type="button" class="linkback" onclick="goScreen('wizard')">‹ Voltar</button>
   <h2 style="margin:14px 0 12px">Cadastrar peça avulsa</h2>
-  <div class="small" style="margin-bottom:10px">Use isso só quando a peça não tem um modelo no catálogo. Você preenche os dados técnicos manualmente depois.</div>
-  <div class="field"><label>ID LumiDNA</label><input id="lidInput" placeholder="LD-000003" style="text-transform:uppercase"></div>
-  <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="createNew()">Criar e abrir</button></div>
+  <div class="small" style="margin-bottom:10px">Use isso só quando a peça não tem um modelo no catálogo. O ID é gerado automaticamente (LD-AVU-000001, 000002...) e você preenche os dados técnicos depois.</div>
+  <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="createNew()">Criar peça avulsa e abrir</button></div>
 </div>
 
 <!-- ===== BUSCA ===== -->
@@ -374,7 +376,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <div class="field hidden" id="det_protocolo_field"><label>Protocolo</label><select name="protocolo_automacao"><option>DALI</option><option>TRIAC</option><option>0-10V</option></select></div>
 </div>
 <div class="small" style="margin-top:14px;font-weight:700">Peças instaladas</div>
-<div class="small" style="margin-bottom:8px">Só muda de "Original" pra um código quando uma troca é enviada pela página pública e aprovada em "Aprovações pendentes". Não dá pra editar aqui direto — isso evita dado digitado errado.</div>
+<div class="small" style="margin-bottom:8px">Só muda de "Original" pra um código quando uma troca é aprovada em "Aprovações pendentes" ou registrada em "Manutenção" (mais abaixo). Não dá pra editar aqui direto — isso evita dado digitado errado.</div>
 <div id="pecasInstaladasView" class="grid3"></div>
 </section>
 
@@ -425,10 +427,10 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 </select></div>
 <div class="field span2"><label>Problema</label><textarea id="man_prob"></textarea></div>
 <div class="field span2"><label>Serviço realizado</label><textarea id="man_serv"></textarea></div>
-<div class="field"><label>Componente removido (modelo)</label><input id="man_comp_removido" placeholder="ex: LF-GIRO13YS0300BU"></div>
-<div class="field"><label>Componente instalado (modelo)</label><input id="man_comp_instalado" placeholder="ex: LF-GIRO13YS0400BU"></div>
+<div class="field"><label>Componente trocado</label><select id="man_comp_removido" onchange="onManCompChange()"><option value="">— não houve troca —</option><option>Luminária inteira</option><option>Driver</option><option>LED</option><option>Óptica</option></select></div>
+<div class="field"><label>Modelo instalado no lugar</label><input id="man_comp_instalado" list="man_comp_opcoes" placeholder="escolha da lista, ou digite. &quot;Original&quot; se voltou ao original"><datalist id="man_comp_opcoes"></datalist></div>
 </div>
-<div class="small" style="margin-top:8px">Preenchendo os dois campos de componente, o LumiDNA registra automaticamente essa troca como evidência de campo no catálogo de equivalentes.</div>
+<div class="small" style="margin-top:8px">Quando você escolhe Driver, LED ou Óptica e informa o modelo, a troca também atualiza "Peças instaladas" desta luminária (e, em Retrofit, potência/CCT/fluxo passam a vir do novo modelo). O histórico de alterações registra a mudança, e a troca vira evidência de campo no catálogo de equivalentes.</div>
 <div class="actions" style="margin-top:12px"><button type="button" class="secondary" onclick="addMaintenance()">Registrar manutenção</button></div>
 <div id="manList" style="margin-top:14px"></div>
 <div class="actions" style="margin-top:12px"><button type="button" class="secondary" onclick="gerarRelatorioPeca()">📄 Ver relatório desta peça</button></div>
@@ -436,19 +438,8 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 
 <section class="card">
 <h2 style="margin:0 0 12px;font-size:16px">Reposição / equivalentes</h2>
-<div class="alert"><b>Regra LumiDNA:</b> somente LumiDNA homologa equivalentes. O preço é referência de venda LumiDNA.</div>
-<div class="grid3">
-<div class="field"><label>Componente de origem</label><select id="rep_comp"><option>Driver</option><option>LED</option><option>Óptica</option></select></div>
-<div class="field"><label>Fabricante original</label><input id="rep_fab_orig"></div>
-<div class="field"><label>Modelo original</label><input id="rep_mod_orig"></div>
-<div class="field"><label>Fabricante equivalente</label><input id="rep_fab_eq"></div>
-<div class="field"><label>Modelo equivalente</label><input id="rep_mod_eq"></div>
-<div class="field"><label>Nível</label><select id="rep_nivel"><option>Compatível Verificado</option><option>Alternativa possível</option></select></div>
-<div class="field"><label>Preço referência</label><input type="number" step="0.01" id="rep_preco"></div>
-<div class="field"><label>Disponibilidade</label><input id="rep_disp" value="Sob consulta"></div>
-<div class="field"><label>Especificação</label><input id="rep_spec"></div>
-</div>
-<div class="actions" style="margin-top:12px"><button type="button" class="secondary" onclick="addReplacement()">Adicionar equivalente</button></div>
+<div class="alert">Peças compatíveis com esta luminária, vindas do Catálogo de componentes. O preço é referência de venda LumiDNA. Pra cadastrar uma peça nova ou mudar a lista de modelos compatíveis, use o Catálogo de componentes.</div>
+<div class="actions" style="margin-top:10px"><button type="button" class="secondary" onclick="goScreen('componentes')">Abrir Catálogo de componentes</button></div>
 <div id="repList" style="margin-top:14px"></div>
 </section>
 

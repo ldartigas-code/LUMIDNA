@@ -306,6 +306,36 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
   <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="createNew()">Criar peça avulsa e abrir</button></div>
 </div>
 
+<!-- ===== COPIAR PEÇA (cria peças novas com os mesmos dados técnicos) ===== -->
+<div id="screenCopiar" class="hidden">
+  <button type="button" class="linkback" onclick="goScreen('search')">‹ Voltar à busca</button>
+  <h2 style="margin:14px 0 12px">Criar cópia (peça nova)</h2>
+  <div class="alert" id="copiaOrigemResumo">Nenhuma peça selecionada.</div>
+  <div id="copiaForm">
+    <div class="small" style="margin-bottom:12px">Serve só pra poupar digitação: cria peças <b>novas</b> (ID e QR novos) com os mesmos dados técnicos. Não move nem altera a peça original.</div>
+    <div class="grid">
+      <div class="field"><label>Obra de destino</label><select id="copia_obra"><option value="">Carregando obras...</option></select></div>
+      <div class="field"><label>Quantidade de peças</label><input type="number" id="copia_qtd" min="1" max="2000" value="1"></div>
+    </div>
+    <label class="small" style="display:flex;align-items:flex-start;gap:8px;margin:4px 0 12px"><input type="checkbox" id="copia_pecas" style="margin-top:2px"> Copiar também as peças instaladas hoje (Driver/LED/Óptica). Sem marcar, as novas nascem "Original".</label>
+    <div class="small" style="margin-bottom:14px">
+      <b>Vem copiado:</b> modelo, fabricante, dados técnicos (potência, CCT, IRC, fluxo, facho, IP, IK) e criticidade. Cliente, e-mail, tensão e automação vêm da obra de destino.<br>
+      <b>Fica em branco:</b> número de série, lote, datas, fotos, local (edifício, andar, ambiente, posição, quadro, circuito), observações, garantias, manutenções e histórico.
+    </div>
+    <div class="actions"><button type="button" class="primary" onclick="criarCopias()">Criar cópias</button></div>
+  </div>
+  <div id="copiaSucesso" class="hidden" style="text-align:center;padding:24px 0">
+    <div style="font-size:40px;color:var(--green)">✓</div>
+    <p style="font-weight:700;font-size:18px;margin:12px 0 4px" id="copiaSucessoTitulo"></p>
+    <div class="small" id="copiaSucessoTexto" style="text-align:left;max-width:420px;margin:0 auto"></div>
+    <div class="actions" style="justify-content:center;margin-top:16px">
+      <button type="button" class="secondary" onclick="goScreen('search')">Voltar à busca</button>
+      <button type="button" class="secondary" onclick="loadById(copiaPrimeiroId)">Abrir a 1ª peça</button>
+      <button type="button" class="primary" onclick="wizImprimirQR()">🖨 Imprimir QR das novas</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== BUSCA ===== -->
 <div id="screenSearch" class="hidden">
   <button type="button" class="linkback" onclick="goScreen('home')">‹ Início</button>
@@ -326,6 +356,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <form id="formLum">
 <section class="card">
 <h2 style="margin:0 0 12px;font-size:16px">Identificação</h2>
+<div class="actions" style="margin-bottom:12px"><button type="button" class="secondary" onclick="abrirCopia(LID)">📋 Criar cópia (peça nova) em outra obra</button></div>
 <div class="alert"><b>DNA ORIGINAL.</b> Estes campos representam como a luminária nasceu. Alterações geram trilha de auditoria (veja o Histórico, no fim desta página).</div>
 <div class="grid">
 <div class="field"><label>ID LumiDNA</label><input name="lumidna_id" readonly></div>

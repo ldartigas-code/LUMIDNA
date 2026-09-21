@@ -2,61 +2,105 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0a0e13"><meta name="color-scheme" content="dark">
 <title>LumiDNA</title>
 <style>
-:root{--bg:#f4f6f8;--text:#1f252b;--muted:#6c7580;--line:#e2e6ea;--orange:#ff6a1a;--green:#2e9d59;--red:#d94b4b;--amber:#c98a12;--gray:#6c7580}
-*{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text);padding:20px}
-.wrap{max-width:640px;margin:0 auto}
-.logo{font-size:26px;font-weight:800;margin:6px 0 18px}.logo span{color:var(--orange)}
-.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,.05)}
-.photo{width:100%;max-height:280px;object-fit:cover;border-radius:12px;margin-bottom:14px;display:block}
-h1{margin:0 0 4px;font-size:22px}.sub{color:var(--muted);margin-bottom:10px}
-.pill{display:inline-block;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:700}
-.pill.st-ok{background:#e9f7ee;color:var(--green)}.pill.st-bad{background:#fdecec;color:var(--red)}
-.pill.st-warn{background:#fff4e0;color:var(--amber)}.pill.st-off{background:#eee;color:var(--gray)}
-.grid{display:grid;grid-template-columns:150px 1fr;gap:8px 14px;margin-top:14px;font-size:14px}
-.k{color:var(--muted)}
-h2{font-size:15px;margin:0 0 10px;color:#39424b}
-table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left}
-th{color:var(--muted);font-weight:600}
-.small{font-size:12px;color:var(--muted)}
-.footer{text-align:center;font-size:12px;color:var(--muted);margin-top:20px}
-.btn{display:inline-block;width:100%;background:var(--orange);color:#fff;border:0;border-radius:10px;padding:13px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:filter .12s,transform .05s}
-.btn:hover{filter:brightness(.94)}
-.btn:active{transform:scale(.98)}
-.btn.secondary{background:#fff;color:var(--text);border:1px solid var(--line)}
-.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
-.field label{font-size:12px;font-weight:700;color:var(--muted)}
-.field input,.field select,.field textarea{border:1px solid var(--line);border-radius:9px;padding:10px 11px;font-family:inherit;font-size:14px;background:#fff;color:var(--text);transition:border-color .15s,box-shadow .15s}
-.field input:hover,.field select:hover,.field textarea:hover{border-color:#c7ccd1}
-.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,106,26,.15)}
-.field input::placeholder,.field textarea::placeholder{color:#a8b0b8}
-.field select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%236c7580'/></svg>");background-repeat:no-repeat;background-position:right 13px center;padding-right:34px}
-.field input[type=file]{border:1px dashed #c7ccd1;background:#fafbfc;padding:10px;font-size:13px;cursor:pointer}
-.field textarea{min-height:70px;resize:vertical}
+:root{color-scheme:dark;--bg:#0a0e13;--s1:#111821;--s2:#172130;--ink:#eef2f7;--muted:#8896a8;--line:#1f2b3b;--orange:#ff7a2f;--green:#34d399;--red:#f87171;--amber:#f5b942;--gray:#8896a8}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 Inter,"Segoe UI",Roboto,system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:110px;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(900px 380px at 50% -120px,rgba(255,122,47,.16),transparent 70%);background-repeat:no-repeat}
+.wrap{max-width:520px;margin:0 auto;padding:0 18px}
+.top{display:flex;justify-content:space-between;align-items:center;padding:18px 4px}
+.logo{font-weight:800;letter-spacing:-.03em;font-size:20px}.logo b{color:var(--orange)}
+.badge{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;border:1px solid var(--line);padding:4px 10px;border-radius:999px}
+.small{font-size:13px;color:var(--muted)}
 .hidden{display:none!important}
-details.card{padding:0}
-details.card>summary{list-style:none;cursor:pointer;padding:18px 20px;font-size:15px;color:#39424b;display:flex;justify-content:space-between;align-items:center}
-details.card>summary::-webkit-details-marker{display:none}
-details.card>summary::after{content:"▾";color:var(--muted);font-size:12px;margin-left:8px;transition:transform .15s}
-details.card[open]>summary::after{transform:rotate(180deg)}
-.details-body{padding:0 20px 20px}
+h1{margin:0 0 4px;font-size:22px}.sub{color:var(--muted)}
+
+.card{background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:20px}
+.hero{background:linear-gradient(180deg,var(--s2),var(--s1));border:1px solid var(--line);border-radius:20px;padding:20px;margin-top:4px}
+.photo{aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:radial-gradient(circle at 50% 30%,#2a3a52,#131c29 70%);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:#5d6d84;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:18px}
+.photo img{width:100%;height:100%;object-fit:cover;display:block}
+.legenda{margin:-8px 0 14px}
+.row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.id{font:600 24px/1.15 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:-.02em;word-break:break-all}
+.model{color:var(--muted);margin-top:4px}
+.status{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;white-space:nowrap;border:1px solid currentColor;background:color-mix(in srgb,currentColor 10%,transparent)}
+.status .dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor}
+.st-ok{color:var(--green)}.st-bad{color:var(--red)}.st-warn{color:var(--amber)}.st-off{color:var(--gray)}
+
+h2.sec{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:26px 4px 12px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:14px 14px 12px;min-width:0}
+.tile svg{width:20px;height:20px;color:var(--orange);stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tile small{display:block;font-size:12px;color:var(--muted);margin:10px 0 2px}
+.tile .v{font-size:26px;font-weight:650;letter-spacing:-.03em;line-height:1.05;overflow-wrap:anywhere}
+.tile .v i{font-style:normal;font-size:13px;color:var(--muted);font-weight:500;margin-left:4px;letter-spacing:0}
+.list{background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:4px 16px}
+.list .r{display:flex;justify-content:space-between;gap:16px;padding:13px 0;border-bottom:1px solid var(--line)}
+.list .r:last-child{border-bottom:0}
+.k{color:var(--muted)}.val{font-weight:600;text-align:right;overflow-wrap:anywhere}
+.chip{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(52,211,153,.12);color:var(--green);margin-left:8px;vertical-align:1px}
+.chip.neutro{background:rgba(136,150,168,.14);color:var(--muted)}
+.tl{position:relative;margin:0;padding:0 0 0 22px;list-style:none}
+.tl:before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.tl li{position:relative;padding:0 0 18px}.tl li:last-child{padding-bottom:0}
+.tl li:before{content:"";position:absolute;left:-22px;top:5px;width:12px;height:12px;border-radius:50%;background:var(--bg);border:2px solid var(--orange)}
+.tl b{display:block}.tl span{color:var(--muted);font-size:13px}
+details.acc{background:var(--s1);border:1px solid var(--line);border-radius:16px;margin-top:10px}
+details.acc summary{list-style:none;cursor:pointer;padding:16px;display:flex;justify-content:space-between;align-items:center;font-weight:600}
+details.acc summary::-webkit-details-marker{display:none}
+details.acc summary svg{transition:transform .15s;color:var(--muted)}
+details.acc[open] summary svg{transform:rotate(180deg)}
+details.acc .body{padding:0 16px 16px}
+.eqv{padding:10px 0;border-top:1px solid var(--line)}.eqv:first-child{border-top:0;padding-top:0}
+.foot{padding:28px 0 8px;color:var(--muted);font-size:12px;text-align:center}
+
+.bar{position:fixed;left:0;right:0;bottom:0;padding:12px 18px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(10,14,19,0),rgba(10,14,19,.94) 40%);z-index:5}
+.bar .in{max-width:520px;margin:0 auto;display:grid;grid-template-columns:1fr 1.25fr;gap:10px}
+.btn{display:inline-block;width:100%;padding:15px 12px;border-radius:14px;font:650 15px inherit;border:1px solid #2b3a50;background:var(--s2);color:var(--ink);cursor:pointer;transition:filter .12s,transform .05s}
+.btn:hover{filter:brightness(1.12)}.btn:active{transform:scale(.98)}
+.btn.p{background:var(--orange);border-color:var(--orange);color:#1a0d04;box-shadow:0 8px 24px rgba(255,122,47,.28)}
+
+.formcard{background:var(--s1);border:1px solid var(--line);border-radius:20px;padding:20px;margin-top:22px}
+.formcard h2{margin:0 0 14px;font-size:18px;letter-spacing:-.01em}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field label{font-size:12px;font-weight:700;color:var(--muted)}
+.field input,.field select,.field textarea{border:1px solid var(--line);border-radius:12px;padding:12px 13px;font-family:inherit;font-size:16px;background:var(--s2);color:var(--ink);transition:border-color .15s,box-shadow .15s;width:100%}
+.field input::placeholder,.field textarea::placeholder{color:#5d6d84}
+.field input:hover,.field select:hover,.field textarea:hover{border-color:#2f4059}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,122,47,.18)}
+.field select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%238896a8'/></svg>");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+.field select option{background:#111821;color:#eef2f7}
+.field textarea{min-height:76px;resize:vertical}
+.field input[type=file]{border:1px dashed #2f4059;background:var(--s2);padding:10px;font-size:14px;cursor:pointer}
+.field input[type=file]::file-selector-button{background:var(--s1);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 12px;margin-right:10px;font-family:inherit;cursor:pointer}
+.alert{padding:12px 14px;border-left:3px solid var(--orange);background:rgba(255,122,47,.09);border-radius:10px;margin-bottom:14px;font-size:14px}
+.alert.warn{border-left-color:var(--amber);background:rgba(245,185,66,.09)}
+.acoes{display:flex;gap:10px}
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></symbol>
+  <symbol id="i-cone" viewBox="0 0 24 24"><path d="M12 3v3M4 21 11 8h2l7 13z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.2 7.8 8 9 4.8-1.2 8-4.5 8-9V6z"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 2v5M15 2v5M6 7h12v4a6 6 0 0 1-12 0zM12 17v5"/></symbol>
+</defs></svg>
+
 <div class="wrap">
-  <div class="logo">Lumi<span>DNA</span></div>
+  <div class="top"><div class="logo">Lumi<b>DNA</b></div><div class="badge">Registro técnico</div></div>
+
   <div id="content">
     <div class="card small">Carregando ativo…</div>
   </div>
 
-  <div id="problemaBox" class="card hidden">
-    <div id="problemaBtnWrap">
-      <button type="button" class="btn" style="background:var(--amber,#c98a12)" onclick="showProblemaForm()">⚠️ Reportar problema</button>
-      <div class="small" style="margin-top:8px">Percebeu que essa luminária parou de funcionar direito, mas ainda não trocou nada? Use isto pra já saber qual peça comprar, antes de chamar a manutenção.</div>
-    </div>
+  <div id="problemaBox" class="formcard hidden">
     <form id="problemaForm" class="hidden" onsubmit="return false">
       <h2>Reportar problema</h2>
+      <div class="small" style="margin-bottom:14px">Percebeu que essa luminária parou de funcionar direito, mas ainda não trocou nada? Use isto pra já saber qual peça comprar, antes de chamar a manutenção.</div>
       <div class="field">
         <label>O que está acontecendo?</label>
         <select id="pb_sintoma" onchange="onSintomaChange()">
@@ -76,25 +120,23 @@ details.card[open]>summary::after{transform:rotate(180deg)}
         <div class="field"><label>Contato (telefone/e-mail, opcional)</label><input id="pb_contato"></div>
       </div>
       <div id="problemaMsg"></div>
-      <div id="pb_actions" class="hidden" style="display:flex;gap:10px">
-        <button type="button" class="btn secondary" onclick="hideProblemaForm()">Cancelar</button>
-        <button type="button" class="btn" onclick="enviarProblema()">Registrar pedido de reposição</button>
+      <div id="pb_actions" class="hidden acoes">
+        <button type="button" class="btn" onclick="hideProblemaForm()">Cancelar</button>
+        <button type="button" class="btn p" onclick="enviarProblema()">Registrar pedido de reposição</button>
       </div>
+      <div id="pb_fechar" style="margin-top:12px"><button type="button" class="btn" onclick="hideProblemaForm()">Fechar</button></div>
     </form>
     <div id="problemaSucesso" class="hidden">
-      <h2>Pedido registrado ✓</h2>
-      <div class="small">Encaminhe a peça recomendada acima pra sua equipe de compras. Quando a troca for feita de verdade, use o "Registrar manutenção" abaixo pra fechar o histórico.</div>
-      <button type="button" class="btn secondary" style="margin-top:12px" onclick="hideProblemaForm()">Fechar</button>
+      <h2>Pedido registrado</h2>
+      <div class="small">Encaminhe a peça recomendada acima pra sua equipe de compras. Quando a troca for feita de verdade, use o "Registrar manutenção" pra fechar o histórico.</div>
+      <button type="button" class="btn" style="margin-top:14px" onclick="hideProblemaForm()">Fechar</button>
     </div>
   </div>
 
-  <div id="manutBox" class="card hidden">
-    <div id="manutBtnWrap">
-      <button type="button" class="btn" onclick="showManutForm()">Registrar manutenção</button>
-      <div class="small" style="margin-top:8px">Preencha se você fez alguma troca ou reparo nesta luminária. O envio passa por aprovação da LumiDNA antes de virar registro oficial.</div>
-    </div>
+  <div id="manutBox" class="formcard hidden">
     <form id="manutForm" class="hidden" onsubmit="return false">
       <h2>Registrar manutenção</h2>
+      <div class="small" style="margin-bottom:14px">Preencha se você fez alguma troca ou reparo nesta luminária. O envio passa por aprovação da LumiDNA antes de virar registro oficial.</div>
       <div class="field"><label>Seu nome</label><input id="pm_nome" required></div>
       <div class="field"><label>Empresa / fornecedor</label><input id="pm_empresa" required></div>
       <div class="field"><label>Tipo</label><select id="pm_tipo"><option>Preventiva</option><option>Corretiva</option><option>Inspeção</option><option>Substituição de componente</option></select></div>
@@ -109,23 +151,29 @@ details.card[open]>summary::after{transform:rotate(180deg)}
         <div class="field"><label>Qual modelo foi instalado</label><input id="pm_comp_modelo" placeholder="ex: LF-GIRO13YS0400BU"></div>
         <div class="field"><label>Fabricante</label><input id="pm_comp_fabricante"></div>
         <div class="field"><label>Foto do componente instalado</label><input type="file" accept="image/*" capture="environment" id="pm_comp_foto"></div>
-        <div class="small">Como não é original nem uma peça compatível verificada, a LumiDNA precisa da foto e do fabricante pra avaliar antes de aprovar.</div>
+        <div class="small" style="margin-bottom:14px">Como não é original nem uma peça compatível verificada, a LumiDNA precisa da foto e do fabricante pra avaliar antes de aprovar.</div>
       </div>
       <div class="field"><label>Fotos do serviço (opcional — até 4, antes/depois)</label><input type="file" accept="image/*" multiple id="pm_fotos"></div>
       <div id="manutMsg"></div>
-      <div style="display:flex;gap:10px">
-        <button type="button" class="btn secondary" onclick="hideManutForm()">Cancelar</button>
-        <button type="button" class="btn" onclick="enviarManutencao()">Enviar para aprovação</button>
+      <div class="acoes">
+        <button type="button" class="btn" onclick="hideManutForm()">Cancelar</button>
+        <button type="button" class="btn p" onclick="enviarManutencao()">Enviar para aprovação</button>
       </div>
     </form>
     <div id="manutSucesso" class="hidden">
-      <h2>Enviado ✓</h2>
+      <h2>Enviado</h2>
       <div class="small">A LumiDNA vai revisar e aprovar essa manutenção. Ela só passa a valer no histórico oficial depois de aprovada.</div>
+      <button type="button" class="btn" style="margin-top:14px" onclick="hideManutForm()">Fechar</button>
     </div>
   </div>
 
-  <div class="footer">Registro técnico permanente da iluminação — LumiDNA</div>
+  <div class="foot">Registro técnico permanente da iluminação — LumiDNA</div>
 </div>
+
+<div id="actionBar" class="bar hidden"><div class="in">
+  <button type="button" class="btn" onclick="showProblemaForm()">Reportar problema</button>
+  <button type="button" class="btn p" onclick="showManutForm()">Registrar manutenção</button>
+</div></div>
 
 <script src="../assets/supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -145,6 +193,24 @@ function notFoundCard(){
 let assetCode=null;
 let currentLum=null;
 
+// ---- montagem da página do ativo ----
+const vazio=v=>v===null||v===undefined||v==="";
+const fmtData=d=>{ if(!d) return "sem data"; const [a,m,dia]=String(d).slice(0,10).split("-"); return `${dia}/${m}/${a}`; };
+const fmtPreco=v=>vazio(v)?null:`R$ ${Number(v).toFixed(2).replace(".",",")}`;
+function tile(icone,rotulo,valor,unidade){
+  return `<div class="tile"><svg><use href="#i-${icone}"/></svg><small>${rotulo}</small><div class="v">${valor}${unidade?`<i>${unidade}</i>`:""}</div></div>`;
+}
+const numOuTraco=v=>vazio(v)?"—":esc(v);
+function tensaoPartes(t){
+  if(vazio(t)) return ["—",""];
+  const m=String(t).trim().match(/^(\d+(?:[.,]\d+)?)\s*V?$/i);
+  return m?[esc(m[1]),"V"]:[esc(t),""];
+}
+function linhas(pares){
+  return pares.filter(([,v])=>!vazio(v)).map(([k,v])=>`<div class="r"><span class="k">${k}</span><span class="val">${v}</span></div>`).join("");
+}
+const seta=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
+
 async function loadAsset(){
   const code=new URLSearchParams(window.location.search).get("c");
   if(!code) return notFoundCard();
@@ -155,8 +221,7 @@ async function loadAsset(){
   if(!lum || !lum.lumidna_id) return notFoundCard();
   assetCode=code;
   currentLum=lum;
-  document.getElementById("manutBox").classList.remove("hidden");
-  document.getElementById("problemaBox").classList.remove("hidden");
+  document.getElementById("actionBar").classList.remove("hidden");
 
   const statusClassMap={"Ativa":"st-ok","Falha":"st-bad","Em manutenção":"st-warn","Desativada":"st-off"};
   const statusClass = statusClassMap[lum.status]||"st-off";
@@ -167,76 +232,86 @@ async function loadAsset(){
 
   const foto = lum.foto_principal_url || lum.foto_catalogo_url;
   const fotoEhCatalogo = !lum.foto_principal_url && !!lum.foto_catalogo_url;
+  const [tensaoN,tensaoU]=tensaoPartes(lum.tensao_instalacao);
+  const verificados=new Set(equivs.filter(e=>e.nivel==="Compatível Verificado").map(e=>e.modelo_equivalente));
+
+  const local=linhas([
+    ["Cliente",esc(lum.cliente)],
+    ["Empreendimento",esc(lum.empreendimento)],
+    ["Edifício · Andar",[lum.edificio,lum.andar].filter(x=>!vazio(x)).map(esc).join(" · ")],
+    ["Ambiente · Posição",[lum.ambiente,lum.posicao].filter(x=>!vazio(x)).map(esc).join(" · ")],
+    ["Quadro · Circuito",[lum.quadro_eletrico,lum.circuito_disjuntor].filter(x=>!vazio(x)).map(esc).join(" · ")]
+  ]);
 
   content.innerHTML = `
-    <div class="card">
-      ${foto?`<img class="photo" src="${esc(foto)}" alt="Foto da luminária">${fotoEhCatalogo?`<div class="small" style="margin:-8px 0 12px">Foto de referência do catálogo — ainda sem foto real desta peça instalada.</div>`:""}`:""}
-      <span class="pill ${statusClass}">${esc(lum.status||"—")}</span>
-      <h1>${esc(lum.lumidna_id)}</h1>
-      <div class="sub">${esc(lum.modelo||"Modelo não informado")} ${lum.fabricante?"— "+esc(lum.fabricante):""}</div>
-      <div class="grid">
-        <div class="k">⚡ Potência</div><div>${lum.potencia_w??"—"} W</div>
-        <div class="k">🌡️ CCT</div><div>${lum.cct_k??"—"} K</div>
-        <div class="k">🎨 IRC</div><div>${lum.irc??"—"}</div>
-        <div class="k">💡 Fluxo</div><div>${lum.fluxo_lm??"—"} lm</div>
-        <div class="k">📐 Facho</div><div>${lum.facho_graus??"—"}°</div>
-        <div class="k">🛡️ IP / IK</div><div>${lum.ip??"—"} / ${lum.ik??"—"}</div>
-        <div class="k">🔌 Tensão</div><div>${lum.tensao_instalacao??"—"}</div>
-        <div class="k">🤖 Automação</div><div>${lum.automacao?`Sim — ${esc(lum.protocolo_automacao)}`:"Não"}</div>
-        <div class="k">🔧 Montagem</div><div>${lum.tipo_montagem??"—"}</div>
+    <div class="hero">
+      <div class="photo">${foto?`<img src="${esc(foto)}" alt="Foto da luminária">`:"Sem foto"}</div>
+      ${fotoEhCatalogo?`<div class="small legenda">Foto de referência do catálogo — ainda sem foto real desta peça instalada.</div>`:""}
+      <div class="row">
+        <div><div class="id">${esc(lum.lumidna_id)}</div><div class="model">${esc(lum.modelo||"Modelo não informado")}${lum.fabricante?" · "+esc(lum.fabricante):""}</div></div>
+        <div class="status ${statusClass}"><span class="dot"></span>${esc(lum.status||"—")}</div>
       </div>
     </div>
 
-    <div class="card">
-      <h2>📍 Localização atual</h2>
-      <div class="grid">
-        <div class="k">🏢 Cliente</div><div>${esc(lum.cliente)||"—"}</div>
-        <div class="k">🏗️ Empreendimento</div><div>${esc(lum.empreendimento)||"—"}</div>
-        <div class="k">🏬 Edifício</div><div>${esc(lum.edificio)||"—"}</div>
-        <div class="k">🔢 Andar</div><div>${esc(lum.andar)||"—"}</div>
-        <div class="k">📦 Ambiente</div><div>${esc(lum.ambiente)||"—"}</div>
-        <div class="k">📍 Posição</div><div>${esc(lum.posicao)||"—"}</div>
-        ${(lum.quadro_eletrico||lum.circuito_disjuntor)?`<div class="k">⚡ Quadro elétrico</div><div>${esc(lum.quadro_eletrico)||"—"}</div><div class="k">🔌 Circuito</div><div>${esc(lum.circuito_disjuntor)||"—"}</div>`:""}
-      </div>
+    <h2 class="sec">Dados técnicos</h2>
+    <div class="tiles">
+      ${tile("bolt","Potência",numOuTraco(lum.potencia_w),vazio(lum.potencia_w)?"":"W")}
+      ${tile("sun","Temp. de cor",numOuTraco(lum.cct_k),vazio(lum.cct_k)?"":"K")}
+      ${tile("bulb","Fluxo",numOuTraco(lum.fluxo_lm),vazio(lum.fluxo_lm)?"":"lm")}
+      ${tile("cone","Facho",numOuTraco(lum.facho_graus),vazio(lum.facho_graus)?"":"°")}
+      ${tile("shield","IP / IK",numOuTraco(lum.ip),vazio(lum.ik)?"":"/ "+esc(lum.ik))}
+      ${tile("plug","Tensão",tensaoN,tensaoU)}
+    </div>
+    <div class="list" style="margin-top:10px">
+      ${linhas([
+        ["IRC",vazio(lum.irc)?"":esc(lum.irc)],
+        ["Automação",lum.automacao?`Sim${lum.protocolo_automacao?" — "+esc(lum.protocolo_automacao):""}`:"Não"],
+        ["Montagem",vazio(lum.tipo_montagem)?"":esc(lum.tipo_montagem)]
+      ])}
     </div>
 
-    <div class="card">
-      <h2>🔧 Peças instaladas</h2>
-      <div class="small" style="margin-bottom:8px">Driver, LED e óptica atualmente nesta luminária.</div>
-      ${compList.length?`<table><tr><th>Tipo</th><th>Modelo</th></tr>${compList.map(c=>`<tr><td>${esc(c.tipo)}</td><td>${esc(c.modelo)||"—"}</td></tr>`).join("")}</table>`:`<div class="small">Nenhuma peça registrada ainda.</div>`}
-    </div>
+    <h2 class="sec">Localização</h2>
+    ${local?`<div class="list">${local}</div>`:`<div class="card small">Localização ainda não informada.</div>`}
 
-    <details class="card">
-      <summary>🛡️ Garantias</summary>
-      <div class="details-body">
-        ${warranties.length?`<table><tr><th>Tipo</th><th>Status</th><th>Fim</th></tr>${warranties.map(x=>`<tr><td>${esc(x.tipo)}</td><td>${esc(x.status)}</td><td>${esc(x.fim)||"—"}</td></tr>`).join("")}</table>`:`<div class="small">Nenhuma garantia registrada.</div>`}
+    <h2 class="sec">Peças instaladas</h2>
+    ${compList.length?`<div class="list">${compList.map(c=>`<div class="r"><span class="k">${esc(c.tipo)}</span><span class="val">${esc(c.modelo)||"—"}${c.modelo&&verificados.has(c.modelo)?`<span class="chip">Compatível verificado</span>`:""}</span></div>`).join("")}</div>`:`<div class="card small">Nenhuma peça registrada ainda.</div>`}
+
+    <h2 class="sec">Histórico de manutenção</h2>
+    ${maint.length?`<div class="list" style="padding:18px 16px 18px 20px"><ul class="tl">${maint.map(x=>`<li><b>${esc(x.tipo)||"Manutenção"}</b><span>${fmtData(x.data)}${x.status?" · "+esc(x.status):""}</span></li>`).join("")}</ul></div>`:`<div class="card small">Nenhuma manutenção registrada.</div>`}
+
+    <details class="acc">
+      <summary>Garantias ${seta}</summary>
+      <div class="body">
+        ${warranties.length?warranties.map(x=>`<div class="eqv">${esc(x.tipo)||"Garantia"} · <b>${esc(x.status)||"—"}</b>${x.fim?" · até "+fmtData(x.fim):""}</div>`).join(""):`<div class="small">Nenhuma garantia registrada.</div>`}
       </div>
     </details>
 
-    <details class="card">
-      <summary>🛠️ Manutenções recentes</summary>
-      <div class="details-body">
-        ${maint.length?`<table><tr><th>Data</th><th>Tipo</th><th>Status</th></tr>${maint.map(x=>`<tr><td>${esc(x.data)||"—"}</td><td>${esc(x.tipo)}</td><td>${esc(x.status)}</td></tr>`).join("")}</table>`:`<div class="small">Nenhuma manutenção registrada.</div>`}
-      </div>
-    </details>
-
-    <details class="card">
-      <summary>✅ Equivalentes compatíveis verificados</summary>
-      <div class="details-body">
-        ${equivs.length?`<table><tr><th>Origem</th><th>Equivalente</th><th>Nível</th><th>Preço ref.</th><th>Evidências</th></tr>${equivs.map(x=>`<tr><td>${esc(x.modelo_original)}</td><td>${esc(x.modelo_equivalente)}</td><td>${esc(x.nivel)}</td><td>${x.preco_referencia??"—"}</td><td>${x.evidencias_campo??0}</td></tr>`).join("")}</table>`:`<div class="small">Nenhum equivalente compatível verificado para os componentes atuais.</div>`}
+    <details class="acc">
+      <summary>Equivalentes compatíveis verificados ${seta}</summary>
+      <div class="body">
+        ${equivs.length?equivs.map(x=>`<div class="eqv"><b>${esc(x.modelo_equivalente)}</b>${x.nivel?`<span class="chip${x.nivel==="Compatível Verificado"?"":" neutro"}">${esc(x.nivel)}</span>`:""}<div class="small">para ${esc(x.modelo_original)||"—"}${fmtPreco(x.preco_referencia)?" · "+fmtPreco(x.preco_referencia):""}${x.evidencias_campo?` · confirmado em ${x.evidencias_campo} caso(s) de campo`:""}</div></div>`).join(""):`<div class="small">Nenhum equivalente compatível verificado para os componentes atuais.</div>`}
       </div>
     </details>
   `;
 }
 loadAsset();
 
+// ---- abrir/fechar os formulários (barra fixa de ações) ----
+function abrirCaixa(qual){
+  const problema=qual==="problema";
+  document.getElementById("problemaBox").classList.toggle("hidden",!problema);
+  document.getElementById("manutBox").classList.toggle("hidden",problema);
+  document.getElementById(problema?"problemaBox":"manutBox").scrollIntoView({behavior:"smooth",block:"start"});
+}
 function showManutForm(){
-  document.getElementById("manutBtnWrap").classList.add("hidden");
+  document.getElementById("manutSucesso").classList.add("hidden");
   document.getElementById("manutForm").classList.remove("hidden");
+  abrirCaixa("manut");
 }
 function hideManutForm(){
   document.getElementById("manutForm").classList.add("hidden");
-  document.getElementById("manutBtnWrap").classList.remove("hidden");
+  document.getElementById("manutSucesso").classList.add("hidden");
+  document.getElementById("manutBox").classList.add("hidden");
 }
 
 // ---- Reportar problema (diagnóstico + recomendação, antes da manutenção) ----
@@ -251,17 +326,19 @@ const SINTOMA_COMPONENTE = {
 let pbRecomendacaoAtual=null;
 
 function showProblemaForm(){
-  document.getElementById("problemaBtnWrap").classList.add("hidden");
+  document.getElementById("problemaSucesso").classList.add("hidden");
   document.getElementById("problemaForm").classList.remove("hidden");
+  abrirCaixa("problema");
 }
 function hideProblemaForm(){
   document.getElementById("problemaForm").classList.add("hidden");
   document.getElementById("problemaSucesso").classList.add("hidden");
-  document.getElementById("problemaBtnWrap").classList.remove("hidden");
+  document.getElementById("problemaBox").classList.add("hidden");
   document.getElementById("pb_sintoma").value="";
   document.getElementById("pb_recomendacao").innerHTML="";
   document.getElementById("pb_solicitanteFields").classList.add("hidden");
   document.getElementById("pb_actions").classList.add("hidden");
+  document.getElementById("pb_fechar").classList.remove("hidden");
   document.getElementById("problemaMsg").innerHTML="";
   pbRecomendacaoAtual=null;
 }
@@ -269,8 +346,8 @@ function hideProblemaForm(){
 async function onSintomaChange(){
   const sintoma=document.getElementById("pb_sintoma").value;
   const box=document.getElementById("pb_recomendacao");
-  if(!sintoma){ box.innerHTML=""; document.getElementById("pb_solicitanteFields").classList.add("hidden"); document.getElementById("pb_actions").classList.add("hidden"); return; }
-  box.innerHTML=`<div class="small">Buscando peça recomendada...</div>`;
+  if(!sintoma){ box.innerHTML=""; document.getElementById("pb_solicitanteFields").classList.add("hidden"); document.getElementById("pb_actions").classList.add("hidden"); document.getElementById("pb_fechar").classList.remove("hidden"); return; }
+  box.innerHTML=`<div class="small" style="margin-bottom:14px">Buscando peça recomendada...</div>`;
   const componente=SINTOMA_COMPONENTE[sintoma];
   const modeloCodigo=currentLum?.modelo||null;
   const componentesParaChecar = componente ? [componente] : ["Driver","LED"];
@@ -286,7 +363,7 @@ async function onSintomaChange(){
     box.innerHTML = recomendacoes.map(rec=>{
       const top=rec.opcoes[0];
       const outras=rec.opcoes.length-1;
-      return `<div class="alert" style="border-left-color:var(--amber,#c98a12);background:#fff8ec">
+      return `<div class="alert warn">
         <b>Provável causa: ${esc(rec.componente)}</b><br>
         Peça recomendada: <b>${esc(top.modelo_equivalente)}</b>${top.fabricante_equivalente?" — "+esc(top.fabricante_equivalente):""}${top.especificacao?`<br><span class="small">${esc(top.especificacao)}</span>`:""}
         ${outras>0?`<div class="small" style="margin-top:4px">+ ${outras} outra(s) opção(ões) compatível(eis) verificada(s)</div>`:""}
@@ -296,6 +373,7 @@ async function onSintomaChange(){
   }
   document.getElementById("pb_solicitanteFields").classList.remove("hidden");
   document.getElementById("pb_actions").classList.remove("hidden");
+  document.getElementById("pb_fechar").classList.add("hidden");
 }
 
 async function enviarProblema(){

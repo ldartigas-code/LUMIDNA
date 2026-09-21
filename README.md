@@ -111,9 +111,19 @@ assets/supabase-config.js    → URL e chave pública do Supabase (compartilhada
   oficial da peça. Registrada direto pelo Admin (na tela da peça), a troca de
   Driver/LED/Óptica também atualiza "Peças instaladas" e o histórico de
   alterações, igual à aprovação — os dois caminhos deixam a peça no mesmo estado.
-- **Relatórios** — relatório de manutenções de uma peça (linha do tempo com
-  fotos) e relatório de uma obra por período (quantas peças mexidas, o que
-  foi trocado, valor de referência investido).
+- **Relatórios** — um PDF por relatório (Imprimir > Salvar como PDF), de uma
+  peça ou de uma obra por período. Cada ocorrência mostra o horário de **cada
+  etapa** — aviso do problema, pedido de compra enviado, compra confirmada,
+  troca em campo e aprovação — com o tempo entre elas (o mais demorado vem
+  destacado), quem avisou, a empresa e o responsável que fez o serviço, o que
+  foi trocado, o valor de referência e as fotos. O relatório da obra ainda traz
+  o resumo de tempo médio por trecho ("onde o tempo é gasto"), as empresas que
+  atuaram e os avisos que ainda estão sem troca. Os horários de pedido e de
+  compra só passam a existir a partir de quando foram introduzidos; antes
+  disso o relatório mostra "não registrado".
+- **Fotos do serviço** — a página pública aceita até 4 fotos ao registrar a
+  manutenção, e o Admin aceita várias ao registrar direto; elas aparecem na
+  aprovação e no relatório.
 - **Auditoria** — toda alteração de campo, componente e manutenção fica
   registrada por peça.
 

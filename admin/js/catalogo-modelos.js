@@ -1,4 +1,8 @@
 // ---- Catálogo de Modelos ----
+// O modelo é a ÚNICA fonte dos dados técnicos (potência, CCT, IRC, fluxo,
+// facho, IP, IK). Cada peça guarda uma cópia desses valores (é o que a página
+// pública lê), mas ninguém digita isso na peça: quando o modelo muda aqui, as
+// peças ligadas a ele acompanham (propagarModelosParaPecas).
 
 async function populateModeloPicker(){
   const sel=q("#modeloPicker");
@@ -6,27 +10,36 @@ async function populateModeloPicker(){
   let modelos=[];
   try{ modelos=await fetchAllRows((de,ate)=>sb.from("modelos").select("id,fabricante,codigo").order("fabricante").order("codigo").order("id").range(de,ate)); }catch(e){}
   const current=sel.value;
-  sel.innerHTML='<option value="">— nenhum / preencher manualmente —</option>'+modelos.map(m=>`<option value="${m.id}">${esc(m.fabricante)||"?"} — ${esc(m.codigo)}</option>`).join("");
+  sel.innerHTML='<option value="">— escolha o modelo —</option>'+modelos.map(m=>`<option value="${m.id}">${esc(m.fabricante)||"?"} — ${esc(m.codigo)}</option>`).join("");
   sel.value=current;
 }
 
-async function applyModeloToForm(){
+const CAMPOS_DO_MODELO_NA_PECA=["potencia_w","cct_k","irc","fluxo_lm","facho_graus","ip","ik"];
+function dadosDoModeloParaPeca(m){
+  const d={modelo:m.codigo,fabricante:m.fabricante};
+  CAMPOS_DO_MODELO_NA_PECA.forEach(k=>d[k]=m[k]??null);
+  return d;
+}
+
+// Troca o modelo da peça que está aberta (grava na hora e registra no histórico).
+async function trocarModeloDaPeca(){
   const id=q("#modeloPicker").value;
-  if(!id) return;
+  if(!LID) return msg("Abra uma peça primeiro.",false);
+  if(!id) return msg("Escolha o modelo na lista.",false);
   const r=await sb.from("modelos").select("*").eq("id",id).single();
   if(r.error) return msg("Erro: "+r.error.message,false);
   const m=r.data;
+  if(!confirm(`Trocar o modelo desta peça para ${m.fabricante||""} ${m.codigo}?\nOs dados técnicos da peça passam a ser os desse modelo.`)) return;
+  const novo={modelo_id:m.id,...dadosDoModeloParaPeca(m)};
+  const u=await sb.from("luminarias").update(novo).eq("id",luminariaDbId);
+  if(u.error) return msg("Erro: "+u.error.message,false);
+  for(const k of Object.keys(novo)) await logAudit(k,originalData?originalData[k]:null,novo[k]);
+  originalData={...originalData,...novo};
   q("input[name=modelo_id]").value=m.id;
-  q("input[name=modelo]").value=m.codigo||"";
-  q("input[name=fabricante]").value=m.fabricante||"";
-  if(m.potencia_w!=null) q("input[name=potencia_w]").value=m.potencia_w;
-  if(m.cct_k!=null) q("input[name=cct_k]").value=m.cct_k;
-  if(m.irc!=null) q("input[name=irc]").value=m.irc;
-  if(m.fluxo_lm!=null) q("input[name=fluxo_lm]").value=m.fluxo_lm;
-  if(m.facho_graus!=null) q("input[name=facho_graus]").value=m.facho_graus;
-  if(m.ip) q("input[name=ip]").value=m.ip;
-  if(m.ik) q("input[name=ik]").value=m.ik;
-  msg("Dados do modelo aplicados no formulário. Clique em SALVAR para gravar.");
+  await renderModeloEObra(originalData);
+  await loadComponents();
+  await loadAudit();
+  msg(`Modelo trocado para ${m.fabricante||""} ${m.codigo}.`);
 }
 
 let modeloSearchTimer=null;
@@ -61,7 +74,7 @@ function renderModelosList(){
     return av<bv?-1*modelosSort.dir:av>bv?1*modelosSort.dir:0;
   });
   const arrow=(col)=>col!==modelosSort.col?"":(modelosSort.dir===1?" ▲":" ▼");
-  box.innerHTML = `<table><tr><th>Foto</th>${MODELOS_COLS.map(([col,label])=>`<th style="cursor:pointer;user-select:none" onclick="sortModelosList('${col}')">${label}${arrow(col)}</th>`).join("")}<th></th></tr>${sorted.map(m=>`<tr><td>${m.imagem_url?`<img src="${esc(m.imagem_url)}" alt="" style="width:44px;height:44px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:`<span class="small" style="color:#bbb">—</span>`}</td><td>${esc(m.fabricante)}</td><td>${esc(m.linha)}</td><td>${esc(m.codigo)}</td><td>${esc(m.descricao)}</td><td>${m.potencia_w??"—"}W</td><td>${m.cct_k??"—"}</td><td>${m.fluxo_lm??"—"}lm</td><td>${m.facho_graus??"—"}°</td><td><button type="button" class="secondary" onclick="startWizardWithModelo(${m.id})">Cadastrar peças ▸</button></td></tr>`).join("")}</table>`;
+  box.innerHTML = `<table><tr><th>Foto</th>${MODELOS_COLS.map(([col,label])=>`<th style="cursor:pointer;user-select:none" onclick="sortModelosList('${col}')">${label}${arrow(col)}</th>`).join("")}<th></th></tr>${sorted.map(m=>`<tr><td>${m.imagem_url?`<img src="${esc(m.imagem_url)}" alt="" style="width:44px;height:44px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:`<span class="small" style="color:#bbb">—</span>`}</td><td>${esc(m.fabricante)}</td><td>${esc(m.linha)}</td><td>${esc(m.codigo)}</td><td>${esc(m.descricao)}</td><td>${m.potencia_w??"—"}W</td><td>${m.cct_k??"—"}</td><td>${m.fluxo_lm??"—"}lm</td><td>${m.facho_graus??"—"}°</td><td><button type="button" class="secondary" onclick="editarModelo(${m.id})">Editar</button> <button type="button" class="secondary" onclick="startWizardWithModelo(${m.id})">Cadastrar peças ▸</button></td></tr>`).join("")}</table>`;
 }
 
 function sortModelosList(col){
@@ -70,11 +83,9 @@ function sortModelosList(col){
   renderModelosList();
 }
 
-// Toda peça com Modelo e Fabricante preenchidos precisa existir como modelo do
-// catálogo (é de lá que o "Montar o pedido" lista). Acha o modelo pelo par
-// fabricante + código; se não existir, cria com os dados técnicos da peça.
+// Acha o modelo pelo par fabricante + código (sem diferenciar maiúscula:
+// LDARTI, Ldarti e ldarti são o mesmo fabricante); se não existir, cria.
 async function garantirModeloNoCatalogo(c){
-  // LDARTI, Ldarti e ldarti são o mesmo fabricante: reaproveita a grafia que já está no catálogo.
   const ex=await sb.from("modelos").select("id,fabricante").ilike("fabricante",likeLiteral(c.fabricante)).ilike("codigo",likeLiteral(c.codigo)).limit(1);
   if(ex.error) return {erro:ex.error.message};
   if(ex.data&&ex.data.length) return {id:ex.data[0].id,criado:false};
@@ -83,10 +94,51 @@ async function garantirModeloNoCatalogo(c){
   const r=await sb.from("modelos").insert({
     fabricante:grafiaFabricante,codigo:c.codigo,
     potencia_w:c.potencia_w??null,cct_k:c.cct_k??null,irc:c.irc??null,fluxo_lm:c.fluxo_lm??null,facho_graus:c.facho_graus??null,
-    ip:c.ip??null,ik:c.ik??null
+    ip:c.ip??null,ik:c.ik??null,tipo_montagem:c.tipo_montagem??null
   }).select("id").single();
   if(r.error) return {erro:r.error.message};
   return {id:r.data.id,criado:true};
+}
+
+// Quando um modelo é editado, as peças ligadas a ele recebem os dados novos.
+async function propagarModelosParaPecas(modelos){
+  const ids=modelos.map(m=>m.id);
+  let atualizadas=0;
+  for(let i=0;i<ids.length;i+=100){
+    const lote=ids.slice(i,i+100);
+    const ligadas=await fetchAllRows((de,ate)=>sb.from("luminarias").select("id,modelo_id").in("modelo_id",lote).order("id").range(de,ate));
+    const comPecas=new Set(ligadas.map(x=>x.modelo_id));
+    for(const m of modelos.filter(x=>comPecas.has(x.id))){
+      const u=await sb.from("luminarias").update(dadosDoModeloParaPeca(m)).eq("modelo_id",m.id).select("id");
+      atualizadas+=(u.data||[]).length;
+    }
+  }
+  return atualizadas;
+}
+
+// ---- formulário do modelo (novo ou edição) ----
+const MO_CAMPOS={mo_fabricante:"fabricante",mo_linha:"linha",mo_codigo:"codigo",mo_descricao:"descricao",mo_potencia:"potencia_w",mo_cct:"cct_k",mo_irc:"irc",mo_fluxo:"fluxo_lm",mo_facho:"facho_graus",mo_ip:"ip",mo_ik:"ik",mo_tensao:"tensao",mo_vida:"vida_util_h",mo_obs:"observacoes",mo_tipo_montagem:"tipo_montagem"};
+
+function novoModeloForm(){
+  Object.keys(MO_CAMPOS).forEach(id=>{q("#"+id).value=""});
+  q("#mo_fabricante").readOnly=false; q("#mo_codigo").readOnly=false;
+  q("#mo_titulo").textContent="Modelo novo";
+}
+
+async function editarModelo(id){
+  const r=await sb.from("modelos").select("*").eq("id",id).single();
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  Object.entries(MO_CAMPOS).forEach(([campo,col])=>{q("#"+campo).value=r.data[col]??""});
+  // fabricante e código identificam o modelo: pra não criar um segundo por engano, não se mexe neles na edição
+  q("#mo_fabricante").readOnly=true; q("#mo_codigo").readOnly=true;
+  q("#mo_titulo").textContent=`Editando: ${r.data.fabricante||""} ${r.data.codigo}`;
+  q("#mo_titulo").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+async function abrirModeloDaPeca(){
+  if(!originalData||!originalData.modelo_id) return msg("Esta peça ainda não está ligada a um modelo do catálogo. Clique em SALVAR que ela é ligada automaticamente.",false);
+  goScreen("catalogo");
+  await editarModelo(originalData.modelo_id);
 }
 
 async function addModelo(){
@@ -106,7 +158,8 @@ async function addModelo(){
   };
   const r=await sb.from("modelos").upsert(p,{onConflict:"fabricante,codigo"}).select();
   if(r.error) return msg("Erro: "+r.error.message,false);
-  msg("Modelo salvo.");
+  let pecas=0;
+  try{ pecas=await propagarModelosParaPecas(r.data||[]); }catch(e){ return msg("Modelo salvo, mas não consegui atualizar as peças ligadas a ele: "+(e.message||e),false); }
+  msg("Modelo salvo."+(pecas?` ${pecas} peça(s) ligada(s) a ele foram atualizadas.`:""));
   loadModelos();populateModeloPicker();
 }
-

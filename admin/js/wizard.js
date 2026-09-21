@@ -91,6 +91,7 @@ function wizEntrarNoCarrinho(){
   q("#wizModeloSearch").value="";
   wizFabricante=null;
   wizFabricantesCache=null;
+  wizFecharModeloNovo();
   q("#wizObraResumo").innerHTML=`Obra: <b>${esc(wizObra.empreendimento)}</b>${wizObraPrefixo?" ("+esc(wizObraPrefixo)+")":""}${wizObra.cliente?" · "+esc(wizObra.cliente):""}`;
   wizFiltrarModelos();
   renderWizCarrinho();
@@ -176,11 +177,42 @@ async function wizFiltrarModelos(){
       cortado=rows.length===100;
     }
     if(seq!==wizFiltroSeq) return;
-    box.innerHTML=(rows.length?rows.map(wizBotaoModelo).join(""):"<div class='small'>Nenhum modelo com esse nome no catálogo. Se a peça existe só como \"peça avulsa\", abra a peça e clique em SALVAR — com Modelo e Fabricante preenchidos ela entra no catálogo sozinha. Ou use \"Cadastrar o modelo no catálogo\" abaixo.</div>")
+    box.innerHTML=(rows.length?rows.map(wizBotaoModelo).join(""):"<div class='small'>Nenhum modelo encontrado. Use o botão \"+ Modelo novo\" abaixo pra cadastrar — ele entra no catálogo e neste pedido.</div>")
       +(cortado?`<div class="small" style="margin-top:8px">Mostrando só os 100 primeiros. Escolha um fabricante ou refine a busca pra ver os outros.</div>`:"");
   }catch(e){
     if(seq===wizFiltroSeq) box.innerHTML="<div class='small'>Erro: "+esc(e.message)+"</div>";
   }
+}
+
+// ---- Modelo novo criado dentro do próprio pedido ----
+function wizAbrirModeloNovo(){
+  const box=q("#wizModeloNovo");
+  box.classList.remove("hidden");
+  q("#mn_fabricante").value=(wizFabricante&&wizFabricante!==WIZ_SEM_FABRICANTE)?wizFabricante:"";
+  q("#mn_codigo").value=q("#wizModeloSearch").value.trim();
+  q("#mn_fabricantes").innerHTML=(wizFabricantesCache||[]).filter(f=>f.fabricante!==WIZ_SEM_FABRICANTE).map(f=>`<option value="${esc(f.fabricante)}">`).join("");
+  box.scrollIntoView({behavior:"smooth",block:"start"});
+  (q("#mn_fabricante").value?q("#mn_codigo"):q("#mn_fabricante")).focus();
+}
+
+function wizFecharModeloNovo(){
+  q("#wizModeloNovo").classList.add("hidden");
+  ["mn_fabricante","mn_codigo","mn_potencia","mn_cct","mn_irc","mn_fluxo","mn_facho","mn_ip","mn_ik"].forEach(id=>{q("#"+id).value=""});
+  q("#mn_tipo").value="";
+}
+
+async function wizSalvarModeloNovo(){
+  const fabricante=q("#mn_fabricante").value.trim(), codigo=q("#mn_codigo").value.trim();
+  if(!fabricante||!codigo) return msg("Informe o fabricante e o código do modelo.",false);
+  const num=id=>q(id).value===""?null:Number(q(id).value);
+  const g=await garantirModeloNoCatalogo({fabricante,codigo,potencia_w:num("#mn_potencia"),cct_k:num("#mn_cct"),irc:num("#mn_irc"),fluxo_lm:num("#mn_fluxo"),facho_graus:num("#mn_facho"),ip:norm(q("#mn_ip").value.trim()),ik:norm(q("#mn_ik").value.trim()),tipo_montagem:norm(q("#mn_tipo").value)});
+  if(g.erro) return msg("Erro ao salvar o modelo: "+g.erro,false);
+  wizFabricantesCache=null;
+  await wizAdicionarAoCarrinho(g.id);
+  wizFecharModeloNovo();
+  msg(g.criado?`Modelo ${codigo} (${fabricante}) salvo no catálogo e adicionado ao pedido.`:`O modelo ${codigo} já existia no catálogo — foi adicionado ao pedido.`);
+  q("#wizCarrinhoList").scrollIntoView({behavior:"smooth",block:"center"});
+  wizFiltrarModelos();
 }
 
 async function wizAdicionarAoCarrinho(modeloId){

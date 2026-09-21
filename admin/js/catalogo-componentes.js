@@ -144,6 +144,8 @@ async function importModelosCSV(){
   if(!payload.length) return msg("Nenhuma linha com 'codigo' preenchido.",false);
   const res=await sb.from("modelos").upsert(payload,{onConflict:"fabricante,codigo"}).select();
   if(res.error) return msg("Erro na importação: "+res.error.message,false);
-  msg(`${res.data.length} modelo(s) importado(s)/atualizado(s).`);
+  let pecasAtualizadas=0;
+  try{ pecasAtualizadas=await propagarModelosParaPecas(res.data); }catch(e){ msg(`${res.data.length} modelo(s) importado(s), mas não consegui atualizar as peças ligadas a eles: ${e.message||e}`,false); loadModelos();populateModeloPicker(); return; }
+  msg(`${res.data.length} modelo(s) importado(s)/atualizado(s).${pecasAtualizadas?` ${pecasAtualizadas} peça(s) ligada(s) a eles foram atualizadas.`:""}`);
   loadModelos();populateModeloPicker();
 }

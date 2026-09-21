@@ -66,33 +66,61 @@ async function preencherSelectObras(selId,comSemObra,rotuloVazio){
   return true;
 }
 
-// Obra da peça (na tela de detalhe): peça sem obra não aparece na lista de
-// nenhuma obra, então dá pra ligar aqui. Só grava ao clicar em SALVAR.
-async function preencherObraDaPeca(data){
+// ---- Modelo e obra da peça (só leitura: vêm do catálogo e da obra) ----
+async function preencherObraDaPeca(){
   const sel=q("#obraPicker");
   sel.dataset.pronto="";
-  const ok=await preencherSelectObras("obraPicker",false,"— sem obra —");
-  if(!ok) return;
-  sel.value=data.obra_id?String(data.obra_id):"";
-  sel.dataset.pronto="1";
+  const ok=await preencherSelectObras("obraPicker",false,"— escolha a obra —");
+  if(ok) sel.dataset.pronto="1";
 }
 
-async function aplicarObraNoForm(){
+async function mostrarObraEscolhida(){
   const id=q("#obraPicker").value;
-  if(!id) return;
-  const r=await sb.from("obras").select("*").eq("id",id).single();
-  if(r.error) return msg("Erro ao ler a obra: "+r.error.message,false);
-  const o=r.data;
-  q("input[name=cliente]").value=o.cliente||"";
-  q("input[name=empreendimento]").value=o.nome||"";
-  if(o.cliente_email) q("input[name=cliente_email]").value=o.cliente_email;
-  q("select[name=tensao_instalacao]").value=o.tensao_instalacao||"";
-  q("#det_automacao").value=o.automacao?"sim":"nao";
-  onDetAutomacaoChange();
-  if(o.automacao&&o.protocolo_automacao) q("select[name=protocolo_automacao]").value=o.protocolo_automacao;
-  msg("Obra \""+o.nome+"\" aplicada no formulário (cliente, e-mail, tensão e automação). Clique em SALVAR para gravar.");
+  await renderModeloEObra({...originalData},id?Number(id):null);
 }
-function carregarObrasAvulsa(){return preencherSelectObras("avulsa_obra",true)}
+
+function abrirObraDaPeca(){
+  if(originalData&&originalData.obra_id) abrirObra(originalData.obra_id);
+}
+
+async function renderModeloEObra(data,obraPendenteId){
+  const box=q("#roModeloObra");
+  const vazioV=v=>v===null||v===undefined||v==="";
+  const val=(v,u)=>vazioV(v)?"—":esc(v)+(u?" "+u:"");
+  const campo=(rot,html,spec,vazio,largo)=>`<div class="field${largo?" wide":""}"><label>${rot}</label><div style="font-weight:600;overflow-wrap:anywhere"${spec?` data-spec="${spec}" data-vazio="${vazio?1:0}"`:""}>${html}</div></div>`;
+  let obra=null;
+  const obraId=obraPendenteId||data.obra_id;
+  if(obraId){
+    const r=await sb.from("obras").select("*").eq("id",obraId).maybeSingle();
+    obra=r.data||null;
+  }
+  box.innerHTML=`
+    ${data.modelo_id?"":`<div class="alert">Esta peça ainda não está ligada a um modelo do catálogo. Ao clicar em SALVAR ela é ligada automaticamente (e o modelo é cadastrado, se for novo).</div>`}
+    <div class="small" style="font-weight:700;margin-bottom:6px">Dados do modelo</div>
+    <div class="ro">
+      ${campo("Modelo",`${esc(data.fabricante)||"—"} — ${esc(data.modelo)||"—"}`,null,false,true)}
+      ${campo("Potência",val(data.potencia_w,"W"),"potencia_w",vazioV(data.potencia_w))}
+      ${campo("CCT",val(data.cct_k,"K"),"cct_k",vazioV(data.cct_k))}
+      ${campo("IRC",val(data.irc))}
+      ${campo("Fluxo",val(data.fluxo_lm,"lm"),"fluxo_lm",vazioV(data.fluxo_lm))}
+      ${campo("Facho",val(data.facho_graus,"°"),"facho_graus",vazioV(data.facho_graus))}
+      ${campo("IP / IK",`${val(data.ip)} / ${val(data.ik)}`)}
+    </div>
+    <div class="small" style="font-weight:700;margin:14px 0 6px">Dados da obra</div>
+    ${obra
+      ? `<div class="ro">
+          ${campo("Obra",`${esc(obra.nome)} <span class="small">(${esc(obra.prefixo)})</span>${obraPendenteId?" <span class='small'>— será aplicada ao salvar</span>":""}`,null,false,true)}
+          ${campo("Cliente",val(obra.cliente))}
+          ${campo("E-mail do cliente",val(obra.cliente_email))}
+          ${campo("Tensão",val(obra.tensao_instalacao))}
+          ${campo("Automação",obra.automacao?"Sim"+(obra.protocolo_automacao?" — "+esc(obra.protocolo_automacao):""):"Não")}
+        </div>`
+      : `<div class="alert">Esta peça não está em nenhuma obra. Escolha abaixo e clique em SALVAR.</div>`}`;
+  q("#boxSemObra").classList.toggle("hidden",!!data.obra_id);
+  q("#btnEditarObraDaPeca").classList.toggle("hidden",!data.obra_id);
+  if(!data.obra_id&&!obraPendenteId&&!q("#obraPicker").dataset.pronto) await preencherObraDaPeca();
+}
+
 
 // ---- Criar cópia de uma peça: só poupa digitação, sempre gera peça NOVA ----
 let copiaOrigem=null, copiaPrimeiroId=null;
@@ -166,27 +194,6 @@ async function criarCopias(){
   q("#copiaSucessoTexto").innerHTML=`Na obra <b>${esc(obra.nome)}</b>, de <b>${esc(criadas[0].lumidna_id)}</b> até <b>${esc(criadas[criadas.length-1].lumidna_id)}</b>.<br>Preencha número de série, local e fotos de cada uma ao abrir.${avisoPecas?"<br><b>"+esc(avisoPecas)+"</b>":""}`;
 }
 
-async function createNew(){
-  const escolha=q("#avulsa_obra").value;
-  if(!escolha) return msg("Escolha a obra da peça (ou \"Sem obra\").",false);
-  let codigo="AVU", daObra={};
-  if(escolha!=="sem"){
-    const o=await sb.from("obras").select("*").eq("id",escolha).single();
-    if(o.error) return msg("Erro ao ler a obra: "+o.error.message,false);
-    codigo=o.data.prefixo;
-    daObra={obra_id:o.data.id,...wizObraDe(o.data)};
-  }
-  const n=await sb.rpc("reservar_numeros",{p_prefix:`LD-${codigo}-`,p_qtd:1});
-  if(n.error) return msg("Erro ao reservar numeração: "+n.error.message,false);
-  const id=buildObraId(codigo,n.data);
-  const c=await sb.from("luminarias").insert({lumidna_id:id,status:"Ativa",criticidade:"Média",...daObra}).select().single();
-  if(c.error) return msg("Erro ao criar: "+c.error.message,false);
-  q("#formLum").reset();
-  goScreen("detail");
-  await openAsset(c.data);
-  msg(id+" criada. Preencha os dados e clique em Salvar.");
-}
-
 async function openAsset(data){
   LID=data.lumidna_id; luminariaDbId=data.id;
   originalData={...data};
@@ -194,11 +201,10 @@ async function openAsset(data){
   fill(data);
   q("input[name=lumidna_id]").value=LID;
   q("#publicLink").value=data.public_code?`${LUMIDNA_SITE_BASE}/ativo/?c=${data.public_code}`:"(salve a luminária para gerar o link)";
-  q("#modeloPicker").value=data.modelo_id||"";
-  preencherObraDaPeca(data);
-  q("#det_automacao").value=data.automacao?"sim":"nao";
-  q("#det_protocolo_field").classList.toggle("hidden",!data.automacao);
+  q("#modeloPicker").value=data.modelo_id?String(data.modelo_id):"";
+  q("#obraPicker").dataset.pronto="";
   ["foto_principal_url","foto_instalada_url","foto_etiqueta_url"].forEach(k=>updatePhotoPreview(k,data[k]));
+  await renderModeloEObra(data);
   await Promise.all([loadComponents(),loadWarranties(),loadMaintenance(),loadReplacement(),loadAudit()]);
 }
 

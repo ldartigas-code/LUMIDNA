@@ -24,59 +24,61 @@ async function loadComponents(){
 // Em modelos Retrofit, potência/CCT/fluxo/facho ficam vazios na própria
 // luminária de propósito — quem carrega esse dado é a lâmpada instalada
 // (tabela componentes -> equivalentes), pra não duplicar informação que
-// desatualiza quando a lâmpada é trocada. Isso deixa os campos "Dados
-// técnicos" parecendo zerados, então aqui só mostramos o valor real da
-// lâmpada como dica (placeholder), sem preencher o campo de verdade.
+// desatualiza quando a lâmpada é trocada. Na área "Modelo e obra" esses
+// campos aparecem então com o valor da lâmpada.
 async function mostrarDicaSpecsRetrofit(modeloLed){
   const hint=q("#specsRetrofitHint");
-  const campos={potencia_w:"input[name=potencia_w]",cct_k:"input[name=cct_k]",fluxo_lm:"input[name=fluxo_lm]",facho_graus:"input[name=facho_graus]"};
-  Object.values(campos).forEach(sel=>{ const el=q(sel); if(el) el.placeholder=""; });
   if(!hint) return;
   hint.textContent="";
   if(!modeloLed||modeloLed==="Original") return;
   const eqR=await sb.from("equivalentes").select("potencia_w,cct_k,fluxo_lm,facho_graus").eq("modelo_equivalente",modeloLed).eq("componente_origem","LED").maybeSingle();
   if(!eqR.data) return;
-  const d=eqR.data;
-  Object.entries(campos).forEach(([campo,sel])=>{
-    const el=q(sel);
-    if(el && !el.value && d[campo]!=null) el.placeholder=String(d[campo]);
+  const unidades={potencia_w:"W",cct_k:"K",fluxo_lm:"lm",facho_graus:"°"};
+  let usou=false;
+  Object.entries(unidades).forEach(([campo,u])=>{
+    const el=document.querySelector(`[data-spec="${campo}"]`);
+    if(el&&el.dataset.vazio==="1"&&eqR.data[campo]!=null){ el.textContent=`${eqR.data[campo]} ${u} (da lâmpada)`; usou=true; }
   });
-  hint.innerHTML=`Campos vazios abaixo? Essa luminária é Retrofit — o valor real vem da lâmpada instalada (<b>${esc(modeloLed)}</b>) e já aparece assim mesmo na página pública. Só preencha aqui se quiser sobrescrever manualmente.`;
-}
-
-function onDetAutomacaoChange(){
-  q("#det_protocolo_field").classList.toggle("hidden",q("#det_automacao").value!=="sim");
+  if(usou) hint.innerHTML=`Esta luminária é Retrofit: potência, CCT, fluxo e facho vêm da lâmpada instalada (<b>${esc(modeloLed)}</b>) e acompanham a troca da lâmpada.`;
 }
 
 q("#formLum").onsubmit=async e=>{
   e.preventDefault();
   if(!LID) return msg("Selecione ou crie um ativo primeiro.",false);
   const p={};for(const [k,v] of new FormData(e.target).entries())p[k]=norm(v);delete p.lumidna_id;
+  p.modelo_id=p.modelo_id?Number(p.modelo_id):null;
+  const orig=originalData||{};
+  const avisos=[];
+
+  // Peça sem obra: a obra escolhida traz cliente, e-mail, tensão e automação.
   const obraSel=q("#obraPicker");
-  if(obraSel&&obraSel.dataset.pronto==="1") p.obra_id=obraSel.value?Number(obraSel.value):null;
-  p.automacao = q("#det_automacao").value==="sim";
-  if(!p.automacao) p.protocolo_automacao=null;
-  let avisoModelo="";
-  if(!p.modelo_id&&p.modelo&&p.fabricante){
-    const num=v=>(v==null||v==="")?null:Number(v);
-    const g=await garantirModeloNoCatalogo({fabricante:p.fabricante,codigo:p.modelo,potencia_w:num(p.potencia_w),cct_k:num(p.cct_k),irc:num(p.irc),fluxo_lm:num(p.fluxo_lm),facho_graus:num(p.facho_graus),ip:p.ip,ik:p.ik});
+  if(!orig.obra_id&&obraSel&&obraSel.dataset.pronto==="1"&&obraSel.value){
+    const o=await sb.from("obras").select("*").eq("id",Number(obraSel.value)).single();
+    if(o.error) return msg("Erro ao ler a obra: "+o.error.message,false);
+    Object.assign(p,{obra_id:o.data.id,cliente:o.data.cliente,cliente_email:o.data.cliente_email,empreendimento:o.data.nome,tensao_instalacao:o.data.tensao_instalacao,automacao:o.data.automacao,protocolo_automacao:o.data.protocolo_automacao});
+    avisos.push(`Obra "${o.data.nome}" aplicada.`);
+  }
+
+  // Peça antiga sem modelo do catálogo: liga (e cadastra o modelo, se for novo).
+  if(!p.modelo_id&&orig.modelo&&orig.fabricante){
+    const g=await garantirModeloNoCatalogo({fabricante:orig.fabricante,codigo:orig.modelo,potencia_w:orig.potencia_w,cct_k:orig.cct_k,irc:orig.irc,fluxo_lm:orig.fluxo_lm,facho_graus:orig.facho_graus,ip:orig.ip,ik:orig.ik});
     if(g.erro){
-      avisoModelo=" Atenção: não consegui cadastrar o modelo no catálogo ("+g.erro+"). Salve de novo ou use Cadastrar modelo novo.";
+      avisos.push("Atenção: não consegui ligar ao catálogo ("+g.erro+").");
     }else{
       p.modelo_id=g.id;
       q("input[name=modelo_id]").value=g.id;
-      avisoModelo=g.criado
-        ? ` Modelo ${p.modelo} (${p.fabricante}) cadastrado no catálogo — já aparece ao montar pedidos.`
-        : ` Ligada ao modelo ${p.modelo} (${p.fabricante}) que já existia no catálogo.`;
+      avisos.push(g.criado?`Modelo ${orig.modelo} (${orig.fabricante}) cadastrado no catálogo.`:`Ligada ao modelo ${orig.modelo} do catálogo.`);
       populateModeloPicker().then(()=>{q("#modeloPicker").value=String(g.id)});
     }
   }
+
   const r=await sb.from("luminarias").update(p).eq("lumidna_id",LID);
   if(r.error) return msg("Erro: "+r.error.message,false);
-  for(const k of Object.keys(p)) await logAudit(k,originalData?originalData[k]:null,p[k]);
-  originalData={...originalData,...p};
+  for(const k of Object.keys(p)) await logAudit(k,orig[k],p[k]);
+  originalData={...orig,...p};
   await loadAudit();
-  msg(LID+" salva no Supabase."+avisoModelo,!avisoModelo.includes("Atenção"));
+  await renderModeloEObra(originalData);
+  msg(LID+" salva."+(avisos.length?" "+avisos.join(" "):""),!avisos.some(a=>a.startsWith("Atenção")));
 };
 
 async function addWarranty(){
@@ -94,7 +96,7 @@ async function onManCompChange(){
   const dl=q("#man_comp_opcoes");
   dl.innerHTML="";
   if(!["Driver","LED","Óptica"].includes(tipo)) return;
-  const r=await sb.rpc("listar_homologados",{p_componente:tipo,p_modelo_codigo:q("input[name=modelo]").value||null});
+  const r=await sb.rpc("listar_homologados",{p_componente:tipo,p_modelo_codigo:(originalData&&originalData.modelo)||null});
   if(r.error) return;
   dl.innerHTML=[`<option value="Original">`].concat((r.data||[]).map(x=>`<option value="${esc(x.modelo_equivalente)}" label="${esc(x.fabricante_equivalente||"")}">`)).join("");
 }
@@ -155,7 +157,7 @@ async function loadMaintenance(){const r=await sb.from("manutencoes").select("*"
 // Só lista (o cadastro de peças compatíveis é feito no Catálogo de componentes).
 async function loadReplacement(){
   const box=q("#repList");
-  const modelo=(q("input[name=modelo]").value||"").trim();
+  const modelo=((originalData&&originalData.modelo)||"").trim();
   const inst=await sb.from("componentes").select("modelo").eq("luminaria_id",luminariaDbId).eq("ativo_atual",true);
   const seguro=s=>s&&s!=="Original"&&!/[,()*]/.test(s);
   const filtros=["modelo_original.is.null"];

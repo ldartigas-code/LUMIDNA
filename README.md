@@ -63,21 +63,30 @@ assets/supabase-config.js    → URL e chave pública do Supabase (compartilhada
   reservada de forma atômica no banco (sem risco de duas peças saírem com o
   mesmo ID em cadastros simultâneos). Trocar o prefixo de uma obra só afeta as
   peças novas; as já cadastradas mantêm o ID que têm.
-- **Catálogo de modelos** — luminárias (Retrofit ou COB), com importação em
-  massa por CSV.
+- **Catálogo de modelos** — luminárias (Retrofit ou COB), com edição (botão
+  Editar em cada modelo) e importação em massa por CSV.
 - **Catálogo de componentes** — Driver/LED/Óptica com compatibilidade
   verificada pela LumiDNA, com preço de referência. É o único lugar onde peças
   compatíveis são cadastradas; a tela de cada peça só lista as que servem pra
   ela.
-- **Peça avulsa** — para peça sem modelo no catálogo. Escolhe-se a obra e a
-  peça nasce com o prefixo dela (`LD-PDC-000007`), pela mesma numeração atômica
-  do cadastro em lote — o ID nunca é digitado à mão, para não colidir com a
-  numeração automática. Só quem marca "Sem obra" recebe `LD-AVU-000001`.
-  Peça avulsa **não cadastra o modelo** no catálogo. Dentro da tela de qualquer
-  peça dá pra escolher a **obra** dela (peça sem obra não aparece na lista de
-  nenhuma obra, e a Buscar peça marca essas com "⚠ sem obra") e, se ela não
-  estiver ligada a um modelo, clicar em **Salvar este modelo no catálogo** pra
-  ele passar a aparecer ao montar pedidos.
+- **Cada dado é digitado uma vez só, no lugar dono dele.** O **modelo** (Catálogo)
+  guarda fabricante, código e dados técnicos (potência, CCT, IRC, fluxo, facho,
+  IP, IK). A **obra** guarda nome, prefixo, cliente, e-mail, tensão e automação.
+  A **peça** só guarda o que é dela: local (edifício, andar, ambiente, posição,
+  quadro, circuito), número de série, lote, datas, status, criticidade, fotos e
+  observações. Na tela da peça, os dados do modelo e da obra aparecem **só para
+  leitura**, com atalhos "Editar este modelo no Catálogo" e "Editar a obra".
+  Quando um modelo é editado no Catálogo (ou reimportado por CSV), todas as
+  peças ligadas a ele acompanham.
+- **Um único caminho para cadastrar peças** — Cadastrar peças novas: Obra ->
+  Modelo -> Quantidade. Se o modelo não existe, o botão **"+ Modelo novo"** do
+  próprio pedido (fabricante e código; dados técnicos opcionais) salva no
+  Catálogo e já adiciona ao pedido. Não existe mais "peça avulsa": toda peça
+  nasce com modelo e obra, então nada fica solto. Fabricante e código não
+  diferenciam maiúscula de minúscula (LDARTI = Ldarti). Peças antigas sem
+  modelo do catálogo são ligadas sozinhas (e o modelo é cadastrado) ao
+  clicar em SALVAR; peça sem obra ganha a obra escolhida na própria tela dela
+  e a Buscar peça marca essas com "sem obra".
 - **Criar cópia (peça nova)** — em Buscar peça (botão Copiar) ou na tela da peça,
   cria uma ou várias peças NOVAS (ID e QR novos, com o prefixo da obra de
   destino) já com os mesmos dados técnicos, só pra poupar digitação. Cliente,

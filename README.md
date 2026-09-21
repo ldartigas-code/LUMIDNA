@@ -73,6 +73,13 @@ assets/supabase-config.js    → URL e chave pública do Supabase (compartilhada
   peça nasce com o prefixo dela (`LD-PDC-000007`), pela mesma numeração atômica
   do cadastro em lote — o ID nunca é digitado à mão, para não colidir com a
   numeração automática. Só quem marca "Sem obra" recebe `LD-AVU-000001`.
+- **Criar cópia (peça nova)** — em Buscar peça (botão Copiar) ou na tela da peça,
+  cria uma ou várias peças NOVAS (ID e QR novos, com o prefixo da obra de
+  destino) já com os mesmos dados técnicos, só pra poupar digitação. Cliente,
+  e-mail, tensão e automação vêm da obra de destino. Número de série, lote,
+  datas, fotos, local, garantias, manutenções e histórico nascem em branco, e
+  as peças instaladas nascem "Original" (a menos que se marque copiá-las).
+  Não move nem altera a peça original — a luminária física nunca troca de obra.
 - **Modelos Retrofit** — no cadastro, já dá pra escolher qual lâmpada
   compatível verificada foi instalada; potência/CCT/fluxo aparecem sozinhos (o dado mora
   na lâmpada, não é duplicado na luminária — se a lâmpada for trocada depois,

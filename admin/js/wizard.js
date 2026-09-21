@@ -1,11 +1,12 @@
 // ---- Assistente: cadastrar peças novas (pedido / carrinho) ----
-let wizObra=null, wizObraId=null, wizCarrinho=[], wizPendingModeloId=null, wizUltimaCriacao=[], wizPularParaCarrinho=false;
+let wizObra=null, wizObraId=null, wizObraPrefixo=null, wizCarrinho=[], wizPendingModeloId=null, wizUltimaCriacao=[], wizPularParaCarrinho=false;
 
 function wizStep(n){
   ["wz-1","wz-2","wz-3","wz-4"].forEach((id,i)=>q("#"+id).classList.toggle("hidden",i!==n-1));
   q("#wizSteps").innerHTML=["Obra","Pedido","Confirmar"].map((l,i)=>(i===n-1?`<b>${i+1}. ${l}</b>`:`${i+1}. ${l}`)).join("  →  ");
   if(n===1){
-    wizObra=null;wizObraId=null;wizCarrinho=[];
+    wizObra=null;wizObraId=null;wizObraPrefixo=null;wizCarrinho=[];
+    q("#wiz_prefixo").value="";q("#wiz_prefixo").dataset.manual="";
     q("#wizObraSearch").value="";
     q("#wizObraBusca").classList.remove("hidden");
     q("#wizObraEscolhida").classList.add("hidden");
@@ -14,6 +15,10 @@ function wizStep(n){
     q("#wiz_tensao").value="";q("#wiz_automacao").value="nao";q("#wiz_protocolo_field").classList.add("hidden");
     wizFiltrarObras();
   }
+}
+
+function buildObraId(prefixo,num){
+  return `LD-${prefixo}-${String(num).padStart(6,"0")}`;
 }
 
 function wizObraDe(o){
@@ -35,7 +40,7 @@ async function wizFiltrarObras(){
   const r=await query;
   if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
   const rows=r.data||[];
-  box.innerHTML=rows.length?rows.map(o=>`<button type="button" class="bigOption" style="padding:10px 14px" onclick="wizEscolherObraExistente(${o.id})"><span class="ic" style="font-size:20px">📁</span><span><b style="font-size:14px">${esc(o.nome)}</b><small>${esc(o.cliente)||""}</small></span></button>`).join(""):"<div class='small'>Nenhuma obra encontrada. Crie uma nova abaixo.</div>";
+  box.innerHTML=rows.length?rows.map(o=>`<button type="button" class="bigOption" style="padding:10px 14px" onclick="wizEscolherObraExistente(${o.id})"><span class="ic" style="font-size:20px">📁</span><span><b style="font-size:14px">${esc(o.nome)}</b><small>Obra ${o.numero} · ${esc(o.prefixo)}${o.cliente?" · "+esc(o.cliente):""}</small></span></button>`).join(""):"<div class='small'>Nenhuma obra encontrada. Crie uma nova abaixo.</div>";
 }
 
 function toggleWizNovaObra(){
@@ -44,7 +49,7 @@ function toggleWizNovaObra(){
 
 function montarResumoObra(){
   const temAuto=wizObra.automacao;
-  q("#wizObraEscolhidaResumo").innerHTML=`Obra: <b>${esc(wizObra.empreendimento)}</b>${wizObra.cliente?" · "+esc(wizObra.cliente):""}${wizObra.tensao_instalacao?" · "+esc(wizObra.tensao_instalacao):""}${temAuto?" · Automação "+esc(wizObra.protocolo_automacao):" · Sem automação"}`;
+  q("#wizObraEscolhidaResumo").innerHTML=`Obra: <b>${esc(wizObra.empreendimento)}</b> (${esc(wizObraPrefixo)})${wizObra.cliente?" · "+esc(wizObra.cliente):""}${wizObra.tensao_instalacao?" · "+esc(wizObra.tensao_instalacao):""}${temAuto?" · Automação "+esc(wizObra.protocolo_automacao):" · Sem automação"}`;
   q("#wizObraBusca").classList.add("hidden");
   q("#wizObraEscolhida").classList.remove("hidden");
 }
@@ -54,6 +59,7 @@ async function wizEscolherObraExistente(id){
   if(r.error) return msg(r.error.message,false);
   const o=r.data;
   wizObraId=o.id;
+  wizObraPrefixo=o.prefixo;
   wizObra=wizObraDe(o);
   montarResumoObra();
 }
@@ -61,11 +67,15 @@ async function wizEscolherObraExistente(id){
 async function wizCriarNovaObra(){
   const nome=q("#wiz_empreendimento").value.trim();
   if(!nome) return msg("Informe o nome da obra.",false);
+  const prefixo=normalizarPrefixo(q("#wiz_prefixo").value);
+  const erroPrefixo=await validarPrefixoObra(prefixo);
+  if(erroPrefixo) return msg(erroPrefixo,false);
   const temAutomacao=q("#wiz_automacao").value==="sim";
-  const p={nome,cliente:norm(q("#wiz_cliente").value.trim()),cliente_email:norm(q("#wiz_cliente_email").value.trim()),tensao_instalacao:norm(q("#wiz_tensao").value),automacao:temAutomacao,protocolo_automacao:temAutomacao?q("#wiz_protocolo").value:null};
+  const p={nome,prefixo,cliente:norm(q("#wiz_cliente").value.trim()),cliente_email:norm(q("#wiz_cliente_email").value.trim()),tensao_instalacao:norm(q("#wiz_tensao").value),automacao:temAutomacao,protocolo_automacao:temAutomacao?q("#wiz_protocolo").value:null};
   const r=await sb.from("obras").insert(p).select().single();
   if(r.error) return msg("Erro ao criar obra: "+r.error.message,false);
   wizObraId=r.data.id;
+  wizObraPrefixo=r.data.prefixo;
   wizObra=wizObraDe(r.data);
   montarResumoObra();
 }
@@ -79,6 +89,9 @@ function wizTrocarObra(){
 
 function wizEntrarNoCarrinho(){
   q("#wizModeloSearch").value="";
+  wizFabricante=null;
+  wizFabricantesCache=null;
+  q("#wizObraResumo").innerHTML=`Obra: <b>${esc(wizObra.empreendimento)}</b>${wizObraPrefixo?" ("+esc(wizObraPrefixo)+")":""}${wizObra.cliente?" · "+esc(wizObra.cliente):""}`;
   wizFiltrarModelos();
   renderWizCarrinho();
   wizStep(2);
@@ -98,15 +111,72 @@ function startWizardWithModelo(id){
 let wizSearchTimer=null;
 function onWizSearchInput(){clearTimeout(wizSearchTimer);wizSearchTimer=setTimeout(wizFiltrarModelos,300)}
 
+const WIZ_SEM_FABRICANTE="(sem fabricante)";
+let wizFabricante=null, wizFabricantesCache=null, wizFiltroSeq=0;
+
+function wizBotaoModelo(m){
+  return `<button type="button" class="bigOption" style="padding:10px 14px" onclick="wizAdicionarAoCarrinho(${m.id})">${m.imagem_url?`<img src="${esc(m.imagem_url)}" alt="" style="width:36px;height:36px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:`<span class="ic" style="font-size:20px">💡</span>`}<span><b style="font-size:14px">${esc(m.fabricante)||"?"} — ${esc(m.codigo)}</b><small>${esc(m.descricao)||""}</small></span></button>`;
+}
+
+async function wizCarregarFabricantes(){
+  const linhas=await fetchAllRows((de,ate)=>sb.from("modelos").select("fabricante").order("id").range(de,ate));
+  const contagem={};
+  linhas.forEach(l=>{const f=l.fabricante||WIZ_SEM_FABRICANTE;contagem[f]=(contagem[f]||0)+1});
+  wizFabricantesCache=Object.keys(contagem).sort((a,b)=>(a===WIZ_SEM_FABRICANTE)-(b===WIZ_SEM_FABRICANTE)||a.localeCompare(b,"pt-BR")).map(f=>({fabricante:f,total:contagem[f]}));
+}
+
+function wizEscolherFabricanteIdx(i){
+  wizFabricante=wizFabricantesCache[i].fabricante;
+  q("#wizModeloSearch").value="";
+  wizFiltrarModelos();
+}
+function wizVoltarFabricantes(){
+  wizFabricante=null;
+  q("#wizModeloSearch").value="";
+  wizFiltrarModelos();
+}
+
 async function wizFiltrarModelos(){
+  const seq=++wizFiltroSeq;
   const term=q("#wizModeloSearch").value.trim();
   const box=q("#wizListaModelos");
-  let query=sb.from("modelos").select("*").order("fabricante").order("codigo").limit(100);
-  if(term) query=query.or(`fabricante.ilike.%${term}%,linha.ilike.%${term}%,codigo.ilike.%${term}%,descricao.ilike.%${term}%`);
-  const r=await query;
-  if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
-  const rows=r.data||[];
-  box.innerHTML=rows.length?rows.map(m=>`<button type="button" class="bigOption" style="padding:10px 14px" onclick="wizAdicionarAoCarrinho(${m.id})">${m.imagem_url?`<img src="${esc(m.imagem_url)}" alt="" style="width:36px;height:36px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:`<span class="ic" style="font-size:20px">💡</span>`}<span><b style="font-size:14px">${esc(m.fabricante)||"?"} — ${esc(m.codigo)}</b><small>${esc(m.descricao)||""}</small></span></button>`).join(""):"<div class='small'>Nenhum modelo encontrado. Tente outro termo.</div>";
+  q("#wizFabBar").classList.toggle("hidden",!wizFabricante);
+  q("#wizFabNome").textContent=wizFabricante||"";
+  q("#wizModeloSearch").placeholder=wizFabricante?`Buscar dentro de ${wizFabricante} (nome ou código)`:"Buscar em todos os fabricantes (nome ou código)";
+  try{
+    if(!wizFabricante && !term){
+      if(!wizFabricantesCache){
+        box.innerHTML="<div class='small'>Carregando fabricantes...</div>";
+        await wizCarregarFabricantes();
+        if(seq!==wizFiltroSeq) return;
+      }
+      box.innerHTML=wizFabricantesCache.length
+        ? `<div class="small" style="margin-bottom:8px">Escolha o fabricante pra ver os modelos dele, ou busque acima em todos.</div>`+wizFabricantesCache.map((f,i)=>`<button type="button" class="bigOption" style="padding:10px 14px" onclick="wizEscolherFabricanteIdx(${i})"><span class="ic" style="font-size:20px">🏭</span><span><b style="font-size:14px">${esc(f.fabricante)}</b><small>${f.total} modelo(s)</small></span></button>`).join("")
+        : "<div class='small'>Nenhum modelo cadastrado ainda. Cadastre em \"Cadastrar modelo novo\".</div>";
+      return;
+    }
+    const consulta=(de,ate)=>{
+      let query=sb.from("modelos").select("*").order("codigo").order("id").range(de,ate);
+      if(wizFabricante) query = wizFabricante===WIZ_SEM_FABRICANTE ? query.is("fabricante",null) : query.eq("fabricante",wizFabricante);
+      if(term) query=query.or(`fabricante.ilike.%${term}%,linha.ilike.%${term}%,codigo.ilike.%${term}%,descricao.ilike.%${term}%`);
+      return query;
+    };
+    box.innerHTML="<div class='small'>Buscando...</div>";
+    let rows, cortado=false;
+    if(wizFabricante){
+      rows=await fetchAllRows(consulta);
+    }else{
+      const r=await consulta(0,99);
+      if(r.error) throw r.error;
+      rows=r.data||[];
+      cortado=rows.length===100;
+    }
+    if(seq!==wizFiltroSeq) return;
+    box.innerHTML=(rows.length?rows.map(wizBotaoModelo).join(""):"<div class='small'>Nenhum modelo encontrado. Tente outro termo.</div>")
+      +(cortado?`<div class="small" style="margin-top:8px">Mostrando só os 100 primeiros. Escolha um fabricante ou refine a busca pra ver os outros.</div>`:"");
+  }catch(e){
+    if(seq===wizFiltroSeq) box.innerHTML="<div class='small'>Erro: "+esc(e.message)+"</div>";
+  }
 }
 
 async function wizAdicionarAoCarrinho(modeloId){
@@ -202,15 +272,16 @@ async function wizColarProcessar(){
 
 async function wizRevisar(){
   if(!wizCarrinho.length) return msg("Adicione pelo menos um modelo ao pedido.",false);
+  if(!wizObraPrefixo) return msg("Essa obra não tem prefixo. Abra a obra, clique em Editar obra e defina um.",false);
+  const total=wizCarrinho.reduce((s,x)=>s+x.qty,0);
+  const r=await sb.rpc("reservar_numeros",{p_prefix:`LD-${wizObraPrefixo}-`,p_qtd:total});
+  if(r.error) return msg("Erro ao reservar numeração: "+r.error.message,false);
+  let proximo=r.data;
   let html="";
-  let total=0;
   for(const item of wizCarrinho){
-    const prefix=`LD-${fabCode(item.modelo.fabricante)}-${modelBase(item.modelo.codigo)}-`;
-    const r=await sb.rpc("reservar_numeros",{p_prefix:prefix,p_qtd:item.qty});
-    if(r.error) return msg("Erro ao reservar numeração: "+r.error.message,false);
-    item.startNum=r.data;
-    const firstId=buildLumidnaId(item.modelo,item.startNum), lastId=buildLumidnaId(item.modelo,item.startNum+item.qty-1);
-    total+=item.qty;
+    item.startNum=proximo;
+    proximo+=item.qty;
+    const firstId=buildObraId(wizObraPrefixo,item.startNum), lastId=buildObraId(wizObraPrefixo,item.startNum+item.qty-1);
     html+=`<div style="margin-bottom:10px"><b>${item.qty}×</b> ${esc(item.modelo.fabricante)} — ${esc(item.modelo.codigo)}<br><span class="small">${firstId}${item.qty>1?" até "+lastId:""}</span>${item.lampada?`<br><span class="small">Lâmpada: ${esc(item.lampada.especificacao||item.lampada.modelo_equivalente)}</span>`:""}</div>`;
   }
   q("#wizResumo").innerHTML=`<div class="small" style="margin-bottom:10px">Obra: <b>${esc(wizObra.empreendimento)||"—"}</b>${wizObra.cliente?" · "+esc(wizObra.cliente):""}</div>${html}<div style="margin-top:6px"><b>Total: ${total} peça(s)</b></div>`;
@@ -223,7 +294,7 @@ async function wizCriar(){
     for(let i=0;i<item.qty;i++){
       const num=item.startNum+i;
       rows.push({
-        lumidna_id:buildLumidnaId(item.modelo,num),
+        lumidna_id:buildObraId(wizObraPrefixo,num),
         modelo_id:item.modelo.id, modelo:item.modelo.codigo, fabricante:item.modelo.fabricante,
         potencia_w:item.modelo.potencia_w, cct_k:item.modelo.cct_k, irc:item.modelo.irc,
         fluxo_lm:item.modelo.fluxo_lm, facho_graus:item.modelo.facho_graus,
@@ -232,9 +303,18 @@ async function wizCriar(){
       });
     }
   }
-  const r=await sb.from("luminarias").insert(rows).select("id,lumidna_id,public_code,numero_serie");
-  if(r.error) return msg("Erro ao criar o pedido: "+r.error.message,false);
-  wizUltimaCriacao=r.data;
+  // Grava em blocos de 500 pra pedido grande não estourar o limite de linhas
+  // devolvidas por consulta (1000) nem o tamanho da requisição.
+  const criadas=[];
+  for(let i=0;i<rows.length;i+=500){
+    const r=await sb.from("luminarias").insert(rows.slice(i,i+500)).select("id,lumidna_id,public_code,numero_serie");
+    if(r.error){
+      const jaFeitas=criadas.length?` Atenção: ${criadas.length} peça(s) já tinham sido criadas antes do erro (${criadas[0].lumidna_id} até ${criadas[criadas.length-1].lumidna_id}) — confira em Buscar peça antes de refazer.`:"";
+      return msg("Erro ao criar o pedido: "+r.error.message+jaFeitas,false);
+    }
+    criadas.push(...r.data);
+  }
+  wizUltimaCriacao=criadas;
 
   // Pra modelos Retrofit onde foi escolhida a lâmpada, já grava ela como
   // componente LED instalado desde a criação — em vez de duplicar
@@ -245,7 +325,7 @@ async function wizCriar(){
   let offset=0;
   const componenteRows=[];
   for(const item of wizCarrinho){
-    const idsDoItem=r.data.slice(offset,offset+item.qty);
+    const idsDoItem=criadas.slice(offset,offset+item.qty);
     offset+=item.qty;
     if(item.lampada&&item.lampada.modelo_equivalente){
       idsDoItem.forEach(l=>componenteRows.push({luminaria_id:l.id,tipo:"LED",modelo:item.lampada.modelo_equivalente,original:false,ativo_atual:true}));
@@ -255,7 +335,7 @@ async function wizCriar(){
     const rc=await sb.from("componentes").insert(componenteRows);
     if(rc.error) msg("Peças criadas, mas houve erro ao gravar a lâmpada instalada: "+rc.error.message,false);
   }
-  const ids=r.data.map(x=>x.lumidna_id);
+  const ids=criadas.map(x=>x.lumidna_id);
   q("#wizSucessoTitulo").textContent=`${ids.length} peça(s) criada(s)`;
   const porModelo=wizCarrinho.map(item=>`${item.qty}× ${esc(item.modelo.fabricante)} — ${esc(item.modelo.codigo)}`).join("<br>");
   q("#wizSucessoTexto").innerHTML=`${porModelo}<br><br>De <b>${ids[0]}</b> até <b>${ids[ids.length-1]}</b>.`;

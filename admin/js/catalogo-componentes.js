@@ -3,8 +3,7 @@ let compModelosTodos=[];
 let compModelosSelecionados=new Set();
 
 async function carregarModelosParaCompat(){
-  const r=await sb.from("modelos").select("id,fabricante,codigo,linha").order("fabricante").order("codigo").limit(2000);
-  compModelosTodos=r.data||[];
+  try{ compModelosTodos=await fetchAllRows((de,ate)=>sb.from("modelos").select("id,fabricante,codigo,linha").order("fabricante").order("codigo").order("id").range(de,ate)); }catch(e){ compModelosTodos=[]; }
   renderCompModelosLista();
 }
 
@@ -19,10 +18,11 @@ function renderCompModelosLista(){
     (m.fabricante||"").toLowerCase().includes(termo) || (m.codigo||"").toLowerCase().includes(termo) || (m.linha||"").toLowerCase().includes(termo)
   ) : compModelosTodos;
   const lista=filtrados.slice(0,150);
+  const aviso=filtrados.length>150?`<div class="small" style="margin-top:6px">Mostrando 150 de ${filtrados.length} — use a busca pra achar os outros.</div>`:"";
   box.innerHTML = lista.length ? lista.map(m=>{
     const checked=compModelosSelecionados.has(m.codigo)?"checked":"";
     return `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer"><input type="checkbox" value="${esc(m.codigo)}" ${checked} onchange="toggleCompModelo('${esc(m.codigo)}',this.checked)"> <span>${esc(m.fabricante)||"?"} — ${esc(m.codigo)}${m.linha?" ("+esc(m.linha)+")":""}</span></label>`;
-  }).join("") : "<div class='small'>Nenhum modelo encontrado. Cadastre o modelo primeiro em \"Cadastrar modelo novo\".</div>";
+  }).join("")+aviso : "<div class='small'>Nenhum modelo encontrado. Cadastre o modelo primeiro em \"Cadastrar modelo novo\".</div>";
   if(!compModelosTodos.length) box.innerHTML="<div class='small'>Carregando modelos...</div>";
 }
 
@@ -147,15 +147,3 @@ async function importModelosCSV(){
   msg(`${res.data.length} modelo(s) importado(s)/atualizado(s).`);
   loadModelos();populateModeloPicker();
 }
-
-function fabCode(fabricante){
-  const letters=(fabricante||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z]/g,"").toUpperCase();
-  return letters.slice(0,3)||"GEN";
-}
-function modelBase(codigo){
-  return (codigo||"").split(".")[0]||codigo||"MODELO";
-}
-function buildLumidnaId(modelo,num){
-  return `LD-${fabCode(modelo.fabricante)}-${modelBase(modelo.codigo)}-${String(num).padStart(6,"0")}`;
-}
-

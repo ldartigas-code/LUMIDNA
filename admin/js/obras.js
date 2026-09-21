@@ -3,6 +3,35 @@ let obraAtual=null;
 let obrasSearchTimer=null;
 function onObrasSearchInput(){clearTimeout(obrasSearchTimer);obrasSearchTimer=setTimeout(loadObras,300)}
 
+// Prefixo curto da obra (ex: Parque das Cerejeiras -> PDC): vira a parte do
+// meio do ID das peças (LD-PDC-000001).
+function sugerirPrefixo(nome){
+  const words=(nome||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/[^A-Z0-9 ]/g," ").split(/\s+/).filter(Boolean);
+  if(!words.length) return "";
+  let p=words.map(w=>w[0]).join("");
+  if(p.length<2) p=words[0].slice(0,3);
+  return p.slice(0,6);
+}
+function normalizarPrefixo(v){return (v||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,6)}
+function onObraNomeInput(nomeId,prefId){
+  const p=q("#"+prefId);
+  if(p.dataset.manual) return;
+  p.value=sugerirPrefixo(q("#"+nomeId).value);
+}
+function onObraPrefixoInput(prefId){
+  const p=q("#"+prefId);
+  p.value=normalizarPrefixo(p.value);
+  p.dataset.manual=p.value?"1":"";
+}
+async function validarPrefixoObra(prefixo,ignorarId){
+  if(!/^[A-Z0-9]{2,6}$/.test(prefixo)) return "O prefixo precisa ter de 2 a 6 letras ou números (ex: PDC).";
+  let qy=sb.from("obras").select("id,nome").eq("prefixo",prefixo).limit(1);
+  if(ignorarId) qy=qy.neq("id",ignorarId);
+  const r=await qy;
+  if(r.data&&r.data.length) return `O prefixo ${prefixo} já é da obra "${r.data[0].nome}". Escolha outro.`;
+  return null;
+}
+
 function onNovaObraAutomacaoChange(){
   q("#obra_protocolo_field").classList.toggle("hidden",q("#obra_automacao").value!=="sim");
 }
@@ -15,17 +44,20 @@ async function loadObras(){
   const r=await query;
   if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
   const rows=r.data||[];
-  box.innerHTML=rows.length?rows.map(o=>`<button type="button" class="bigOption" onclick="abrirObra(${o.id})"><span class="ic">📁</span><span><b style="font-size:15px">${esc(o.nome)}</b><small>${esc(o.cliente)||"—"} · ${o.luminarias?.[0]?.count??0} peça(s)</small></span></button>`).join(""):"<div class='small'>Nenhuma obra cadastrada ainda.</div>";
+  box.innerHTML=rows.length?rows.map(o=>`<button type="button" class="bigOption" onclick="abrirObra(${o.id})"><span class="ic">📁</span><span><b style="font-size:15px">${esc(o.nome)}</b><small>Obra ${o.numero} · ${esc(o.prefixo)} · ${esc(o.cliente)||"—"} · ${o.luminarias?.[0]?.count??0} peça(s)</small></span></button>`).join(""):"<div class='small'>Nenhuma obra cadastrada ainda.</div>";
 }
 
 async function criarObra(){
   const nome=q("#obra_nome").value.trim();
   if(!nome) return msg("Informe o nome da obra.",false);
+  const prefixo=normalizarPrefixo(q("#obra_prefixo").value);
+  const erroPrefixo=await validarPrefixoObra(prefixo);
+  if(erroPrefixo) return msg(erroPrefixo,false);
   const temAutomacao=q("#obra_automacao").value==="sim";
-  const p={nome,cliente:norm(q("#obra_cliente").value.trim()),cliente_email:norm(q("#obra_cliente_email").value.trim()),tensao_instalacao:norm(q("#obra_tensao").value),automacao:temAutomacao,protocolo_automacao:temAutomacao?q("#obra_protocolo").value:null};
+  const p={nome,prefixo,cliente:norm(q("#obra_cliente").value.trim()),cliente_email:norm(q("#obra_cliente_email").value.trim()),tensao_instalacao:norm(q("#obra_tensao").value),automacao:temAutomacao,protocolo_automacao:temAutomacao?q("#obra_protocolo").value:null};
   const r=await sb.from("obras").insert(p).select().single();
   if(r.error) return msg("Erro ao criar obra: "+r.error.message,false);
-  q("#obra_nome").value="";q("#obra_cliente").value="";q("#obra_cliente_email").value="";q("#obra_tensao").value="";q("#obra_automacao").value="nao";q("#obra_protocolo_field").classList.add("hidden");
+  q("#obra_nome").value="";q("#obra_prefixo").value="";q("#obra_prefixo").dataset.manual="";q("#obra_cliente").value="";q("#obra_cliente_email").value="";q("#obra_tensao").value="";q("#obra_automacao").value="nao";q("#obra_protocolo_field").classList.add("hidden");
   msg("Obra criada.");
   abrirObra(r.data.id);
 }
@@ -36,7 +68,7 @@ async function abrirObra(id){
   if(r.error) return msg(r.error.message,false);
   obraAtual=r.data;
   goScreen("obraDetalhe");
-  q("#obraDetalheHeader").innerHTML=`<h2 style="margin:0 0 8px">${esc(obraAtual.nome)}</h2><div class="small">${obraAtual.cliente?"Cliente: "+esc(obraAtual.cliente)+" · ":""}${obraAtual.tensao_instalacao?"Tensão: "+esc(obraAtual.tensao_instalacao)+" · ":""}${obraAtual.automacao?"Automação: "+esc(obraAtual.protocolo_automacao):"Sem automação"}</div>`;
+  q("#obraDetalheHeader").innerHTML=`<h2 style="margin:0 0 8px">${esc(obraAtual.nome)}</h2><div class="small" style="margin-bottom:4px">Obra ${obraAtual.numero} · prefixo <b>${esc(obraAtual.prefixo)}</b> · as peças saem como LD-${esc(obraAtual.prefixo)}-000001</div><div class="small">${obraAtual.cliente?"Cliente: "+esc(obraAtual.cliente)+" · ":""}${obraAtual.tensao_instalacao?"Tensão: "+esc(obraAtual.tensao_instalacao)+" · ":""}${obraAtual.automacao?"Automação: "+esc(obraAtual.protocolo_automacao):"Sem automação"}</div>`;
   loadObraPecas();
   loadObraPendentes();
 }
@@ -44,6 +76,7 @@ async function abrirObra(id){
 function abrirEdicaoObra(){
   if(!obraAtual) return;
   q("#eo_nome").value=obraAtual.nome||"";
+  q("#eo_prefixo").value=obraAtual.prefixo||"";
   q("#eo_cliente").value=obraAtual.cliente||"";
   q("#eo_cliente_email").value=obraAtual.cliente_email||"";
   q("#eo_aplicar_pecas").checked=true;
@@ -62,9 +95,12 @@ function onEditarObraAutomacaoChange(){
 async function salvarEdicaoObra(){
   const nome=q("#eo_nome").value.trim();
   if(!nome) return msg("Informe o nome da obra.",false);
+  const prefixo=normalizarPrefixo(q("#eo_prefixo").value);
+  const erroPrefixo=await validarPrefixoObra(prefixo,obraAtual.id);
+  if(erroPrefixo) return msg(erroPrefixo,false);
   const temAutomacao=q("#eo_automacao").value==="sim";
   const p={
-    nome, cliente:norm(q("#eo_cliente").value.trim()),
+    nome, prefixo, cliente:norm(q("#eo_cliente").value.trim()),
     cliente_email:norm(q("#eo_cliente_email").value.trim()),
     tensao_instalacao:norm(q("#eo_tensao").value),
     automacao:temAutomacao,
@@ -89,6 +125,7 @@ async function salvarEdicaoObra(){
 function cadastrarMaisNestaObra(){
   if(!obraAtual) return;
   wizObraId=obraAtual.id;
+  wizObraPrefixo=obraAtual.prefixo;
   wizObra=wizObraDe(obraAtual);
   wizPularParaCarrinho=true;
   goScreen("wizard");

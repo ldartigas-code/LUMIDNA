@@ -56,12 +56,29 @@ async function loadById(id){
   msg(id+" carregada.");
 }
 
+async function carregarObrasAvulsa(){
+  const sel=q("#avulsa_obra");
+  const r=await sb.from("obras").select("id,numero,prefixo,nome").order("numero");
+  if(r.error){sel.innerHTML=`<option value="">Erro ao carregar obras</option>`;return}
+  sel.innerHTML=`<option value="">— escolha a obra —</option>`
+    +(r.data||[]).map(o=>`<option value="${o.id}">Obra ${o.numero} · ${esc(o.prefixo)} — ${esc(o.nome)}</option>`).join("")
+    +`<option value="sem">Sem obra (LD-AVU)</option>`;
+}
+
 async function createNew(){
-  const prefix="LD-AVU-";
-  const n=await sb.rpc("reservar_numeros",{p_prefix:prefix,p_qtd:1});
+  const escolha=q("#avulsa_obra").value;
+  if(!escolha) return msg("Escolha a obra da peça (ou \"Sem obra\").",false);
+  let codigo="AVU", daObra={};
+  if(escolha!=="sem"){
+    const o=await sb.from("obras").select("*").eq("id",escolha).single();
+    if(o.error) return msg("Erro ao ler a obra: "+o.error.message,false);
+    codigo=o.data.prefixo;
+    daObra={obra_id:o.data.id,...wizObraDe(o.data)};
+  }
+  const n=await sb.rpc("reservar_numeros",{p_prefix:`LD-${codigo}-`,p_qtd:1});
   if(n.error) return msg("Erro ao reservar numeração: "+n.error.message,false);
-  const id=prefix+String(n.data).padStart(6,"0");
-  const c=await sb.from("luminarias").insert({lumidna_id:id,status:"Ativa",criticidade:"Média"}).select().single();
+  const id=buildObraId(codigo,n.data);
+  const c=await sb.from("luminarias").insert({lumidna_id:id,status:"Ativa",criticidade:"Média",...daObra}).select().single();
   if(c.error) return msg("Erro ao criar: "+c.error.message,false);
   q("#formLum").reset();
   goScreen("detail");

@@ -17,6 +17,19 @@ let appInitialized=false;
 function showApp(user){currentUserEmail=user.email;q("#loginScreen").classList.add("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.remove("hidden");q("#userEmail").textContent=user.email;q("#connStatus").textContent="Supabase conectado";checkWarrantyAlerts();checkPendentesBadge();checkReposicaoBadge();populateModeloPicker();if(!appInitialized){appInitialized=true;goScreen("home")}}
 
 // ---- Navegação entre telas ----
+// O Supabase devolve no máximo 1000 linhas por consulta, mesmo com .limit(5000).
+// Pra listas que precisam vir completas, busca página por página.
+async function fetchAllRows(montarConsulta){
+  const PAGINA=1000, todas=[];
+  for(let de=0;;de+=PAGINA){
+    const r=await montarConsulta(de,de+PAGINA-1);
+    if(r.error) throw r.error;
+    const linhas=r.data||[];
+    todas.push(...linhas);
+    if(linhas.length<PAGINA) return todas;
+  }
+}
+
 // Cada troca de tela vira uma entrada no histórico do navegador, senão o
 // botão "voltar" do celular não tem pra onde voltar dentro do app e acaba
 // saindo direto do site.
@@ -30,6 +43,7 @@ function renderScreen(name){
   if(name==="aprovacoes"){loadPendentes();loadAprovadas();loadRejeitadas();}
   if(name==="reposicao"){loadReposicoes();loadReposicoesResolvidas();}
   if(name==="obras"){q("#obrasSearch").value="";loadObras();}
+  if(name==="avulsa") carregarObrasAvulsa();
   if(name==="componentes"){q("#compSearch").value="";q("#compList").innerHTML="<div class='small'>Digite algo acima pra buscar.</div>";onCompTipoChange();limparCompModelos();carregarModelosParaCompat();}
   if(name==="home"){checkPendentesBadge();checkReposicaoBadge();}
 }

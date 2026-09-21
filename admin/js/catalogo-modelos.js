@@ -1,11 +1,12 @@
 // ---- Catálogo de Modelos ----
 
 async function populateModeloPicker(){
-  const r=await sb.from("modelos").select("id,fabricante,codigo").order("fabricante").order("codigo").limit(5000);
   const sel=q("#modeloPicker");
   if(!sel) return;
+  let modelos=[];
+  try{ modelos=await fetchAllRows((de,ate)=>sb.from("modelos").select("id,fabricante,codigo").order("fabricante").order("codigo").order("id").range(de,ate)); }catch(e){}
   const current=sel.value;
-  sel.innerHTML='<option value="">— nenhum / preencher manualmente —</option>'+(r.data||[]).map(m=>`<option value="${m.id}">${esc(m.fabricante)||"?"} — ${esc(m.codigo)}</option>`).join("");
+  sel.innerHTML='<option value="">— nenhum / preencher manualmente —</option>'+modelos.map(m=>`<option value="${m.id}">${esc(m.fabricante)||"?"} — ${esc(m.codigo)}</option>`).join("");
   sel.value=current;
 }
 
@@ -36,12 +37,14 @@ function onModeloSearchInput(){
 
 async function loadModelos(){
   const term=q("#modeloSearch").value.trim();
-  let query=sb.from("modelos").select("*").order("fabricante").order("codigo").limit(2000);
-  if(term) query=query.or(`fabricante.ilike.%${term}%,linha.ilike.%${term}%,codigo.ilike.%${term}%,descricao.ilike.%${term}%`);
-  const r=await query;
   const box=q("#modelosList");
-  if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
-  lastModelosRows=r.data||[];
+  try{
+    lastModelosRows=await fetchAllRows((de,ate)=>{
+      let query=sb.from("modelos").select("*").order("fabricante").order("codigo").order("id").range(de,ate);
+      if(term) query=query.or(`fabricante.ilike.%${term}%,linha.ilike.%${term}%,codigo.ilike.%${term}%,descricao.ilike.%${term}%`);
+      return query;
+    });
+  }catch(e){box.innerHTML="<div class='small'>Erro: "+esc(e.message)+"</div>";return}
   renderModelosList();
 }
 

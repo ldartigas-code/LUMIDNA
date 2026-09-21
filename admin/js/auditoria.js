@@ -84,12 +84,34 @@ async function onManCompChange(){
   dl.innerHTML=[`<option value="Original">`].concat((r.data||[]).map(x=>`<option value="${esc(x.modelo_equivalente)}" label="${esc(x.fabricante_equivalente||"")}">`)).join("");
 }
 
+function hojeLocal(){return new Date().toLocaleDateString("sv-SE")}
+
+async function enviarFotosManutencao(fileList){
+  const arquivos=[...(fileList||[])];
+  const urls=[];
+  for(let i=0;i<arquivos.length;i++){
+    const f=arquivos[i];
+    if(!f.type.startsWith("image/")) throw new Error(`"${f.name}" não é uma imagem.`);
+    if(f.size>8*1024*1024) throw new Error(`"${f.name}" passa de 8MB.`);
+    const path=`${LID}/manutencao_${Date.now()}_${i}_${f.name}`.replace(/[^\w./-]+/g,"_");
+    const up=await sb.storage.from("fotos").upload(path,f,{upsert:true});
+    if(up.error) throw up.error;
+    urls.push(sb.storage.from("fotos").getPublicUrl(path).data.publicUrl);
+  }
+  return urls;
+}
+
 async function addMaintenance(){
   if(!LID)return msg("Selecione um ativo primeiro.",false);
   const tipoComp=norm(q("#man_comp_removido").value), novoModelo=norm(q("#man_comp_instalado").value.trim());
   if(tipoComp&&!novoModelo) return msg("Informe o modelo instalado no lugar (ou \"Original\").",false);
   if(!tipoComp&&novoModelo) return msg("Escolha qual componente foi trocado.",false);
-  const p={luminaria_id:luminariaDbId,data:norm(q("#man_data").value),tipo:q("#man_tipo").value,categoria_falha:norm(q("#man_categoria").value),problema:norm(q("#man_prob").value),servico_realizado:norm(q("#man_serv").value),responsavel:norm(q("#man_resp").value),status:q("#man_status").value,componente_removido:tipoComp,componente_instalado:novoModelo};
+  let fotosUrls=[];
+  try{ fotosUrls=await enviarFotosManutencao(q("#man_fotos").files); }
+  catch(e){ return msg("Erro ao enviar as fotos: "+(e.message||e),false); }
+  const dataServico=norm(q("#man_data").value)||hojeLocal();
+  const solicitacaoId=await acharSolicitacaoParaLigar(luminariaDbId,new Date(dataServico+"T23:59:59").toISOString());
+  const p={luminaria_id:luminariaDbId,data:dataServico,empresa:norm(q("#man_empresa").value.trim()),fotos:fotosUrls.length?fotosUrls:null,solicitacao_id:solicitacaoId,tipo:q("#man_tipo").value,categoria_falha:norm(q("#man_categoria").value),problema:norm(q("#man_prob").value),servico_realizado:norm(q("#man_serv").value),responsavel:norm(q("#man_resp").value),status:q("#man_status").value,componente_removido:tipoComp,componente_instalado:novoModelo};
   const r=await sb.from("manutencoes").insert(p);
   if(r.error)return msg("Erro na manutenção: "+r.error.message,false);
   await logAudit("manutencao_registrada","",`${p.tipo} em ${p.data||"—"} (${p.status})`);
@@ -109,7 +131,7 @@ async function addMaintenance(){
       avisoPecas=" Peças instaladas atualizadas.";
     }
   }
-  q("#man_comp_removido").value="";q("#man_comp_instalado").value="";q("#man_comp_opcoes").innerHTML="";
+  q("#man_comp_removido").value="";q("#man_comp_instalado").value="";q("#man_comp_opcoes").innerHTML="";q("#man_fotos").value="";q("#man_empresa").value="";
   loadMaintenance();loadAudit();loadReplacement();loadComponents();
   msg("Manutenção registrada."+avisoPecas,!avisoPecas.includes("Mas não"));
 }

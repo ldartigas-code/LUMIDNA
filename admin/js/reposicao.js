@@ -19,6 +19,9 @@ function renderReposicaoCard(p,resolvida,precoAtual){
         <div>
           <b>${esc(p.luminarias?.lumidna_id)}</b> — ${esc(p.luminarias?.modelo)||"—"} ${p.luminarias?.empreendimento?"· "+esc(p.luminarias.empreendimento):""}${p.luminarias?.cliente?" · "+esc(p.luminarias.cliente):""}
           <div class="small">Reportado ${p.solicitante_nome?"por <b>"+esc(p.solicitante_nome)+"</b> ":""}em ${new Date(p.criado_em).toLocaleString('pt-BR')}${p.solicitante_contato?" — contato: "+esc(p.solicitante_contato):""}</div>
+          <div class="small">${resolvida
+            ? (p.comprado_em?"Comprado em "+new Date(p.comprado_em).toLocaleString('pt-BR')+" — "+fmtDuracao(new Date(p.comprado_em)-new Date(p.criado_em))+" depois do aviso":"Horário da compra não registrado (compra anterior ao controle de horários)")
+            : "<b style='color:var(--red)'>Aguardando há "+fmtDuracao(Date.now()-new Date(p.criado_em).getTime())+"</b>"+(p.pedido_enviado_em?" · pedido enviado em "+new Date(p.pedido_enviado_em).toLocaleString('pt-BR'):" · pedido ainda não enviado")}</div>
         </div>
         <span class="pill" style="${resolvida?"background:#e9f7ee;color:#257944":"background:#fff4e0;color:#c98a12"}">${resolvida?"Comprado":"Aguardando compra"}</span>
       </div>
@@ -37,6 +40,18 @@ function renderReposicaoCard(p,resolvida,precoAtual){
         <button type="button" class="secondary" onclick="gerarEmailReposicao(${p.id})">✉ Gerar e-mail pra compra</button>
       </div>`}
     </div>`;
+}
+
+// Aviso de problema mais recente da peça que ainda não foi ligado a nenhuma
+// troca — é a ele que a manutenção que está sendo registrada responde.
+async function acharSolicitacaoParaLigar(luminariaId,ateISO){
+  const s=await sb.from("solicitacoes_reposicao").select("id").eq("luminaria_id",luminariaId).lte("criado_em",ateISO).order("criado_em",{ascending:false}).limit(20);
+  const ids=(s.data||[]).map(x=>x.id);
+  if(!ids.length) return null;
+  const usados=await sb.from("manutencoes").select("solicitacao_id").in("solicitacao_id",ids);
+  const ocupados=new Set((usados.data||[]).map(x=>x.solicitacao_id));
+  const livre=ids.find(id=>!ocupados.has(id));
+  return livre==null?null:livre;
 }
 
 async function precosDe(codigos){
@@ -106,7 +121,7 @@ async function onTrocarPecaReposicao(id){
 }
 
 async function marcarReposicaoComprada(id){
-  const r=await sb.from("solicitacoes_reposicao").update({status:"Comprado"}).eq("id",id);
+  const r=await sb.from("solicitacoes_reposicao").update({status:"Comprado",comprado_em:new Date().toISOString()}).eq("id",id);
   if(r.error) return msg("Erro: "+r.error.message,false);
   msg("Marcado como comprado. Quando a peça for instalada, confirme em \"Registrar manutenção\".");
   loadReposicoes();loadReposicoesResolvidas();checkReposicaoBadge();
@@ -134,6 +149,7 @@ Por favor, providenciar a compra da peça acima antes do técnico ir a campo.
 
 Atenciosamente,
 LumiDNA`;
+  if(!p.pedido_enviado_em) await sb.from("solicitacoes_reposicao").update({pedido_enviado_em:new Date().toISOString()}).eq("id",id);
   const destinatario = (p.solicitante_contato&&p.solicitante_contato.includes("@")) ? p.solicitante_contato : "";
   window.location.href=`mailto:${encodeURIComponent(destinatario)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
 }

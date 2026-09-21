@@ -28,6 +28,7 @@ async function loadPendentes(){
         <div class="field span2"><label>Serviço realizado</label><div class="small">${esc(p.servico_realizado)||"—"}</div></div>
         ${p.componente_removido?`<div class="field"><label>Componente removido</label><div class="small">${esc(p.componente_removido)}</div></div>`:""}
         ${p.componente_instalado_tipo?`<div class="field"><label>Componente instalado</label><div class="small">${esc(labelCompTipo(p.componente_instalado_tipo))}${p.componente_instalado_tipo==="Outro"?` — ${esc(p.componente_instalado)} (${esc(p.componente_instalado_fabricante)})`:p.componente_instalado_tipo==="Homologado"?` — ${esc(p.componente_instalado)}`:""}</div></div>`:""}
+        ${(p.fotos||[]).length?`<div class="field span2"><label>Fotos do serviço (${p.fotos.length})</label><div style="display:flex;gap:8px;flex-wrap:wrap">${p.fotos.map(u=>`<a href="${esc(u)}" target="_blank"><img src="${esc(u)}" alt="" style="max-width:120px;border-radius:8px;border:1px solid var(--line)"></a>`).join("")}</div></div>`:""}
         ${p.componente_instalado_foto_url?`<div class="field span2"><label>Foto enviada</label><a href="${esc(p.componente_instalado_foto_url)}" target="_blank"><img src="${esc(p.componente_instalado_foto_url)}" alt="" style="max-width:160px;border-radius:8px;border:1px solid var(--line)"></a></div>`:""}
       </div>
       ${p.componente_instalado_tipo==="Outro"?`<div class="alert" style="margin-top:10px">⚠️ Componente fora do catálogo — confira a foto e o fabricante antes de aprovar.</div>`:""}
@@ -39,13 +40,23 @@ async function loadPendentes(){
 }
 
 async function aprovarPendente(id){
-  const r=await sb.from("manutencoes_pendentes").select("*").eq("id",id).single();
-  if(r.error) return msg("Erro: "+r.error.message,false);
-  const p=r.data;
+  // Reivindica o envio primeiro ("Aguardando aprovação" -> "Aprovada"): se o
+  // botão for tocado duas vezes, o segundo toque não acha mais nada pra
+  // aprovar e não duplica a manutenção.
+  const claim=await sb.from("manutencoes_pendentes").update({status:"Aprovada",revisado_por:currentUserEmail,revisado_em:new Date().toISOString()}).eq("id",id).eq("status","Aguardando aprovação").select();
+  if(claim.error) return msg("Erro: "+claim.error.message,false);
+  if(!claim.data||!claim.data.length){
+    loadPendentes();loadAprovadas();checkPendentesBadge();
+    return msg("Esse envio já foi decidido — nada foi duplicado.",false);
+  }
+  const p=claim.data[0];
+  const desfazer=()=>sb.from("manutencoes_pendentes").update({status:"Aguardando aprovação",revisado_por:null,revisado_em:null}).eq("id",id);
   const instaladoDesc = p.componente_instalado_tipo==="Outro" ? `${p.componente_instalado_tipo}: ${p.componente_instalado} (${p.componente_instalado_fabricante})` : `${p.componente_instalado_tipo}${p.componente_instalado&&p.componente_instalado!=="Original"?": "+p.componente_instalado:""}`;
-  const ins={luminaria_id:p.luminaria_id,tipo:p.tipo,problema:p.problema,servico_realizado:p.servico_realizado,responsavel:`${p.responsavel} (${p.empresa})`,status:"Concluída",componente_removido:p.componente_removido,componente_instalado:instaladoDesc};
+  const solicitacaoId=await acharSolicitacaoParaLigar(p.luminaria_id,p.criado_em);
+  const fotos=[...(p.fotos||[]),...(p.componente_instalado_foto_url?[p.componente_instalado_foto_url]:[])];
+  const ins={luminaria_id:p.luminaria_id,data:new Date(p.criado_em).toLocaleDateString("sv-SE"),tipo:p.tipo,problema:p.problema,servico_realizado:p.servico_realizado,responsavel:`${p.responsavel} (${p.empresa})`,empresa:p.empresa,status:"Concluída",componente_removido:p.componente_removido,componente_instalado:instaladoDesc,pendente_id:p.id,solicitacao_id:solicitacaoId,fotos:fotos.length?fotos:null};
   const insR=await sb.from("manutencoes").insert(ins);
-  if(insR.error) return msg("Erro ao aprovar: "+insR.error.message,false);
+  if(insR.error){ await desfazer(); return msg("Erro ao aprovar: "+insR.error.message,false); }
 
   if(p.componente_removido && p.componente_instalado_tipo){
     const compR=await sb.from("componentes").select("id,modelo").eq("luminaria_id",p.luminaria_id).eq("tipo",p.componente_removido).eq("ativo_atual",true).maybeSingle();
@@ -56,7 +67,6 @@ async function aprovarPendente(id){
     if((p.componente_instalado_tipo==="Outro"||p.componente_instalado_tipo==="Homologado") && modeloAnterior && modeloAnterior!=="Original") await registerFieldEvidence(modeloAnterior,p.componente_instalado);
   }
 
-  await sb.from("manutencoes_pendentes").update({status:"Aprovada",revisado_por:currentUserEmail,revisado_em:new Date().toISOString()}).eq("id",id);
   msg("Manutenção aprovada e registrada no histórico oficial da peça.");
   loadPendentes();loadAprovadas();checkPendentesBadge();
 }

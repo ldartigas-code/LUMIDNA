@@ -111,6 +111,7 @@ details.card[open]>summary::after{transform:rotate(180deg)}
         <div class="field"><label>Foto do componente instalado</label><input type="file" accept="image/*" capture="environment" id="pm_comp_foto"></div>
         <div class="small">Como não é original nem uma peça compatível verificada, a LumiDNA precisa da foto e do fabricante pra avaliar antes de aprovar.</div>
       </div>
+      <div class="field"><label>Fotos do serviço (opcional — até 4, antes/depois)</label><input type="file" accept="image/*" multiple id="pm_fotos"></div>
       <div id="manutMsg"></div>
       <div style="display:flex;gap:10px">
         <button type="button" class="btn secondary" onclick="hideManutForm()">Cancelar</button>
@@ -386,6 +387,19 @@ async function enviarManutencao(){
     compModelo="Original";
   }
 
+  const fotosArquivos=[...(document.getElementById("pm_fotos").files||[])];
+  if(fotosArquivos.length>4){msgBox.innerHTML=`<div class="small" style="color:var(--red)">Envie no máximo 4 fotos do serviço.</div>`;return}
+  const fotosServico=[];
+  for(let i=0;i<fotosArquivos.length;i++){
+    const f=fotosArquivos[i];
+    if(!f.type.startsWith("image/")){msgBox.innerHTML=`<div class="small" style="color:var(--red)">"${esc(f.name)}" não é uma foto.</div>`;return}
+    if(f.size>8*1024*1024){msgBox.innerHTML=`<div class="small" style="color:var(--red)">"${esc(f.name)}" passa de 8MB.</div>`;return}
+    msgBox.innerHTML=`<div class="small">Enviando foto ${i+1} de ${fotosArquivos.length}...</div>`;
+    const caminho=`${assetCode}/servico_${Date.now()}_${i}_${f.name}`.replace(/[^\w./-]+/g,"_");
+    const envio=await sb.storage.from("evidencias").upload(caminho,f);
+    if(envio.error){msgBox.innerHTML=`<div class="small" style="color:var(--red)">Erro ao enviar foto: ${esc(envio.error.message)}</div>`;return}
+    fotosServico.push(sb.storage.from("evidencias").getPublicUrl(caminho).data.publicUrl);
+  }
   const p={
     p_code:assetCode,
     p_tipo:document.getElementById("pm_tipo").value,
@@ -397,7 +411,8 @@ async function enviarManutencao(){
     p_comp_instalado_tipo:compInstaladoTipo,
     p_comp_instalado_modelo:compModelo,
     p_comp_instalado_fabricante:compFabricante,
-    p_comp_instalado_foto:compFotoUrl
+    p_comp_instalado_foto:compFotoUrl,
+    p_fotos:fotosServico.length?fotosServico:null
   };
   const r=await sb.rpc("enviar_manutencao_pendente",p);
   if(r.error){msgBox.innerHTML=`<div class="small" style="color:var(--red)">Erro ao enviar: ${esc(r.error.message)}</div>`;return}

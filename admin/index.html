@@ -52,9 +52,20 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 .relatorio table{width:100%;border-collapse:collapse;margin-bottom:16px}
 .relatorio th,.relatorio td{padding:8px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}
 .relatorio th{background:#fafbfc}
+.relatorio h2{font-size:15px;margin:20px 0 8px}
+.relatorio .oc{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:14px;page-break-inside:avoid}
+.relatorio .oc-head{font-size:14px;margin-bottom:8px}
+.relatorio .oc-local{color:var(--muted);font-size:12px;margin-left:8px}
+.relatorio .oc table{margin-bottom:8px}
+.relatorio .oc th{vertical-align:top}
+.relatorio .oc td{vertical-align:top;font-size:12.5px}
+.relatorio .oc .tempos{background:#fff7f0;border-left:4px solid var(--orange);padding:7px 10px;border-radius:6px;font-size:13px;margin-bottom:8px}
+.relatorio .fotos{display:flex;flex-wrap:wrap;gap:6px}
+.relatorio .fotos img{max-width:150px;max-height:120px;object-fit:cover}
 .relatorio .totais{background:#fff7f0;border-left:4px solid var(--orange);padding:12px 14px;border-radius:8px;margin-bottom:16px;font-size:14px}
 .relatorio img{max-width:120px;border-radius:6px;border:1px solid var(--line);margin:2px}
 @media print{
+  @page{margin:12mm}
   body *{visibility:hidden}
   #printQRSheet, #printQRSheet *{visibility:visible}
   #printQRSheet{position:absolute;top:0;left:0;width:100%}
@@ -461,7 +472,8 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <h2 style="margin:0 0 12px;font-size:16px">Manutenção</h2>
 <div class="grid">
 <div class="field"><label>Tipo</label><select id="man_tipo"><option>Preventiva</option><option>Corretiva</option><option>Inspeção</option><option>Substituição de componente</option></select></div>
-<div class="field"><label>Responsável</label><input id="man_resp"></div>
+<div class="field"><label>Responsável (quem fez)</label><input id="man_resp"></div>
+<div class="field"><label>Empresa que realizou o serviço</label><input id="man_empresa"></div>
 <div class="field"><label>Status</label><select id="man_status"><option>Concluída</option><option>Em andamento</option><option>Aguardando peça</option></select></div>
 <div class="field"><label>Data</label><input type="date" id="man_data"></div>
 <div class="field"><label>Categoria da falha</label><select id="man_categoria">
@@ -474,6 +486,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
   <option>Falha de instalação</option>
   <option>Outro</option>
 </select></div>
+<div class="field span2"><label>Fotos do serviço (opcional — várias, antes/depois)</label><input type="file" accept="image/*" multiple id="man_fotos"></div>
 <div class="field span2"><label>Problema</label><textarea id="man_prob"></textarea></div>
 <div class="field span2"><label>Serviço realizado</label><textarea id="man_serv"></textarea></div>
 <div class="field"><label>Componente trocado</label><select id="man_comp_removido" onchange="onManCompChange()"><option value="">— não houve troca —</option><option>Luminária inteira</option><option>Driver</option><option>LED</option><option>Óptica</option></select></div>

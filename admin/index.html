@@ -254,7 +254,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
     </div>
     <input id="wizModeloSearch" placeholder="Buscar em todos os fabricantes (nome ou código)" oninput="onWizSearchInput()" style="width:100%;margin-bottom:8px">
     <div id="wizListaModelos"></div>
-    <div class="small" style="margin-top:10px"><a href="#" onclick="goScreen('avulsa');return false">Não achou o modelo? Cadastrar peça avulsa sem modelo</a></div>
+    <div class="small" style="margin-top:10px">Não achou o modelo? <a href="#" onclick="goScreen('catalogo');return false">Cadastrar o modelo no catálogo</a> (recomendado — depois ele aparece aqui) · <a href="#" onclick="goScreen('avulsa');return false">ou criar uma peça avulsa</a></div>
 
     <div class="small" style="margin:16px 0 6px"><a href="#" onclick="toggleWizColar();return false" id="wizColarToggle">Pedido grande? Colar lista (código, quantidade)</a></div>
     <div id="wizColarBox" class="hidden">
@@ -301,7 +301,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <div id="screenAvulsa" class="hidden">
   <button type="button" class="linkback" onclick="goScreen('wizard')">‹ Voltar</button>
   <h2 style="margin:14px 0 12px">Cadastrar peça avulsa</h2>
-  <div class="small" style="margin-bottom:10px">Use isso só quando a peça não tem um modelo no catálogo. O ID é gerado automaticamente com o prefixo da obra escolhida (ex: LD-PDC-000007) e você preenche os dados técnicos depois.</div>
+  <div class="small" style="margin-bottom:10px">Cria <b>uma peça</b> sem modelo do catálogo. Atenção: isso <b>não cadastra o modelo</b> — pra ele aparecer ao montar pedidos, use "Cadastrar modelo novo" (ou, depois de criar a peça, o botão "Salvar este modelo no catálogo" dentro dela). O ID é gerado automaticamente com o prefixo da obra escolhida (ex: LD-PDC-000007).</div>
   <div class="field"><label>Obra da peça</label><select id="avulsa_obra"><option value="">Carregando obras...</option></select></div>
   <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="createNew()">Criar peça avulsa e abrir</button></div>
 </div>
@@ -365,6 +365,14 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <div class="field span2">
   <label>Vincular a um modelo do catálogo (opcional, preenche os dados técnicos sozinho)</label>
   <div class="actions"><select id="modeloPicker" style="flex:1"><option value="">— nenhum / preencher manualmente —</option></select><button type="button" class="secondary" onclick="applyModeloToForm()">Aplicar dados do modelo</button></div>
+</div>
+<div class="field span2">
+  <label>Obra desta peça (peça sem obra não aparece na lista de nenhuma obra)</label>
+  <select id="obraPicker" onchange="aplicarObraNoForm()"><option value="">Carregando obras...</option></select>
+</div>
+<div class="field span2 hidden" id="salvarModeloBox">
+  <button type="button" class="secondary" onclick="salvarModeloNoCatalogo()">📚 Salvar este modelo no catálogo</button>
+  <div class="small">Esta peça não está ligada a nenhum modelo do catálogo. Preencha Modelo e Fabricante abaixo e clique aqui pra o modelo passar a aparecer ao cadastrar peças em qualquer obra.</div>
 </div>
 <div class="field"><label>Modelo</label><input name="modelo"></div>
 <div class="field"><label>Fabricante</label><input name="fabricante"></div>

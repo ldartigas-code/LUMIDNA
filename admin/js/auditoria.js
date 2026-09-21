@@ -52,6 +52,8 @@ q("#formLum").onsubmit=async e=>{
   e.preventDefault();
   if(!LID) return msg("Selecione ou crie um ativo primeiro.",false);
   const p={};for(const [k,v] of new FormData(e.target).entries())p[k]=norm(v);delete p.lumidna_id;
+  const obraSel=q("#obraPicker");
+  if(obraSel&&obraSel.dataset.pronto==="1") p.obra_id=obraSel.value?Number(obraSel.value):null;
   p.automacao = q("#det_automacao").value==="sim";
   if(!p.automacao) p.protocolo_automacao=null;
   const r=await sb.from("luminarias").update(p).eq("lumidna_id",LID);

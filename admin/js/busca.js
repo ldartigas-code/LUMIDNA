@@ -12,7 +12,7 @@ async function searchAssets(){
   const termo=q("#f_busca").value.trim();
   const fab=q("#f_fabricante").value.trim(), mod=q("#f_modelo").value.trim(), loc=q("#f_local").value.trim();
   if(!termo&&!fab&&!mod&&!loc){q("#searchResults").innerHTML="";return}
-  let query=sb.from("luminarias").select("id,lumidna_id,modelo,fabricante,cliente,empreendimento,edificio,andar,ambiente,posicao,status").order("lumidna_id").limit(1000);
+  let query=sb.from("luminarias").select("id,lumidna_id,obra_id,modelo,fabricante,cliente,empreendimento,edificio,andar,ambiente,posicao,status").order("lumidna_id").limit(1000);
   if(termo) query=query.or(`lumidna_id.ilike.%${termo}%,modelo.ilike.%${termo}%,fabricante.ilike.%${termo}%,cliente.ilike.%${termo}%,empreendimento.ilike.%${termo}%,edificio.ilike.%${termo}%`);
   if(fab) query=query.ilike("fabricante",`%${fab}%`);
   if(mod) query=query.ilike("modelo",`%${mod}%`);
@@ -37,7 +37,7 @@ function renderSearchResults(rows){
   });
   const arrow=(col)=>col!==searchSort.col?"":(searchSort.dir===1?" ▲":" ▼");
   box.innerHTML=`<table><tr>${SEARCH_COLS.map(([col,label])=>`<th style="cursor:pointer;user-select:none" onclick="sortSearchResults('${col}')">${label}${arrow(col)}</th>`).join("")}<th></th></tr>
-    ${sorted.map(x=>`<tr><td>${esc(x.lumidna_id)}</td><td>${esc(x.modelo)||"—"}</td><td>${esc(x.fabricante)||"—"}</td><td>${esc(x.cliente)||"—"}</td><td>${esc(x._local)||"—"}</td><td>${esc(x.status)||"—"}</td><td><button type="button" class="secondary" onclick="loadById('${x.lumidna_id}')">Abrir</button> <button type="button" class="secondary" onclick="abrirCopia('${x.lumidna_id}')">Copiar</button></td></tr>`).join("")}
+    ${sorted.map(x=>`<tr><td>${esc(x.lumidna_id)}${x.obra_id?"":`<div class="small" style="color:var(--red);font-weight:700">⚠ sem obra</div>`}</td><td>${esc(x.modelo)||"—"}</td><td>${esc(x.fabricante)||"—"}</td><td>${esc(x.cliente)||"—"}</td><td>${esc(x._local)||"—"}</td><td>${esc(x.status)||"—"}</td><td><button type="button" class="secondary" onclick="loadById('${x.lumidna_id}')">Abrir</button> <button type="button" class="secondary" onclick="abrirCopia('${x.lumidna_id}')">Copiar</button></td></tr>`).join("")}
   </table>`;
 }
 
@@ -56,13 +56,41 @@ async function loadById(id){
   msg(id+" carregada.");
 }
 
-async function preencherSelectObras(selId,comSemObra){
+async function preencherSelectObras(selId,comSemObra,rotuloVazio){
   const sel=q("#"+selId);
   const r=await sb.from("obras").select("id,numero,prefixo,nome").order("numero");
-  if(r.error){sel.innerHTML=`<option value="">Erro ao carregar obras</option>`;return}
-  sel.innerHTML=`<option value="">— escolha a obra —</option>`
+  if(r.error){sel.innerHTML=`<option value="">Erro ao carregar obras</option>`;return false}
+  sel.innerHTML=`<option value="">${rotuloVazio||"— escolha a obra —"}</option>`
     +(r.data||[]).map(o=>`<option value="${o.id}">Obra ${o.numero} · ${esc(o.prefixo)} — ${esc(o.nome)}</option>`).join("")
     +(comSemObra?`<option value="sem">Sem obra (LD-AVU)</option>`:"");
+  return true;
+}
+
+// Obra da peça (na tela de detalhe): peça sem obra não aparece na lista de
+// nenhuma obra, então dá pra ligar aqui. Só grava ao clicar em SALVAR.
+async function preencherObraDaPeca(data){
+  const sel=q("#obraPicker");
+  sel.dataset.pronto="";
+  const ok=await preencherSelectObras("obraPicker",false,"— sem obra —");
+  if(!ok) return;
+  sel.value=data.obra_id?String(data.obra_id):"";
+  sel.dataset.pronto="1";
+}
+
+async function aplicarObraNoForm(){
+  const id=q("#obraPicker").value;
+  if(!id) return;
+  const r=await sb.from("obras").select("*").eq("id",id).single();
+  if(r.error) return msg("Erro ao ler a obra: "+r.error.message,false);
+  const o=r.data;
+  q("input[name=cliente]").value=o.cliente||"";
+  q("input[name=empreendimento]").value=o.nome||"";
+  if(o.cliente_email) q("input[name=cliente_email]").value=o.cliente_email;
+  q("select[name=tensao_instalacao]").value=o.tensao_instalacao||"";
+  q("#det_automacao").value=o.automacao?"sim":"nao";
+  onDetAutomacaoChange();
+  if(o.automacao&&o.protocolo_automacao) q("select[name=protocolo_automacao]").value=o.protocolo_automacao;
+  msg("Obra \""+o.nome+"\" aplicada no formulário (cliente, e-mail, tensão e automação). Clique em SALVAR para gravar.");
 }
 function carregarObrasAvulsa(){return preencherSelectObras("avulsa_obra",true)}
 
@@ -167,6 +195,8 @@ async function openAsset(data){
   q("input[name=lumidna_id]").value=LID;
   q("#publicLink").value=data.public_code?`${LUMIDNA_SITE_BASE}/ativo/?c=${data.public_code}`:"(salve a luminária para gerar o link)";
   q("#modeloPicker").value=data.modelo_id||"";
+  q("#salvarModeloBox").classList.toggle("hidden",!!data.modelo_id);
+  preencherObraDaPeca(data);
   q("#det_automacao").value=data.automacao?"sim":"nao";
   q("#det_protocolo_field").classList.toggle("hidden",!data.automacao);
   ["foto_principal_url","foto_instalada_url","foto_etiqueta_url"].forEach(k=>updatePhotoPreview(k,data[k]));

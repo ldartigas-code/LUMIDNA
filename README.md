@@ -51,22 +51,28 @@ assets/supabase-config.js    → URL e chave pública do Supabase (compartilhada
 
 - **Obras** — cada projeto/local é uma entidade própria (tensão, automação,
   cliente e e-mail do cliente), com sua lista de peças e aprovações pendentes.
+  Cada obra recebe um número automático (Obra 1, 2, 3...) e um prefixo curto
+  de 2 a 6 letras/números, sugerido a partir do nome (Parque das Cerejeiras =
+  PDC) e editável, único entre as obras.
   Ao editar a obra, dá pra aplicar nome, cliente, e-mail, tensão e automação
   nas peças já cadastradas (o e-mail só é aplicado se estiver preenchido).
 - **Cadastro em lote (wizard)** — escolhe a obra, monta um "pedido" com vários
-  modelos e quantidades, e o sistema gera os IDs (`LD-FAB-MODELO-000001`) e o
-  QR de cada peça de uma vez. A numeração é reservada de forma atômica no
-  banco (sem risco de duas peças saírem com o mesmo ID em cadastros
-  simultâneos).
+  modelos e quantidades, e o sistema gera os IDs no formato
+  `LD-<PREFIXO DA OBRA>-000001` (ex: `LD-PDC-000001`, contando dentro da obra,
+  independente do modelo) e o QR de cada peça de uma vez. A numeração é
+  reservada de forma atômica no banco (sem risco de duas peças saírem com o
+  mesmo ID em cadastros simultâneos). Trocar o prefixo de uma obra só afeta as
+  peças novas; as já cadastradas mantêm o ID que têm.
 - **Catálogo de modelos** — luminárias (Retrofit ou COB), com importação em
   massa por CSV.
 - **Catálogo de componentes** — Driver/LED/Óptica com compatibilidade
   verificada pela LumiDNA, com preço de referência. É o único lugar onde peças
   compatíveis são cadastradas; a tela de cada peça só lista as que servem pra
   ela.
-- **Peça avulsa** — para peça sem modelo no catálogo. O ID é gerado pela
-  mesma numeração atômica do cadastro em lote (`LD-AVU-000001`, `000002`...),
-  nunca digitado à mão, para não colidir com a numeração automática.
+- **Peça avulsa** — para peça sem modelo no catálogo. Escolhe-se a obra e a
+  peça nasce com o prefixo dela (`LD-PDC-000007`), pela mesma numeração atômica
+  do cadastro em lote — o ID nunca é digitado à mão, para não colidir com a
+  numeração automática. Só quem marca "Sem obra" recebe `LD-AVU-000001`.
 - **Modelos Retrofit** — no cadastro, já dá pra escolher qual lâmpada
   compatível verificada foi instalada; potência/CCT/fluxo aparecem sozinhos (o dado mora
   na lâmpada, não é duplicado na luminária — se a lâmpada for trocada depois,

@@ -17,6 +17,9 @@ let appInitialized=false;
 function showApp(user){currentUserEmail=user.email;q("#loginScreen").classList.add("hidden");q("#resetScreen").classList.add("hidden");q("#appScreen").classList.remove("hidden");q("#userEmail").textContent=user.email;q("#connStatus").textContent="Supabase conectado";checkWarrantyAlerts();checkPendentesBadge();checkReposicaoBadge();populateModeloPicker();if(!appInitialized){appInitialized=true;goScreen("home")}}
 
 // ---- Navegação entre telas ----
+// Texto literal dentro de um ilike (sem tratar % e _ como curinga).
+function likeLiteral(s){return String(s).replace(/[\\%_]/g,"\\$&")}
+
 // O Supabase devolve no máximo 1000 linhas por consulta, mesmo com .limit(5000).
 // Pra listas que precisam vir completas, busca página por página.
 async function fetchAllRows(montarConsulta){

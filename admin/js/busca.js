@@ -195,7 +195,6 @@ async function openAsset(data){
   q("input[name=lumidna_id]").value=LID;
   q("#publicLink").value=data.public_code?`${LUMIDNA_SITE_BASE}/ativo/?c=${data.public_code}`:"(salve a luminária para gerar o link)";
   q("#modeloPicker").value=data.modelo_id||"";
-  q("#salvarModeloBox").classList.toggle("hidden",!!data.modelo_id);
   preencherObraDaPeca(data);
   q("#det_automacao").value=data.automacao?"sim":"nao";
   q("#det_protocolo_field").classList.toggle("hidden",!data.automacao);

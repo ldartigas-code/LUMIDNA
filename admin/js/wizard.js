@@ -120,9 +120,13 @@ function wizBotaoModelo(m){
 
 async function wizCarregarFabricantes(){
   const linhas=await fetchAllRows((de,ate)=>sb.from("modelos").select("fabricante").order("id").range(de,ate));
-  const contagem={};
-  linhas.forEach(l=>{const f=l.fabricante||WIZ_SEM_FABRICANTE;contagem[f]=(contagem[f]||0)+1});
-  wizFabricantesCache=Object.keys(contagem).sort((a,b)=>(a===WIZ_SEM_FABRICANTE)-(b===WIZ_SEM_FABRICANTE)||a.localeCompare(b,"pt-BR")).map(f=>({fabricante:f,total:contagem[f]}));
+  const grupos={};
+  linhas.forEach(l=>{
+    const nome=l.fabricante||WIZ_SEM_FABRICANTE;
+    const g=(grupos[nome.toLowerCase()]=grupos[nome.toLowerCase()]||{fabricante:nome,total:0});
+    g.total++;
+  });
+  wizFabricantesCache=Object.values(grupos).sort((a,b)=>(a.fabricante===WIZ_SEM_FABRICANTE)-(b.fabricante===WIZ_SEM_FABRICANTE)||a.fabricante.localeCompare(b.fabricante,"pt-BR"));
 }
 
 function wizEscolherFabricanteIdx(i){
@@ -157,7 +161,7 @@ async function wizFiltrarModelos(){
     }
     const consulta=(de,ate)=>{
       let query=sb.from("modelos").select("*").order("codigo").order("id").range(de,ate);
-      if(wizFabricante) query = wizFabricante===WIZ_SEM_FABRICANTE ? query.is("fabricante",null) : query.eq("fabricante",wizFabricante);
+      if(wizFabricante) query = wizFabricante===WIZ_SEM_FABRICANTE ? query.is("fabricante",null) : query.ilike("fabricante",likeLiteral(wizFabricante));
       if(term) query=query.or(`fabricante.ilike.%${term}%,linha.ilike.%${term}%,codigo.ilike.%${term}%,descricao.ilike.%${term}%`);
       return query;
     };
@@ -172,7 +176,7 @@ async function wizFiltrarModelos(){
       cortado=rows.length===100;
     }
     if(seq!==wizFiltroSeq) return;
-    box.innerHTML=(rows.length?rows.map(wizBotaoModelo).join(""):"<div class='small'>Nenhum modelo encontrado. Tente outro termo.</div>")
+    box.innerHTML=(rows.length?rows.map(wizBotaoModelo).join(""):"<div class='small'>Nenhum modelo com esse nome no catálogo. Se a peça existe só como \"peça avulsa\", abra a peça e clique em SALVAR — com Modelo e Fabricante preenchidos ela entra no catálogo sozinha. Ou use \"Cadastrar o modelo no catálogo\" abaixo.</div>")
       +(cortado?`<div class="small" style="margin-top:8px">Mostrando só os 100 primeiros. Escolha um fabricante ou refine a busca pra ver os outros.</div>`:"");
   }catch(e){
     if(seq===wizFiltroSeq) box.innerHTML="<div class='small'>Erro: "+esc(e.message)+"</div>";

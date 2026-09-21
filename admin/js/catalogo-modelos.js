@@ -70,35 +70,23 @@ function sortModelosList(col){
   renderModelosList();
 }
 
-// Salva o Modelo/Fabricante/dados técnicos que estão na tela de uma peça como
-// modelo do catálogo (ou acha o que já existe) e vincula a peça a ele. Serve
-// pra peça avulsa: o modelo passa a aparecer ao cadastrar peças em qualquer obra.
-async function salvarModeloNoCatalogo(){
-  if(!LID) return msg("Abra uma peça primeiro.",false);
-  const codigo=q("input[name=modelo]").value.trim();
-  const fabricante=norm(q("input[name=fabricante]").value.trim());
-  if(!codigo||!fabricante) return msg("Preencha Modelo e Fabricante da peça antes de salvar no catálogo.",false);
-  const existente=await sb.from("modelos").select("id").eq("fabricante",fabricante).eq("codigo",codigo).maybeSingle();
-  if(existente.error) return msg("Erro ao consultar o catálogo: "+existente.error.message,false);
-  let modeloId;
-  if(existente.data){
-    modeloId=existente.data.id;
-  }else{
-    const num=n=>{const v=q(`input[name=${n}]`).value; return v?Number(v):null};
-    const p={fabricante,codigo,potencia_w:num("potencia_w"),cct_k:num("cct_k"),irc:num("irc"),fluxo_lm:num("fluxo_lm"),facho_graus:num("facho_graus"),ip:norm(q("input[name=ip]").value.trim()),ik:norm(q("input[name=ik]").value.trim())};
-    const r=await sb.from("modelos").insert(p).select("id").single();
-    if(r.error) return msg("Erro ao salvar no catálogo: "+r.error.message,false);
-    modeloId=r.data.id;
-  }
-  const u=await sb.from("luminarias").update({modelo_id:modeloId}).eq("id",luminariaDbId);
-  if(u.error) return msg("Modelo salvo no catálogo, mas não consegui vincular esta peça: "+u.error.message,false);
-  await logAudit("modelo_id",originalData?originalData.modelo_id:null,modeloId);
-  if(originalData) originalData.modelo_id=modeloId;
-  q("input[name=modelo_id]").value=modeloId;
-  q("#salvarModeloBox").classList.add("hidden");
-  populateModeloPicker().then(()=>{q("#modeloPicker").value=String(modeloId)});
-  loadAudit();
-  msg(existente.data?"Esse modelo já existia no catálogo — a peça foi vinculada a ele.":"Modelo salvo no catálogo e vinculado a esta peça. Agora ele aparece ao cadastrar peças em qualquer obra.");
+// Toda peça com Modelo e Fabricante preenchidos precisa existir como modelo do
+// catálogo (é de lá que o "Montar o pedido" lista). Acha o modelo pelo par
+// fabricante + código; se não existir, cria com os dados técnicos da peça.
+async function garantirModeloNoCatalogo(c){
+  // LDARTI, Ldarti e ldarti são o mesmo fabricante: reaproveita a grafia que já está no catálogo.
+  const ex=await sb.from("modelos").select("id,fabricante").ilike("fabricante",likeLiteral(c.fabricante)).ilike("codigo",likeLiteral(c.codigo)).limit(1);
+  if(ex.error) return {erro:ex.error.message};
+  if(ex.data&&ex.data.length) return {id:ex.data[0].id,criado:false};
+  const fab=await sb.from("modelos").select("fabricante").ilike("fabricante",likeLiteral(c.fabricante)).limit(1);
+  const grafiaFabricante=(fab.data&&fab.data.length)?fab.data[0].fabricante:c.fabricante;
+  const r=await sb.from("modelos").insert({
+    fabricante:grafiaFabricante,codigo:c.codigo,
+    potencia_w:c.potencia_w??null,cct_k:c.cct_k??null,irc:c.irc??null,fluxo_lm:c.fluxo_lm??null,facho_graus:c.facho_graus??null,
+    ip:c.ip??null,ik:c.ik??null
+  }).select("id").single();
+  if(r.error) return {erro:r.error.message};
+  return {id:r.data.id,criado:true};
 }
 
 async function addModelo(){

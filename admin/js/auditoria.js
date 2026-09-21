@@ -56,12 +56,27 @@ q("#formLum").onsubmit=async e=>{
   if(obraSel&&obraSel.dataset.pronto==="1") p.obra_id=obraSel.value?Number(obraSel.value):null;
   p.automacao = q("#det_automacao").value==="sim";
   if(!p.automacao) p.protocolo_automacao=null;
+  let avisoModelo="";
+  if(!p.modelo_id&&p.modelo&&p.fabricante){
+    const num=v=>(v==null||v==="")?null:Number(v);
+    const g=await garantirModeloNoCatalogo({fabricante:p.fabricante,codigo:p.modelo,potencia_w:num(p.potencia_w),cct_k:num(p.cct_k),irc:num(p.irc),fluxo_lm:num(p.fluxo_lm),facho_graus:num(p.facho_graus),ip:p.ip,ik:p.ik});
+    if(g.erro){
+      avisoModelo=" Atenção: não consegui cadastrar o modelo no catálogo ("+g.erro+"). Salve de novo ou use Cadastrar modelo novo.";
+    }else{
+      p.modelo_id=g.id;
+      q("input[name=modelo_id]").value=g.id;
+      avisoModelo=g.criado
+        ? ` Modelo ${p.modelo} (${p.fabricante}) cadastrado no catálogo — já aparece ao montar pedidos.`
+        : ` Ligada ao modelo ${p.modelo} (${p.fabricante}) que já existia no catálogo.`;
+      populateModeloPicker().then(()=>{q("#modeloPicker").value=String(g.id)});
+    }
+  }
   const r=await sb.from("luminarias").update(p).eq("lumidna_id",LID);
   if(r.error) return msg("Erro: "+r.error.message,false);
   for(const k of Object.keys(p)) await logAudit(k,originalData?originalData[k]:null,p[k]);
   originalData={...originalData,...p};
   await loadAudit();
-  msg(LID+" salva no Supabase.");
+  msg(LID+" salva no Supabase."+avisoModelo,!avisoModelo.includes("Atenção"));
 };
 
 async function addWarranty(){

@@ -21,7 +21,8 @@ input,select,textarea{border:1px solid var(--line);border-radius:9px;padding:10p
 .secondary{background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px 14px;cursor:pointer}
 .alert{padding:12px 14px;border-left:4px solid var(--orange);background:#fff7f0;border-radius:8px;margin-bottom:14px}
 .success{padding:12px 14px;border-left:4px solid var(--green);background:#eef9f2;border-radius:8px;margin-bottom:14px}
-.hidden{display:none!important}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}
+.hidden{display:none!important}
+.ro{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}.ro .wide{grid-column:1/-1}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}
 th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pill{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;background:#edf3ff;color:#355fa8}
 .fotoPreview{width:100%;max-height:160px;object-fit:cover;border-radius:9px;margin-top:6px}
 .modeBtn{background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 16px;font-weight:700;cursor:pointer;color:var(--muted)}
@@ -127,7 +128,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
   </button>
   <button type="button" class="bigOption" onclick="goScreen('wizard')">
     <span class="ic">➕</span>
-    <span><b>Cadastrar peças novas</b><small>Gerar uma ou várias luminárias para uma obra</small></span>
+    <span><b>Cadastrar peças novas</b><small>Escolher a obra e o modelo (ou criar um modelo novo ali mesmo) e gerar as peças com QR</small></span>
   </button>
   <button type="button" class="bigOption" onclick="goScreen('search')">
     <span class="ic">🔍</span>
@@ -143,11 +144,11 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
   </button>
   <button type="button" class="bigOption" onclick="goScreen('catalogo')">
     <span class="ic">💡</span>
-    <span><b>Cadastrar modelo novo</b><small>Peça independente pra usar em obras futuras — sem precisar vincular a nenhuma obra agora. Também importa catálogo em CSV.</small></span>
+    <span><b>Catálogo de modelos</b><small>Ver, editar e importar (CSV) os modelos. Modelo novo também dá pra criar direto em "Cadastrar peças novas".</small></span>
   </button>
   <button type="button" class="bigOption" onclick="goScreen('componentes')">
     <span class="ic">🔧</span>
-    <span><b>Cadastrar componente novo</b><small>Driver, LED ou Óptica compatível verificado — independente, pra ficar disponível no catálogo.</small></span>
+    <span><b>Catálogo de componentes</b><small>Drivers, LEDs e ópticas compatíveis verificados, com preço de referência.</small></span>
   </button>
 </div>
 
@@ -265,7 +266,32 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
     </div>
     <input id="wizModeloSearch" placeholder="Buscar em todos os fabricantes (nome ou código)" oninput="onWizSearchInput()" style="width:100%;margin-bottom:8px">
     <div id="wizListaModelos"></div>
-    <div class="small" style="margin-top:10px">Não achou o modelo? <a href="#" onclick="goScreen('catalogo');return false">Cadastrar o modelo no catálogo</a> (recomendado — depois ele aparece aqui) · <a href="#" onclick="goScreen('avulsa');return false">ou criar uma peça avulsa</a></div>
+    <div style="margin-top:12px"><button type="button" class="secondary" onclick="wizAbrirModeloNovo()">+ Modelo novo (não está na lista)</button></div>
+    <div id="wizModeloNovo" class="card hidden" style="margin-top:12px">
+      <h2 style="margin:0 0 4px;font-size:16px">Modelo novo</h2>
+      <div class="small" style="margin-bottom:12px">Fica salvo no catálogo e já entra neste pedido. Só fabricante e código são obrigatórios.</div>
+      <div class="grid">
+        <div class="field"><label>Fabricante</label><input id="mn_fabricante" list="mn_fabricantes" autocomplete="off"><datalist id="mn_fabricantes"></datalist></div>
+        <div class="field"><label>Código do modelo</label><input id="mn_codigo" autocomplete="off"></div>
+      </div>
+      <details style="margin-top:10px">
+        <summary class="small" style="cursor:pointer;font-weight:700">Dados técnicos (opcional — dá pra completar depois no Catálogo)</summary>
+        <div class="grid3" style="margin-top:10px">
+          <div class="field"><label>Potência (W)</label><input type="number" step="0.01" id="mn_potencia"></div>
+          <div class="field"><label>CCT (K)</label><input type="number" id="mn_cct"></div>
+          <div class="field"><label>IRC</label><input type="number" step="0.1" id="mn_irc"></div>
+          <div class="field"><label>Fluxo (lm)</label><input type="number" step="0.1" id="mn_fluxo"></div>
+          <div class="field"><label>Facho (graus)</label><input type="number" step="0.1" id="mn_facho"></div>
+          <div class="field"><label>IP</label><input id="mn_ip"></div>
+          <div class="field"><label>IK</label><input id="mn_ik"></div>
+          <div class="field"><label>Tipo de montagem</label><select id="mn_tipo"><option value="">— não classificado —</option><option>Retrofit</option><option>COB</option></select></div>
+        </div>
+      </details>
+      <div class="actions" style="margin-top:12px">
+        <button type="button" class="secondary" onclick="wizFecharModeloNovo()">Cancelar</button>
+        <button type="button" class="primary" onclick="wizSalvarModeloNovo()">Salvar e adicionar ao pedido</button>
+      </div>
+    </div>
 
     <div class="small" style="margin:16px 0 6px"><a href="#" onclick="toggleWizColar();return false" id="wizColarToggle">Pedido grande? Colar lista (código, quantidade)</a></div>
     <div id="wizColarBox" class="hidden">
@@ -307,15 +333,6 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <!-- ===== IMPRESSÃO DE QR (só aparece no papel) ===== -->
 <div id="printQRSheet" class="hidden"></div>
 <div id="printRelatorio" class="hidden"></div>
-
-<!-- ===== AVULSA: cadastro manual sem modelo ===== -->
-<div id="screenAvulsa" class="hidden">
-  <button type="button" class="linkback" onclick="goScreen('wizard')">‹ Voltar</button>
-  <h2 style="margin:14px 0 12px">Cadastrar peça avulsa</h2>
-  <div class="small" style="margin-bottom:10px">Cria <b>uma peça</b> sem modelo do catálogo. Atenção: isso <b>não cadastra o modelo</b> — pra ele aparecer ao montar pedidos, use "Cadastrar modelo novo" (ou, depois de criar a peça, o botão "Salvar este modelo no catálogo" dentro dela). O ID é gerado automaticamente com o prefixo da obra escolhida (ex: LD-PDC-000007).</div>
-  <div class="field"><label>Obra da peça</label><select id="avulsa_obra"><option value="">Carregando obras...</option></select></div>
-  <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="createNew()">Criar peça avulsa e abrir</button></div>
-</div>
 
 <!-- ===== COPIAR PEÇA (cria peças novas com os mesmos dados técnicos) ===== -->
 <div id="screenCopiar" class="hidden">
@@ -365,83 +382,74 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <div id="screenDetail" class="hidden">
   <button type="button" class="linkback" onclick="goScreen('search')">‹ Voltar à busca</button>
 <form id="formLum">
+<input type="hidden" name="modelo_id">
 <section class="card">
 <h2 style="margin:0 0 12px;font-size:16px">Identificação</h2>
 <div class="actions" style="margin-bottom:12px"><button type="button" class="secondary" onclick="abrirCopia(LID)">📋 Criar cópia (peça nova) em outra obra</button></div>
-<div class="alert"><b>DNA ORIGINAL.</b> Estes campos representam como a luminária nasceu. Alterações geram trilha de auditoria (veja o Histórico, no fim desta página).</div>
 <div class="grid">
 <div class="field"><label>ID LumiDNA</label><input name="lumidna_id" readonly></div>
-<div class="field span2"><label>Link público (NFC/QR)</label><div class="actions"><input id="publicLink" readonly style="flex:1"><button type="button" class="secondary" onclick="copyPublicLink()">Copiar</button></div></div>
-<input type="hidden" name="modelo_id">
-<div class="field span2">
-  <label>Vincular a um modelo do catálogo (opcional, preenche os dados técnicos sozinho)</label>
-  <div class="actions"><select id="modeloPicker" style="flex:1"><option value="">— nenhum / preencher manualmente —</option></select><button type="button" class="secondary" onclick="applyModeloToForm()">Aplicar dados do modelo</button></div>
-</div>
-<div class="field span2">
-  <label>Obra desta peça (peça sem obra não aparece na lista de nenhuma obra)</label>
-  <select id="obraPicker" onchange="aplicarObraNoForm()"><option value="">Carregando obras...</option></select>
-</div>
-<div class="field"><label>Modelo</label><input name="modelo"></div>
-<div class="field"><label>Fabricante</label><input name="fabricante"></div>
-<div class="field"><label>Lote</label><input name="lote"></div>
-<div class="field"><label>Número de série</label><input name="numero_serie"></div>
-<div class="field"><label>Data da venda</label><input type="date" name="data_venda"></div>
 <div class="field"><label>Status</label><select name="status"><option>Ativa</option><option>Em manutenção</option><option>Falha</option><option>Desativada</option></select></div>
+<div class="field span2"><label>Link público (NFC/QR)</label><div class="actions"><input id="publicLink" readonly style="flex:1"><button type="button" class="secondary" onclick="copyPublicLink()">Copiar</button></div></div>
+<div class="field"><label>Número de série</label><input name="numero_serie"></div>
+<div class="field"><label>Lote</label><input name="lote"></div>
+<div class="field"><label>Data da venda</label><input type="date" name="data_venda"></div>
+<div class="field"><label>Data de instalação</label><input type="date" name="data_instalacao"></div>
 <div class="field"><label>Criticidade</label><select name="criticidade"><option>Baixa</option><option selected>Média</option><option>Alta</option><option>Crítica</option></select></div>
 <div class="field span2"><label>Observações</label><textarea name="observacoes"></textarea></div>
 </div></section>
 
 <section class="card">
+<h2 style="margin:0 0 6px;font-size:16px">Modelo e obra</h2>
+<div class="small" style="margin-bottom:12px">Estes dados vêm do modelo (no Catálogo) e da obra. Não se digitam aqui, pra nunca ficarem diferentes de uma peça pra outra: pra mudar, edite na origem e a peça acompanha.</div>
+<div id="roModeloObra"></div>
+<div class="small" id="specsRetrofitHint" style="margin-top:10px"></div>
+<div id="boxSemObra" class="hidden" style="margin-top:14px">
+  <div class="field"><label>Obra desta peça</label><select id="obraPicker" onchange="mostrarObraEscolhida()"><option value="">Carregando obras...</option></select></div>
+  <div class="small">Escolha a obra e clique em SALVAR. Cliente, e-mail, tensão e automação passam a vir dela.</div>
+</div>
+<div class="actions" style="margin-top:14px">
+  <button type="button" class="secondary" onclick="abrirModeloDaPeca()">Editar este modelo no Catálogo</button>
+  <button type="button" class="secondary" id="btnEditarObraDaPeca" onclick="abrirObraDaPeca()">Editar a obra</button>
+</div>
+<details style="margin-top:14px">
+  <summary class="small" style="cursor:pointer;font-weight:700">Esta peça é de outro modelo? Trocar</summary>
+  <div class="actions" style="margin-top:10px"><select id="modeloPicker" style="flex:1"><option value="">— escolha o modelo —</option></select><button type="button" class="secondary" onclick="trocarModeloDaPeca()">Usar este modelo</button></div>
+</details>
+</section>
+
+<section class="card">
 <h2 style="margin:0 0 12px;font-size:16px">📷 Fotos</h2>
-<div class="alert">Envie a foto direto do celular ou computador. Também aceita colar uma URL pública manualmente.</div>
+<div class="small" style="margin-bottom:10px">Envie a foto direto do celular ou computador e clique em SALVAR.</div>
 <div class="grid">
 <div class="field">
   <label>Foto principal</label>
-  <input name="foto_principal_url" placeholder="URL (gerada ao enviar, ou cole uma)">
+  <input type="hidden" name="foto_principal_url">
   <input type="file" accept="image/*" data-target="foto_principal_url" onchange="uploadPhoto(event)">
   <img class="fotoPreview hidden" data-preview="foto_principal_url">
 </div>
 <div class="field">
   <label>Foto instalada</label>
-  <input name="foto_instalada_url" placeholder="URL (gerada ao enviar, ou cole uma)">
+  <input type="hidden" name="foto_instalada_url">
   <input type="file" accept="image/*" capture="environment" data-target="foto_instalada_url" onchange="uploadPhoto(event)">
   <img class="fotoPreview hidden" data-preview="foto_instalada_url">
 </div>
 <div class="field">
   <label>Foto da etiqueta</label>
-  <input name="foto_etiqueta_url" placeholder="URL (gerada ao enviar, ou cole uma)">
+  <input type="hidden" name="foto_etiqueta_url">
   <input type="file" accept="image/*" capture="environment" data-target="foto_etiqueta_url" onchange="uploadPhoto(event)">
   <img class="fotoPreview hidden" data-preview="foto_etiqueta_url">
 </div>
 </div></section>
 
 <section class="card">
-<h2 style="margin:0 0 12px;font-size:16px">Dados técnicos</h2>
-<div class="small" id="specsRetrofitHint" style="margin-bottom:10px"></div>
-<div class="grid3">
-<div class="field"><label>Potência (W)</label><input type="number" step="0.01" name="potencia_w"></div>
-<div class="field"><label>CCT (K)</label><input type="number" name="cct_k"></div>
-<div class="field"><label>IRC</label><input type="number" step="0.1" name="irc"></div>
-<div class="field"><label>Fluxo (lm)</label><input type="number" step="0.1" name="fluxo_lm"></div>
-<div class="field"><label>Facho (graus)</label><input type="number" step="0.1" name="facho_graus"></div>
-<div class="field"><label>IP</label><input name="ip"></div>
-<div class="field"><label>IK</label><input name="ik"></div>
-<div class="field"><label>Data de instalação</label><input type="date" name="data_instalacao"></div>
-<div class="field"><label>Tensão da instalação</label><select name="tensao_instalacao"><option value="">— selecione —</option><option>127V</option><option>220V</option></select></div>
-<div class="field"><label>Tem automação?</label><select id="det_automacao" onchange="onDetAutomacaoChange()"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
-<div class="field hidden" id="det_protocolo_field"><label>Protocolo</label><select name="protocolo_automacao"><option>DALI</option><option>TRIAC</option><option>0-10V</option></select></div>
-</div>
-<div class="small" style="margin-top:14px;font-weight:700">Peças instaladas</div>
+<h2 style="margin:0 0 12px;font-size:16px">Peças instaladas</h2>
 <div class="small" style="margin-bottom:8px">Só muda de "Original" pra um código quando uma troca é aprovada em "Aprovações pendentes" ou registrada em "Manutenção" (mais abaixo). Não dá pra editar aqui direto — isso evita dado digitado errado.</div>
 <div id="pecasInstaladasView" class="grid3"></div>
 </section>
 
 <section class="card">
-<h2 style="margin:0 0 12px;font-size:16px">Cliente e localização</h2>
+<h2 style="margin:0 0 12px;font-size:16px">Localização na obra</h2>
 <div class="grid">
-<div class="field"><label>Cliente</label><input name="cliente"></div>
-<div class="field"><label>E-mail do cliente (opcional)</label><input type="email" name="cliente_email" placeholder="pra avisos de manutenção não aprovada"></div>
-<div class="field"><label>Empreendimento</label><input name="empreendimento"></div>
 <div class="field"><label>Edifício / Torre / Bloco</label><input name="edificio"></div>
 <div class="field"><label>Andar</label><input name="andar"></div>
 <div class="field"><label>Ambiente</label><input name="ambiente"></div>
@@ -548,7 +556,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
   </div>
 
   <div class="card">
-    <h2 style="margin:0 0 12px;font-size:16px">Cadastrar modelo manualmente</h2>
+    <h2 id="mo_titulo" style="margin:0 0 12px;font-size:16px">Modelo novo</h2>
     <div class="grid3">
       <div class="field"><label>Fabricante</label><input id="mo_fabricante"></div>
       <div class="field"><label>Linha</label><input id="mo_linha"></div>
@@ -566,7 +574,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
       <div class="field"><label>Tipo de montagem</label><select id="mo_tipo_montagem"><option value="">— não classificado —</option><option>Retrofit</option><option>COB</option></select></div>
       <div class="field span2"><label>Observações</label><input id="mo_obs"></div>
     </div>
-    <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="addModelo()">Salvar modelo</button></div>
+    <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="addModelo()">Salvar modelo</button><button type="button" class="secondary" onclick="novoModeloForm()">Limpar / novo modelo</button></div>
   </div>
 
   <div class="card">

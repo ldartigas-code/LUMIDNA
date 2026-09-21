@@ -37,7 +37,7 @@ function renderSearchResults(rows){
   });
   const arrow=(col)=>col!==searchSort.col?"":(searchSort.dir===1?" ▲":" ▼");
   box.innerHTML=`<table><tr>${SEARCH_COLS.map(([col,label])=>`<th style="cursor:pointer;user-select:none" onclick="sortSearchResults('${col}')">${label}${arrow(col)}</th>`).join("")}<th></th></tr>
-    ${sorted.map(x=>`<tr><td>${esc(x.lumidna_id)}</td><td>${esc(x.modelo)||"—"}</td><td>${esc(x.fabricante)||"—"}</td><td>${esc(x.cliente)||"—"}</td><td>${esc(x._local)||"—"}</td><td>${esc(x.status)||"—"}</td><td><button type="button" class="secondary" onclick="loadById('${x.lumidna_id}')">Abrir</button></td></tr>`).join("")}
+    ${sorted.map(x=>`<tr><td>${esc(x.lumidna_id)}</td><td>${esc(x.modelo)||"—"}</td><td>${esc(x.fabricante)||"—"}</td><td>${esc(x.cliente)||"—"}</td><td>${esc(x._local)||"—"}</td><td>${esc(x.status)||"—"}</td><td><button type="button" class="secondary" onclick="loadById('${x.lumidna_id}')">Abrir</button> <button type="button" class="secondary" onclick="abrirCopia('${x.lumidna_id}')">Copiar</button></td></tr>`).join("")}
   </table>`;
 }
 
@@ -56,13 +56,86 @@ async function loadById(id){
   msg(id+" carregada.");
 }
 
-async function carregarObrasAvulsa(){
-  const sel=q("#avulsa_obra");
+async function preencherSelectObras(selId,comSemObra){
+  const sel=q("#"+selId);
   const r=await sb.from("obras").select("id,numero,prefixo,nome").order("numero");
   if(r.error){sel.innerHTML=`<option value="">Erro ao carregar obras</option>`;return}
   sel.innerHTML=`<option value="">— escolha a obra —</option>`
     +(r.data||[]).map(o=>`<option value="${o.id}">Obra ${o.numero} · ${esc(o.prefixo)} — ${esc(o.nome)}</option>`).join("")
-    +`<option value="sem">Sem obra (LD-AVU)</option>`;
+    +(comSemObra?`<option value="sem">Sem obra (LD-AVU)</option>`:"");
+}
+function carregarObrasAvulsa(){return preencherSelectObras("avulsa_obra",true)}
+
+// ---- Criar cópia de uma peça: só poupa digitação, sempre gera peça NOVA ----
+let copiaOrigem=null, copiaPrimeiroId=null;
+const COPIA_CAMPOS=["modelo_id","modelo","fabricante","potencia_w","cct_k","irc","fluxo_lm","facho_graus","ip","ik","criticidade"];
+
+async function abrirCopia(lumidnaId){
+  const r=await sb.from("luminarias").select("*").eq("lumidna_id",lumidnaId).maybeSingle();
+  if(r.error||!r.data) return msg("Não consegui ler a peça "+lumidnaId+".",false);
+  copiaOrigem=r.data;
+  goScreen("copiar");
+}
+
+async function prepararTelaCopia(){
+  q("#copiaSucesso").classList.add("hidden");
+  q("#copiaForm").classList.toggle("hidden",!copiaOrigem);
+  if(!copiaOrigem){
+    q("#copiaOrigemResumo").textContent="Nenhuma peça selecionada. Volte à busca e use o botão Copiar numa peça.";
+    return;
+  }
+  q("#copiaOrigemResumo").innerHTML=`Copiar a partir de: <b>${esc(copiaOrigem.lumidna_id)}</b> — ${esc(copiaOrigem.modelo)||"sem modelo"}${copiaOrigem.fabricante?" ("+esc(copiaOrigem.fabricante)+")":""}`;
+  q("#copia_qtd").value=1;
+  q("#copia_pecas").checked=false;
+  await preencherSelectObras("copia_obra",false);
+}
+
+async function criarCopias(){
+  if(!copiaOrigem) return;
+  const obraId=q("#copia_obra").value;
+  if(!obraId) return msg("Escolha a obra de destino.",false);
+  const qtd=parseInt(q("#copia_qtd").value,10);
+  if(!qtd||qtd<1||qtd>2000) return msg("Informe uma quantidade entre 1 e 2000.",false);
+  const o=await sb.from("obras").select("*").eq("id",obraId).single();
+  if(o.error) return msg("Erro ao ler a obra: "+o.error.message,false);
+  const obra=o.data;
+
+  let pecasCopiadas=[];
+  if(q("#copia_pecas").checked){
+    const rc=await sb.from("componentes").select("tipo,modelo").eq("luminaria_id",copiaOrigem.id).eq("ativo_atual",true);
+    if(rc.error) return msg("Erro ao ler as peças instaladas: "+rc.error.message,false);
+    pecasCopiadas=(rc.data||[]).filter(c=>c.modelo&&c.modelo!=="Original");
+  }
+
+  const rq=await sb.rpc("reservar_numeros",{p_prefix:`LD-${obra.prefixo}-`,p_qtd:qtd});
+  if(rq.error) return msg("Erro ao reservar numeração: "+rq.error.message,false);
+
+  const base={};
+  COPIA_CAMPOS.forEach(k=>{ if(copiaOrigem[k]!=null) base[k]=copiaOrigem[k]; });
+  const rows=[];
+  for(let i=0;i<qtd;i++){
+    rows.push({...base, criticidade:base.criticidade||"Média", lumidna_id:buildObraId(obra.prefixo,rq.data+i), status:"Ativa", obra_id:obra.id, ...wizObraDe(obra)});
+  }
+  const ins=await inserirLuminariasEmBlocos(rows);
+  if(ins.erro) return msg("Erro ao criar as cópias: "+ins.erro,false);
+  const criadas=ins.criadas;
+
+  let avisoPecas="";
+  if(pecasCopiadas.length){
+    const compRows=[];
+    criadas.forEach(l=>pecasCopiadas.forEach(c=>compRows.push({luminaria_id:l.id,tipo:c.tipo,modelo:c.modelo,original:false,ativo_atual:true})));
+    for(let i=0;i<compRows.length;i+=500){
+      const rc=await sb.from("componentes").insert(compRows.slice(i,i+500));
+      if(rc.error){avisoPecas=" Mas houve erro ao copiar as peças instaladas: "+rc.error.message;break}
+    }
+  }
+
+  wizUltimaCriacao=criadas;
+  copiaPrimeiroId=criadas[0].lumidna_id;
+  q("#copiaForm").classList.add("hidden");
+  q("#copiaSucesso").classList.remove("hidden");
+  q("#copiaSucessoTitulo").textContent=`${criadas.length} peça(s) nova(s) criada(s)`;
+  q("#copiaSucessoTexto").innerHTML=`Na obra <b>${esc(obra.nome)}</b>, de <b>${esc(criadas[0].lumidna_id)}</b> até <b>${esc(criadas[criadas.length-1].lumidna_id)}</b>.<br>Preencha número de série, local e fotos de cada uma ao abrir.${avisoPecas?"<br><b>"+esc(avisoPecas)+"</b>":""}`;
 }
 
 async function createNew(){

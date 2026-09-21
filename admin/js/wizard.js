@@ -288,6 +288,22 @@ async function wizRevisar(){
   wizStep(3);
 }
 
+// Grava em blocos de 500 pra pedido grande não estourar o limite de linhas
+// devolvidas por consulta (1000) nem o tamanho da requisição. Se um bloco
+// falhar, o erro já avisa quais IDs chegaram a ser criados.
+async function inserirLuminariasEmBlocos(rows){
+  const criadas=[];
+  for(let i=0;i<rows.length;i+=500){
+    const r=await sb.from("luminarias").insert(rows.slice(i,i+500)).select("id,lumidna_id,public_code,numero_serie");
+    if(r.error){
+      const jaFeitas=criadas.length?` Atenção: ${criadas.length} peça(s) já tinham sido criadas antes do erro (${criadas[0].lumidna_id} até ${criadas[criadas.length-1].lumidna_id}) — confira em Buscar peça antes de refazer.`:"";
+      return {criadas,erro:r.error.message+jaFeitas};
+    }
+    criadas.push(...r.data);
+  }
+  return {criadas,erro:null};
+}
+
 async function wizCriar(){
   const rows=[];
   for(const item of wizCarrinho){
@@ -303,17 +319,9 @@ async function wizCriar(){
       });
     }
   }
-  // Grava em blocos de 500 pra pedido grande não estourar o limite de linhas
-  // devolvidas por consulta (1000) nem o tamanho da requisição.
-  const criadas=[];
-  for(let i=0;i<rows.length;i+=500){
-    const r=await sb.from("luminarias").insert(rows.slice(i,i+500)).select("id,lumidna_id,public_code,numero_serie");
-    if(r.error){
-      const jaFeitas=criadas.length?` Atenção: ${criadas.length} peça(s) já tinham sido criadas antes do erro (${criadas[0].lumidna_id} até ${criadas[criadas.length-1].lumidna_id}) — confira em Buscar peça antes de refazer.`:"";
-      return msg("Erro ao criar o pedido: "+r.error.message+jaFeitas,false);
-    }
-    criadas.push(...r.data);
-  }
+  const ins=await inserirLuminariasEmBlocos(rows);
+  if(ins.erro) return msg("Erro ao criar o pedido: "+ins.erro,false);
+  const criadas=ins.criadas;
   wizUltimaCriacao=criadas;
 
   // Pra modelos Retrofit onde foi escolhida a lâmpada, já grava ela como

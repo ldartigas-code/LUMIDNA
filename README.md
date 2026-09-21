@@ -73,6 +73,11 @@ assets/supabase-config.js    → URL e chave pública do Supabase (compartilhada
   peça nasce com o prefixo dela (`LD-PDC-000007`), pela mesma numeração atômica
   do cadastro em lote — o ID nunca é digitado à mão, para não colidir com a
   numeração automática. Só quem marca "Sem obra" recebe `LD-AVU-000001`.
+  Peça avulsa **não cadastra o modelo** no catálogo. Dentro da tela de qualquer
+  peça dá pra escolher a **obra** dela (peça sem obra não aparece na lista de
+  nenhuma obra, e a Buscar peça marca essas com "⚠ sem obra") e, se ela não
+  estiver ligada a um modelo, clicar em **Salvar este modelo no catálogo** pra
+  ele passar a aparecer ao montar pedidos.
 - **Criar cópia (peça nova)** — em Buscar peça (botão Copiar) ou na tela da peça,
   cria uma ou várias peças NOVAS (ID e QR novos, com o prefixo da obra de
   destino) já com os mesmos dados técnicos, só pra poupar digitação. Cliente,

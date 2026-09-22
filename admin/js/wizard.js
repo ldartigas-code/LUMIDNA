@@ -242,38 +242,51 @@ function renderWizCarrinho(){
         <input type="number" min="1" value="${item.qty}" style="width:80px" onchange="wizAtualizarQtd(${idx},this.value)">
         <button type="button" class="secondary" onclick="wizRemoverItem(${idx})">Remover</button>
       </div>
-      ${item.modelo.tipo_montagem==="Retrofit"?`
-      <div class="field" style="margin-top:10px">
-        <label>Lâmpada instalada (opcional — preenche potência/CCT/fluxo automaticamente)</label>
-        <select id="wizLampada${idx}" onchange="wizEscolherLampada(${idx},this.value)">
-          <option value="">Carregando lâmpadas compatíveis...</option>
-        </select>
-      </div>`:""}
+      <details class="wizCompDetails" ontoggle="onWizCompToggle(${idx},this)">
+        <summary class="small" style="cursor:pointer;font-weight:700;margin-top:8px">Definir Driver / LED / Óptica instalados (opcional)</summary>
+        <div class="grid3" id="wizComp${idx}" style="margin-top:10px"><div class="small">Abrindo...</div></div>
+      </details>
     </div>`).join("") : "<div class='small'>Nenhum item adicionado ainda.</div>";
-  wizCarrinho.forEach((item,idx)=>{ if(item.modelo.tipo_montagem==="Retrofit") carregarLampadasDoItem(idx); });
 }
 
-async function carregarLampadasDoItem(idx){
-  const item=wizCarrinho[idx];
-  if(!item) return;
-  const sel=q(`#wizLampada${idx}`);
-  if(!sel) return;
-  const r=await sb.rpc("listar_homologados",{p_componente:"LED",p_modelo_codigo:item.modelo.codigo});
-  if(!q(`#wizLampada${idx}`)) return; // carrinho pode ter mudado enquanto carregava
-  const rows=r.error?[]:(r.data||[]);
-  const atual=item.lampada?item.lampada.modelo_equivalente:"";
-  sel.innerHTML = `<option value="">— nenhuma / definir depois —</option>` +
-    rows.map(x=>`<option value="${esc(x.modelo_equivalente)}">${esc(x.modelo_equivalente)}${x.fabricante_equivalente?" — "+esc(x.fabricante_equivalente):""}${x.especificacao?" ("+esc(x.especificacao)+")":""}</option>`).join("");
-  sel.value=atual;
+const WIZ_TIPOS_COMPONENTE=["Driver","LED","Óptica"];
+
+function onWizCompToggle(idx,detailsEl){
+  if(detailsEl.open) carregarComponentesDoItem(idx);
 }
 
-function wizEscolherLampada(idx,codigo){
+// Carrega, pra este item do pedido, as peças compatíveis verificadas de cada
+// tipo (Driver/LED/Óptica) já cadastradas no Catálogo de componentes — quem
+// monta o pedido escolhe o que veio de fábrica em cada peça, sem digitar nada.
+async function carregarComponentesDoItem(idx){
+  const item=wizCarrinho[idx];
+  const box=q(`#wizComp${idx}`);
+  if(!item||!box) return;
+  const resultados=await Promise.all(WIZ_TIPOS_COMPONENTE.map(tipo=>sb.rpc("listar_homologados",{p_componente:tipo,p_modelo_codigo:item.modelo.codigo})));
+  if(!q(`#wizComp${idx}`)) return; // carrinho pode ter mudado enquanto carregava
+  box.innerHTML = WIZ_TIPOS_COMPONENTE.map((tipo,i)=>{
+    const r=resultados[i];
+    const rows=r.error?[]:(r.data||[]);
+    const atual=(item.compSelecionado&&item.compSelecionado[tipo])?item.compSelecionado[tipo].modelo_equivalente:"";
+    const opcoes = rows.length
+      ? rows.map(x=>`<option value="${esc(x.modelo_equivalente)}">${esc(x.modelo_equivalente)}${x.fabricante_equivalente?" — "+esc(x.fabricante_equivalente):""}${x.especificacao?" ("+esc(x.especificacao)+")":""}</option>`).join("")
+      : `<option value="" disabled>— nenhuma peça compatível verificada cadastrada —</option>`;
+    return `<div class="field"><label>${tipo}</label><select id="wizComp${idx}_${tipo}" onchange="wizEscolherComponente(${idx},'${tipo}',this.value)"><option value="">— não definir agora —</option>${opcoes}</select></div>`;
+  }).join("");
+  WIZ_TIPOS_COMPONENTE.forEach(tipo=>{
+    const atual=(item.compSelecionado&&item.compSelecionado[tipo])?item.compSelecionado[tipo].modelo_equivalente:"";
+    if(atual) q(`#wizComp${idx}_${tipo}`).value=atual;
+  });
+}
+
+function wizEscolherComponente(idx,tipo,codigo){
   const item=wizCarrinho[idx];
   if(!item) return;
-  if(!codigo){ item.lampada=null; return; }
-  const sel=q(`#wizLampada${idx}`);
+  item.compSelecionado=item.compSelecionado||{};
+  if(!codigo){ delete item.compSelecionado[tipo]; return; }
+  const sel=q(`#wizComp${idx}_${tipo}`);
   const opt=sel&&sel.querySelector(`option[value="${CSS.escape(codigo)}"]`);
-  item.lampada={modelo_equivalente:codigo, especificacao:opt?opt.textContent:codigo};
+  item.compSelecionado[tipo]={modelo_equivalente:codigo, especificacao:opt?opt.textContent:codigo};
 }
 
 function toggleWizColar(){
@@ -318,7 +331,8 @@ async function wizRevisar(){
     item.startNum=proximo;
     proximo+=item.qty;
     const firstId=buildObraId(wizObraPrefixo,item.startNum), lastId=buildObraId(wizObraPrefixo,item.startNum+item.qty-1);
-    html+=`<div style="margin-bottom:10px"><b>${item.qty}×</b> ${esc(item.modelo.fabricante)} — ${esc(item.modelo.codigo)}<br><span class="small">${firstId}${item.qty>1?" até "+lastId:""}</span>${item.lampada?`<br><span class="small">Lâmpada: ${esc(item.lampada.especificacao||item.lampada.modelo_equivalente)}</span>`:""}</div>`;
+    const compTxt=Object.entries(item.compSelecionado||{}).filter(([,v])=>v&&v.modelo_equivalente).map(([tipo,v])=>`${tipo}: ${esc(v.especificacao||v.modelo_equivalente)}`).join(" · ");
+    html+=`<div style="margin-bottom:10px"><b>${item.qty}×</b> ${esc(item.modelo.fabricante)} — ${esc(item.modelo.codigo)}<br><span class="small">${firstId}${item.qty>1?" até "+lastId:""}</span>${compTxt?`<br><span class="small">${compTxt}</span>`:""}</div>`;
   }
   q("#wizResumo").innerHTML=`<div class="small" style="margin-bottom:10px">Obra: <b>${esc(wizObra.empreendimento)||"—"}</b>${wizObra.cliente?" · "+esc(wizObra.cliente):""}</div>${html}<div style="margin-top:6px"><b>Total: ${total} peça(s)</b></div>`;
   wizStep(3);
@@ -360,24 +374,27 @@ async function wizCriar(){
   const criadas=ins.criadas;
   wizUltimaCriacao=criadas;
 
-  // Pra modelos Retrofit onde foi escolhida a lâmpada, já grava ela como
-  // componente LED instalado desde a criação — em vez de duplicar
-  // potência/CCT/fluxo na luminária, a página pública busca esses dados
-  // direto do catálogo de componentes (permanecem complementares, não
-  // unidos: se a lâmpada for trocada depois, o histórico de manutenção
+  // Pra itens onde foi escolhido Driver/LED/Óptica (Definir peças instaladas,
+  // no passo 2), já grava isso como componente original desde a criação —
+  // pra modelos Retrofit, é assim que a página pública passa a buscar
+  // potência/CCT/fluxo direto do catálogo de componentes (complementares,
+  // não unidos: se a peça for trocada depois, o histórico de manutenção
   // continua sendo a fonte da verdade).
   let offset=0;
   const componenteRows=[];
   for(const item of wizCarrinho){
     const idsDoItem=criadas.slice(offset,offset+item.qty);
     offset+=item.qty;
-    if(item.lampada&&item.lampada.modelo_equivalente){
-      idsDoItem.forEach(l=>componenteRows.push({luminaria_id:l.id,tipo:"LED",modelo:item.lampada.modelo_equivalente,original:false,ativo_atual:true}));
-    }
+    Object.entries(item.compSelecionado||{}).forEach(([tipo,val])=>{
+      if(!val||!val.modelo_equivalente) return;
+      idsDoItem.forEach(l=>componenteRows.push({luminaria_id:l.id,tipo,modelo:val.modelo_equivalente,original:true,ativo_atual:true}));
+    });
   }
   if(componenteRows.length){
-    const rc=await sb.from("componentes").insert(componenteRows);
-    if(rc.error) msg("Peças criadas, mas houve erro ao gravar a lâmpada instalada: "+rc.error.message,false);
+    for(let i=0;i<componenteRows.length;i+=500){
+      const rc=await sb.from("componentes").insert(componenteRows.slice(i,i+500));
+      if(rc.error){ msg("Peças criadas, mas houve erro ao gravar as peças instaladas: "+rc.error.message,false); break; }
+    }
   }
   const ids=criadas.map(x=>x.lumidna_id);
   q("#wizSucessoTitulo").textContent=`${ids.length} peça(s) criada(s)`;

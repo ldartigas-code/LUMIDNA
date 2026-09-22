@@ -199,6 +199,13 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
   <div class="actions" style="margin:16px 0">
     <button type="button" class="primary" onclick="cadastrarMaisNestaObra()" style="font-size:16px;padding:12px 24px">➕ Cadastrar mais peças nesta obra</button>
     <button type="button" class="secondary" onclick="abrirEdicaoObra()" style="font-size:16px;padding:12px 24px">✏️ Editar obra</button>
+    <button type="button" class="secondary" onclick="toggleImprimirQRObra()" style="font-size:16px;padding:12px 24px">🖨 Imprimir QR / etiquetas</button>
+  </div>
+  <div id="imprimirQRObraCard" class="card hidden">
+    <h2 style="margin:0 0 12px;font-size:16px">🖨 Imprimir QR / etiquetas</h2>
+    <div class="small" style="margin-bottom:12px">Reimprime a etiqueta das peças que já existem nesta obra — não cria nem numera peça nova. Pode repetir sempre que precisar (etiqueta perdida, peça nova, etc).</div>
+    <div class="field"><label>Filtrar por ambiente, modelo ou ID (opcional)</label><input id="qrObraFiltro" placeholder="deixe em branco pra imprimir todas as peças desta obra"></div>
+    <div class="actions"><button type="button" class="primary" onclick="imprimirQRDaObra()">Buscar e imprimir</button></div>
   </div>
   <h2 style="margin:20px 0 10px;font-size:16px">Peças desta obra</h2>
   <div id="obraPecasList"></div>

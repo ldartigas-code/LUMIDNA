@@ -387,14 +387,18 @@ async function wizCriar(){
   q("#wizSteps").innerHTML="";
 }
 
-function wizImprimirQR(){
-  if(!wizUltimaCriacao.length) return;
+// Imprime QR + etiqueta de uma lista de peças ({lumidna_id, public_code}).
+// Só lê dados que já existem — não cria nem reserva nenhuma peça nova. Usada
+// tanto pela tela de sucesso do cadastro em lote quanto pelo botão de
+// reimpressão na tela da obra.
+function imprimirEtiquetasQR(lista){
+  if(!lista.length) return msg("Nenhuma peça pra imprimir.",false);
   const sheet=q("#printQRSheet");
   sheet.innerHTML="";
   const grid=document.createElement("div");
   grid.className="qrGrid";
   sheet.appendChild(grid);
-  wizUltimaCriacao.forEach(x=>{
+  lista.forEach(x=>{
     const url=`${LUMIDNA_SITE_BASE}/ativo/?c=${x.public_code}`;
     const item=document.createElement("div");
     item.className="qrItem";
@@ -422,5 +426,9 @@ function wizImprimirQR(){
     grid.appendChild(item);
   });
   setTimeout(()=>window.print(),300);
+}
+
+function wizImprimirQR(){
+  imprimirEtiquetasQR(wizUltimaCriacao);
 }
 

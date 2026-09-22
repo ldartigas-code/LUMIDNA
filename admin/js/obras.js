@@ -67,6 +67,8 @@ async function abrirObra(id){
   const r=await sb.from("obras").select("*").eq("id",id).single();
   if(r.error) return msg(r.error.message,false);
   obraAtual=r.data;
+  q("#imprimirQRObraCard").classList.add("hidden");
+  q("#qrObraFiltro").value="";
   goScreen("obraDetalhe");
   q("#obraDetalheHeader").innerHTML=`<h2 style="margin:0 0 8px">${esc(obraAtual.nome)}</h2><div class="small" style="margin-bottom:4px">Obra ${obraAtual.numero} · prefixo <b>${esc(obraAtual.prefixo)}</b> · as peças saem como LD-${esc(obraAtual.prefixo)}-000001</div><div class="small">${obraAtual.cliente?"Cliente: "+esc(obraAtual.cliente)+" · ":""}${obraAtual.tensao_instalacao?"Tensão: "+esc(obraAtual.tensao_instalacao)+" · ":""}${obraAtual.automacao?"Automação: "+esc(obraAtual.protocolo_automacao):"Sem automação"}</div>`;
   loadObraPecas();
@@ -131,6 +133,25 @@ function cadastrarMaisNestaObra(){
   goScreen("wizard");
   wizPularParaCarrinho=false;
   wizEntrarNoCarrinho();
+}
+
+// Reimpressão de QR/etiqueta a qualquer momento — só lê peças que já existem
+// na obra, nunca cria nem reserva numeração nova.
+function toggleImprimirQRObra(){
+  q("#imprimirQRObraCard").classList.toggle("hidden");
+}
+
+async function imprimirQRDaObra(){
+  if(!obraAtual) return;
+  const termo=q("#qrObraFiltro").value.trim();
+  let query=sb.from("luminarias").select("lumidna_id,public_code").eq("obra_id",obraAtual.id).order("lumidna_id");
+  if(termo) query=query.or(`ambiente.ilike.%${termo}%,modelo.ilike.%${termo}%,lumidna_id.ilike.%${termo}%`);
+  let pecas;
+  try{ pecas=await fetchAllRows((de,ate)=>query.range(de,ate)); }
+  catch(e){ return msg("Erro ao buscar peças: "+(e.message||e),false); }
+  if(!pecas.length) return msg(termo?`Nenhuma peça encontrada pra "${termo}".`:"Esta obra não tem peças ainda.",false);
+  imprimirEtiquetasQR(pecas);
+  msg(`${pecas.length} etiqueta(s) enviada(s) pra impressão.`);
 }
 
 async function loadObraPecas(){

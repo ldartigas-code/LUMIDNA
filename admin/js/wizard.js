@@ -1,11 +1,12 @@
 // ---- Assistente: cadastrar peças novas (pedido / carrinho) ----
 let wizObra=null, wizObraId=null, wizObraPrefixo=null, wizCarrinho=[], wizPendingModeloId=null, wizUltimaCriacao=[], wizPularParaCarrinho=false;
+let wizColarPendentes=[], wizPendenteAtual=null;
 
 function wizStep(n){
   ["wz-1","wz-2","wz-3","wz-4"].forEach((id,i)=>q("#"+id).classList.toggle("hidden",i!==n-1));
   q("#wizSteps").innerHTML=["Obra","Pedido","Confirmar"].map((l,i)=>(i===n-1?`<b>${i+1}. ${l}</b>`:`${i+1}. ${l}`)).join("  →  ");
   if(n===1){
-    wizObra=null;wizObraId=null;wizObraPrefixo=null;wizCarrinho=[];
+    wizObra=null;wizObraId=null;wizObraPrefixo=null;wizCarrinho=[];wizColarPendentes=[];wizPendenteAtual=null;
     q("#wiz_prefixo").value="";q("#wiz_prefixo").dataset.manual="";
     q("#wizObraSearch").value="";
     q("#wizObraBusca").classList.remove("hidden");
@@ -95,8 +96,20 @@ function wizEntrarNoCarrinho(){
   q("#wizObraResumo").innerHTML=`Obra: <b>${esc(wizObra.empreendimento)}</b>${wizObraPrefixo?" ("+esc(wizObraPrefixo)+")":""}${wizObra.cliente?" · "+esc(wizObra.cliente):""}`;
   wizFiltrarModelos();
   renderWizCarrinho();
+  wizCarregarAmbientesDaObra();
   wizStep(2);
   if(wizPendingModeloId){const id=wizPendingModeloId;wizPendingModeloId=null;wizAdicionarAoCarrinho(id)}
+}
+
+// Sugestões de ambiente (autocompletar) com os nomes já usados nesta obra,
+// pra não nascer "Sala Reunião" numa peça e "Sala de Reunião" noutra.
+async function wizCarregarAmbientesDaObra(){
+  const dl=q("#wizAmbientesList");
+  if(!dl||!wizObraId) return;
+  const r=await sb.from("luminarias").select("ambiente").eq("obra_id",wizObraId).not("ambiente","is",null).limit(2000);
+  if(r.error) return;
+  const distintos=[...new Set((r.data||[]).map(x=>x.ambiente).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  dl.innerHTML=distintos.map(a=>`<option value="${esc(a)}">`).join("");
 }
 
 function wizIrParaCarrinho(){
@@ -186,6 +199,7 @@ async function wizFiltrarModelos(){
 
 // ---- Modelo novo criado dentro do próprio pedido ----
 function wizAbrirModeloNovo(){
+  wizPendenteAtual=null;
   const box=q("#wizModeloNovo");
   box.classList.remove("hidden");
   q("#mn_fabricante").value=(wizFabricante&&wizFabricante!==WIZ_SEM_FABRICANTE)?wizFabricante:"";
@@ -195,8 +209,24 @@ function wizAbrirModeloNovo(){
   (q("#mn_fabricante").value?q("#mn_codigo"):q("#mn_fabricante")).focus();
 }
 
+// Aberto a partir de um código "não encontrado" da lista colada: já vem com
+// fabricante/código preenchidos, e ao salvar entra no pedido com a
+// quantidade e o ambiente que estavam naquela linha da lista.
+function wizAbrirModeloNovoDoPendente(i){
+  wizPendenteAtual=wizColarPendentes[i];
+  if(!wizPendenteAtual) return;
+  const box=q("#wizModeloNovo");
+  box.classList.remove("hidden");
+  q("#mn_fabricante").value=wizPendenteAtual.fabricante||"";
+  q("#mn_codigo").value=wizPendenteAtual.codigo||"";
+  q("#mn_fabricantes").innerHTML=(wizFabricantesCache||[]).filter(f=>f.fabricante!==WIZ_SEM_FABRICANTE).map(f=>`<option value="${esc(f.fabricante)}">`).join("");
+  box.scrollIntoView({behavior:"smooth",block:"start"});
+  (q("#mn_fabricante").value?q("#mn_codigo"):q("#mn_fabricante")).focus();
+}
+
 function wizFecharModeloNovo(){
   q("#wizModeloNovo").classList.add("hidden");
+  wizPendenteAtual=null;
   ["mn_fabricante","mn_codigo","mn_potencia","mn_cct","mn_irc","mn_fluxo","mn_facho","mn_ip","mn_ik"].forEach(id=>{q("#"+id).value=""});
   q("#mn_tipo").value="";
 }
@@ -208,20 +238,35 @@ async function wizSalvarModeloNovo(){
   const g=await garantirModeloNoCatalogo({fabricante,codigo,potencia_w:num("#mn_potencia"),cct_k:num("#mn_cct"),irc:num("#mn_irc"),fluxo_lm:num("#mn_fluxo"),facho_graus:num("#mn_facho"),ip:norm(q("#mn_ip").value.trim()),ik:norm(q("#mn_ik").value.trim()),tipo_montagem:norm(q("#mn_tipo").value)});
   if(g.erro) return msg("Erro ao salvar o modelo: "+g.erro,false);
   wizFabricantesCache=null;
-  await wizAdicionarAoCarrinho(g.id);
+  const pendente=wizPendenteAtual;
+  if(pendente){
+    await wizAdicionarAoCarrinho(g.id,pendente.qty,pendente.ambiente);
+    wizColarPendentes=wizColarPendentes.filter(p=>p!==pendente);
+    atualizarWizColarPendentesUI();
+  }else{
+    await wizAdicionarAoCarrinho(g.id);
+  }
   wizFecharModeloNovo();
   msg(g.criado?`Modelo ${codigo} (${fabricante}) salvo no catálogo e adicionado ao pedido.`:`O modelo ${codigo} já existia no catálogo — foi adicionado ao pedido.`);
   q("#wizCarrinhoList").scrollIntoView({behavior:"smooth",block:"center"});
   wizFiltrarModelos();
 }
 
-async function wizAdicionarAoCarrinho(modeloId){
-  const existing=wizCarrinho.find(x=>x.modelo.id===modeloId);
-  if(existing){existing.qty++;renderWizCarrinho();return}
+// Junta no carrinho por modelo + ambiente: mesmo código no mesmo ambiente
+// soma a quantidade; mesmo código em ambiente diferente vira outra linha.
+function ambienteKey(a){return (a||"").trim().toLowerCase()}
+function wizAddOrMergeItem(modelo,qty,ambiente){
+  ambiente=norm((ambiente||"").trim());
+  const existing=wizCarrinho.find(x=>x.modelo.id===modelo.id && ambienteKey(x.ambiente)===ambienteKey(ambiente));
+  if(existing) existing.qty+=qty;
+  else wizCarrinho.push({modelo,qty,ambiente});
+  renderWizCarrinho();
+}
+
+async function wizAdicionarAoCarrinho(modeloId,qty=1,ambiente=""){
   const r=await sb.from("modelos").select("*").eq("id",modeloId).single();
   if(r.error) return msg(r.error.message,false);
-  wizCarrinho.push({modelo:r.data,qty:1});
-  renderWizCarrinho();
+  wizAddOrMergeItem(r.data,qty,ambiente);
 }
 
 function wizRemoverItem(idx){wizCarrinho.splice(idx,1);renderWizCarrinho()}
@@ -230,15 +275,19 @@ function wizAtualizarQtd(idx,val){
   wizCarrinho[idx].qty=(n&&n>0)?n:1;
   q("#wizCarrinhoTotal").textContent=wizCarrinho.reduce((s,x)=>s+x.qty,0);
 }
+function wizAtualizarAmbiente(idx,val){
+  wizCarrinho[idx].ambiente=norm(val.trim());
+}
 
 function renderWizCarrinho(){
   const box=q("#wizCarrinhoList");
   q("#wizCarrinhoTotal").textContent=wizCarrinho.reduce((s,x)=>s+x.qty,0);
   box.innerHTML = wizCarrinho.length ? wizCarrinho.map((item,idx)=>`
     <div class="card" style="padding:12px 14px">
-      <div style="display:flex;align-items:center;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         ${item.modelo.imagem_url?`<img src="${esc(item.modelo.imagem_url)}" alt="" style="width:36px;height:36px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:""}
-        <div style="flex:1"><b>${esc(item.modelo.fabricante)||""} — ${esc(item.modelo.codigo)}</b>${item.modelo.tipo_montagem==="Retrofit"?` <span class="pill" style="background:#edf3ff;color:#355fa8">Retrofit</span>`:""}</div>
+        <div style="flex:1;min-width:160px"><b>${esc(item.modelo.fabricante)||""} — ${esc(item.modelo.codigo)}</b>${item.modelo.tipo_montagem==="Retrofit"?` <span class="pill" style="background:#edf3ff;color:#355fa8">Retrofit</span>`:""}</div>
+        <input type="text" placeholder="Ambiente (opcional)" list="wizAmbientesList" value="${esc(item.ambiente||"")}" style="width:170px" onchange="wizAtualizarAmbiente(${idx},this.value)">
         <input type="number" min="1" value="${item.qty}" style="width:80px" onchange="wizAtualizarQtd(${idx},this.value)">
         <button type="button" class="secondary" onclick="wizRemoverItem(${idx})">Remover</button>
       </div>
@@ -292,31 +341,81 @@ function wizEscolherComponente(idx,tipo,codigo){
 function toggleWizColar(){
   const box=q("#wizColarBox");
   box.classList.toggle("hidden");
-  q("#wizColarToggle").textContent=box.classList.contains("hidden")?"Pedido grande? Colar lista (código, quantidade)":"Esconder colagem de lista";
+  q("#wizColarToggle").textContent=box.classList.contains("hidden")?"Pedido grande? Colar lista (código, quantidade, ambiente)":"Esconder colagem de lista";
 }
 
+function wizDetectarSeparador(linha){
+  if(linha.includes("\t")) return "\t";
+  if(linha.includes(";")) return ";";
+  return ",";
+}
+function wizParseNumero(s){
+  const n=parseInt(String(s||"").replace(/[^\d-]/g,""),10);
+  return (n&&n>0)?n:null;
+}
+
+// Aceita: código, quantidade, ambiente, fabricante (as 3 últimas opcionais).
+// Fabricante só é necessário quando o mesmo código existe em mais de um
+// fabricante no catálogo. Detecta e ignora uma linha de cabeçalho sozinho.
 async function wizColarProcessar(){
   const texto=q("#wizColarTexto").value.trim();
   const msgBox=q("#wizColarMsg");
   if(!texto) return;
-  const linhas=texto.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-  let achados=0, naoAchados=[];
+  let linhas=texto.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!linhas.length) return;
+  const sep=wizDetectarSeparador(linhas[0]);
+  const primeirasPartes=linhas[0].split(sep).map(s=>s.trim());
+  if(primeirasPartes.length>=2 && !wizParseNumero(primeirasPartes[1])){
+    linhas=linhas.slice(1); // 1ª linha parece cabeçalho (2ª coluna não é número)
+  }
+  let achados=0;
+  const ambiguos=[];
   for(const linha of linhas){
-    const [codigoRaw,qtdRaw]=linha.split(",").map(s=>s.trim());
+    const partes=linha.split(sep).map(s=>s.trim());
+    const [codigoRaw,qtdRaw,ambienteRaw,fabricanteRaw]=partes;
     if(!codigoRaw) continue;
-    const qty=parseInt(qtdRaw,10)||1;
-    const r=await sb.from("modelos").select("*").ilike("codigo",codigoRaw).limit(1);
-    if(r.error||!r.data||!r.data.length){naoAchados.push(codigoRaw);continue}
-    const modelo=r.data[0];
-    const existing=wizCarrinho.find(x=>x.modelo.id===modelo.id);
-    if(existing) existing.qty+=qty; else wizCarrinho.push({modelo,qty});
+    const qty=wizParseNumero(qtdRaw)||1;
+    const ambiente=(ambienteRaw||"").trim();
+    const fabricante=(fabricanteRaw||"").trim();
+    let query=sb.from("modelos").select("*").ilike("codigo",likeLiteral(codigoRaw));
+    if(fabricante) query=query.ilike("fabricante",likeLiteral(fabricante));
+    const r=await query.limit(10);
+    if(r.error){ msgBox.innerHTML="Erro: "+esc(r.error.message); return; }
+    const rows=r.data||[];
+    if(!rows.length){
+      wizColarPendentes.push({codigo:codigoRaw,fabricante,qty,ambiente});
+      continue;
+    }
+    if(rows.length>1){
+      const fabsDistintos=[...new Set(rows.map(x=>x.fabricante||"(sem fabricante)"))];
+      if(fabsDistintos.length>1){ ambiguos.push({codigo:codigoRaw,fabricantes:fabsDistintos}); continue; }
+    }
+    wizAddOrMergeItem(rows[0],qty,ambiente);
     achados++;
   }
-  renderWizCarrinho();
   q("#wizColarTexto").value="";
-  msgBox.innerHTML = achados
-    ? `${achados} modelo(s) adicionado(s).${naoAchados.length?` Não encontrado(s): ${naoAchados.map(esc).join(", ")}`:""}`
-    : `Nenhum código reconhecido.${naoAchados.length?` Não encontrado(s): ${naoAchados.map(esc).join(", ")}`:""}`;
+  renderWizColarMsg(achados,ambiguos);
+}
+
+function renderWizColarMsg(achados,ambiguos){
+  const msgBox=q("#wizColarMsg");
+  let html="";
+  if(achados) html+=`${achados} linha(s) adicionada(s) ao pedido.`;
+  if(ambiguos&&ambiguos.length){
+    html+=`<div style="margin-top:6px;color:#b33">Código existe em mais de um fabricante — inclua o fabricante na linha pra eu saber qual usar:<br>${ambiguos.map(a=>`${esc(a.codigo)} (${a.fabricantes.map(esc).join(", ")})`).join("<br>")}</div>`;
+  }
+  if(wizColarPendentes.length){
+    html+=`<div style="margin-top:6px">Código(s) não encontrado(s) no catálogo — clique pra cadastrar e já entrar no pedido:<br>${wizColarPendentes.map((p,i)=>`<button type="button" class="secondary" style="margin:4px 4px 0 0" onclick="wizAbrirModeloNovoDoPendente(${i})">${esc(p.codigo)}${p.ambiente?" — "+esc(p.ambiente):""} (${p.qty}×)</button>`).join("")}</div>`;
+  }
+  msgBox.innerHTML = html || "Nenhum código reconhecido nessa lista.";
+}
+
+function atualizarWizColarPendentesUI(){
+  const msgBox=q("#wizColarMsg");
+  if(!msgBox) return;
+  msgBox.innerHTML = wizColarPendentes.length
+    ? `Ainda faltam cadastrar:<br>${wizColarPendentes.map((p,i)=>`<button type="button" class="secondary" style="margin:4px 4px 0 0" onclick="wizAbrirModeloNovoDoPendente(${i})">${esc(p.codigo)}${p.ambiente?" — "+esc(p.ambiente):""} (${p.qty}×)</button>`).join("")}`
+    : "Tudo adicionado ao pedido.";
 }
 
 async function wizRevisar(){
@@ -332,7 +431,7 @@ async function wizRevisar(){
     proximo+=item.qty;
     const firstId=buildObraId(wizObraPrefixo,item.startNum), lastId=buildObraId(wizObraPrefixo,item.startNum+item.qty-1);
     const compTxt=Object.entries(item.compSelecionado||{}).filter(([,v])=>v&&v.modelo_equivalente).map(([tipo,v])=>`${tipo}: ${esc(v.especificacao||v.modelo_equivalente)}`).join(" · ");
-    html+=`<div style="margin-bottom:10px"><b>${item.qty}×</b> ${esc(item.modelo.fabricante)} — ${esc(item.modelo.codigo)}<br><span class="small">${firstId}${item.qty>1?" até "+lastId:""}</span>${compTxt?`<br><span class="small">${compTxt}</span>`:""}</div>`;
+    html+=`<div style="margin-bottom:10px"><b>${item.qty}×</b> ${esc(item.modelo.fabricante)} — ${esc(item.modelo.codigo)}${item.ambiente?" · "+esc(item.ambiente):""}<br><span class="small">${firstId}${item.qty>1?" até "+lastId:""}</span>${compTxt?`<br><span class="small">${compTxt}</span>`:""}</div>`;
   }
   q("#wizResumo").innerHTML=`<div class="small" style="margin-bottom:10px">Obra: <b>${esc(wizObra.empreendimento)||"—"}</b>${wizObra.cliente?" · "+esc(wizObra.cliente):""}</div>${html}<div style="margin-top:6px"><b>Total: ${total} peça(s)</b></div>`;
   wizStep(3);
@@ -364,7 +463,7 @@ async function wizCriar(){
         modelo_id:item.modelo.id, modelo:item.modelo.codigo, fabricante:item.modelo.fabricante,
         potencia_w:item.modelo.potencia_w, cct_k:item.modelo.cct_k, irc:item.modelo.irc,
         fluxo_lm:item.modelo.fluxo_lm, facho_graus:item.modelo.facho_graus,
-        ip:item.modelo.ip, ik:item.modelo.ik,
+        ip:item.modelo.ip, ik:item.modelo.ik, ambiente:item.ambiente||null,
         status:"Ativa", criticidade:"Média", obra_id:wizObraId, ...wizObra
       });
     }

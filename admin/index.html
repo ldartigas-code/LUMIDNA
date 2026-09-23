@@ -178,6 +178,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <div id="screenObraDetalhe" class="hidden">
   <button type="button" class="linkback" onclick="goScreen('obras')">‹ Obras</button>
   <div class="card" id="obraDetalheHeader" style="margin-top:14px"></div>
+  <div class="card" id="obraProgresso" style="margin-top:10px"></div>
   <div class="card hidden" id="editarObraCard">
     <h2 style="margin:0 0 12px;font-size:16px">Editar obra</h2>
     <div class="grid">
@@ -377,7 +378,10 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <div id="screenSearch" class="hidden">
   <button type="button" class="linkback" onclick="goScreen('home')">‹ Início</button>
   <h2 style="margin:14px 0 12px">Buscar peça</h2>
-  <input id="f_busca" placeholder="Digite o ID, cliente, obra ou modelo" oninput="onSearchInput()" style="width:100%">
+  <div style="display:flex;gap:8px">
+    <input id="f_busca" placeholder="Digite o ID, cliente, obra ou modelo" oninput="onSearchInput()" style="flex:1">
+    <button type="button" class="secondary" onclick="abrirScanQR()">📷 Escanear QR</button>
+  </div>
   <div style="text-align:right;margin:8px 0 6px"><a href="#" class="small" onclick="toggleAdvSearch();return false" id="advSearchToggle">busca avançada</a></div>
   <div id="advSearch" class="hidden grid3" style="margin-bottom:12px">
     <div class="field"><label>Fabricante</label><input id="f_fabricante" oninput="onSearchInput()"></div>
@@ -385,6 +389,12 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
     <div class="field"><label>Local (edifício, andar, ambiente...)</label><input id="f_local" oninput="onSearchInput()"></div>
   </div>
   <div id="searchResults" style="margin-top:10px"></div>
+</div>
+
+<div id="qrScanOverlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px">
+  <video id="qrScanVideo" playsinline autoplay muted style="width:100%;max-width:420px;border-radius:8px;background:#000"></video>
+  <div id="qrScanStatus" class="small" style="color:#fff;margin:14px 0;text-align:center">Abrindo câmera...</div>
+  <button type="button" class="secondary" onclick="pararScanQR()">Cancelar</button>
 </div>
 
 <!-- ===== DETALHE (uma peça) ===== -->
@@ -635,6 +645,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <script src="../assets/supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="js/core.js"></script>
 <script src="js/catalogo-modelos.js"></script>
 <script src="js/catalogo-componentes.js"></script>

@@ -48,12 +48,15 @@ async function salvarPecasInstaladas(){
   if(!LID) return msg("Selecione um ativo primeiro.",false);
   const avisos=[];
   let mudou=false;
+  const digitados=[]; // {tipo,codigo} escolhidos em "Outro modelo" — candidatos a entrar no catálogo
   for(const tipo of COMP_TIPOS){
     const sel=q(`#pi_${tipo}`);
     if(!sel) continue;
     let valor=sel.value;
-    if(valor==="__outro__") valor=q(`#pi_${tipo}_outro`).value.trim();
+    const ehOutro=valor==="__outro__";
+    if(ehOutro) valor=q(`#pi_${tipo}_outro`).value.trim();
     if(!valor) continue;
+    if(ehOutro) digitados.push({tipo,codigo:valor});
     const compR=await sb.from("componentes").select("id,modelo").eq("luminaria_id",luminariaDbId).eq("tipo",tipo).eq("ativo_atual",true).maybeSingle();
     const modeloAnterior=compR.data?compR.data.modelo:null;
     if(modeloAnterior===valor) continue;
@@ -68,6 +71,73 @@ async function salvarPecasInstaladas(){
   await loadAudit();
   if(avisos.length) return msg(avisos.join(" "),false);
   msg(mudou?"Peças instaladas salvas.":"Nada mudou.");
+  await ofereceCadastrarNoCatalogo(digitados);
+}
+
+// Quando o código digitado em "Outro modelo" ainda não existe no Catálogo de
+// componentes, oferece cadastrar já pelo menos o código lá (nível "Alternativa
+// possível" — sinaliza que ainda não foi conferido; dá pra completar
+// fabricante/preço/nível depois direto no Catálogo de componentes).
+async function ofereceCadastrarNoCatalogo(candidatos){
+  for(const c of candidatos){
+    const existe=await sb.from("equivalentes").select("id").eq("componente_origem",c.tipo).eq("modelo_equivalente",c.codigo).limit(1).maybeSingle();
+    if(existe.data) continue;
+    const modeloPeca=(originalData&&originalData.modelo)||null;
+    if(!confirm(`O código "${c.codigo}" (${c.tipo}) ainda não está no Catálogo de componentes.\n\nQuer cadastrar já pelo menos o código? Fabricante, preço e nível dá pra completar depois direto no Catálogo de componentes.`)) continue;
+    const ins=await sb.from("equivalentes").insert({componente_origem:c.tipo,modelo_equivalente:c.codigo,modelo_original:modeloPeca,nivel:"Alternativa possível",disponibilidade:"Sob consulta",homologado_por:currentUserEmail||null});
+    if(ins.error) msg(`Não consegui cadastrar ${c.codigo} no catálogo: ${ins.error.message}`,false);
+    else msg(`${c.codigo} cadastrado no Catálogo de componentes (nível "Alternativa possível" — complete quando puder).`);
+  }
+}
+
+// Replica o Driver/LED/Óptica desta peça pras outras peças do MESMO MODELO
+// nesta obra — só do mesmo modelo, porque um driver/LED de um modelo não
+// serve fisicamente noutro. Grava direto em "componentes" de cada peça
+// (sem tocar no catálogo central nem em peças de outro modelo).
+async function aplicarPecasInstaladasNaObra(){
+  if(!LID||!luminariaDbId) return msg("Selecione uma peça primeiro.",false);
+  if(!originalData||!originalData.obra_id) return msg("Esta peça não está em nenhuma obra.",false);
+  if(!originalData.modelo_id) return msg("Esta peça ainda não está ligada a um modelo do catálogo.",false);
+  await salvarPecasInstaladas();
+  const compR=await sb.from("componentes").select("tipo,modelo").eq("luminaria_id",luminariaDbId).eq("ativo_atual",true);
+  const atuais=(compR.data||[]).filter(c=>c.modelo);
+  if(!atuais.length) return msg("Defina ao menos um componente (Driver/LED/Óptica) antes de aplicar às outras.",false);
+
+  const alvoR=await sb.from("luminarias").select("id").eq("obra_id",originalData.obra_id).eq("modelo_id",originalData.modelo_id).neq("id",luminariaDbId);
+  if(alvoR.error) return msg("Erro ao buscar as outras peças: "+alvoR.error.message,false);
+  const outras=alvoR.data||[];
+  if(!outras.length) return msg(`Não há outra peça do modelo ${originalData.modelo} nesta obra.`,false);
+
+  const resumo=atuais.map(c=>`${c.tipo}: ${c.modelo}`).join(" · ");
+  if(!confirm(`Aplicar "${resumo}" em ${outras.length} outra(s) peça(s) do modelo ${originalData.modelo} nesta obra?\n\nIsso substitui o que estiver definido nelas agora. Não afeta o catálogo nem peças de outro modelo.`)) return;
+
+  const idsAlvo=outras.map(o=>o.id);
+  const tiposDefinidos=atuais.map(c=>c.tipo);
+  const existentesR=await sb.from("componentes").select("id,luminaria_id,tipo").in("luminaria_id",idsAlvo).in("tipo",tiposDefinidos).eq("ativo_atual",true);
+  if(existentesR.error) return msg("Erro: "+existentesR.error.message,false);
+  const mapExistente={};
+  (existentesR.data||[]).forEach(c=>{ mapExistente[c.luminaria_id+"|"+c.tipo]=c.id; });
+
+  const toUpdate=[], toInsert=[];
+  idsAlvo.forEach(lid=>{
+    atuais.forEach(c=>{
+      const existenteId=mapExistente[lid+"|"+c.tipo];
+      if(existenteId) toUpdate.push({id:existenteId,modelo:c.modelo});
+      else toInsert.push({luminaria_id:lid,tipo:c.tipo,modelo:c.modelo,original:true,ativo_atual:true});
+    });
+  });
+
+  let erro=null;
+  for(let i=0;i<toUpdate.length&&!erro;i+=500){
+    const r=await sb.from("componentes").upsert(toUpdate.slice(i,i+500));
+    if(r.error) erro=r.error.message;
+  }
+  for(let i=0;i<toInsert.length&&!erro;i+=500){
+    const r=await sb.from("componentes").insert(toInsert.slice(i,i+500));
+    if(r.error) erro=r.error.message;
+  }
+  if(erro) return msg("Erro ao aplicar nas outras peças: "+erro,false);
+  msg(`Aplicado em ${outras.length} peça(s) do modelo ${originalData.modelo}.`);
 }
 
 // Em modelos Retrofit, potência/CCT/fluxo/facho ficam vazios na própria

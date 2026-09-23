@@ -9,16 +9,65 @@ async function loadAudit(){
   q("#histList").innerHTML=(r.data&&r.data.length)?`<table><tr><th>Data/hora</th><th>Usuário</th><th>Campo</th><th>De</th><th>Para</th></tr>${r.data.map(x=>`<tr><td>${new Date(x.criado_em).toLocaleString('pt-BR')}</td><td>${esc(x.usuario_email)}</td><td>${esc(x.campo)}</td><td>${esc(x.valor_anterior)}</td><td>${esc(x.valor_novo)}</td></tr>`).join("")}</table>`:"<div class='small'>Nenhuma alteração registrada ainda.</div>";
 }
 
+const COMP_TIPOS=["Driver","LED","Óptica"];
+
+// Caixa de seleção por tipo, com as peças compatíveis já homologadas no
+// Catálogo de componentes + "Integrada" (não existe separada) + "Outro
+// modelo" (digita livre, pra peça ainda não homologada). Só grava na peça
+// (tabela componentes, por luminaria_id) — nunca no catálogo central.
 async function loadComponents(){
   const r=await sb.from("componentes").select("*").eq("luminaria_id",luminariaDbId).eq("ativo_atual",true);
   const byTipo={};(r.data||[]).forEach(c=>byTipo[c.tipo]=c.modelo);
-  const tipos=["Driver","LED","Óptica"];
-  q("#pecasInstaladasView").innerHTML = tipos.map(t=>{
-    const modelo=byTipo[t]||"Original";
-    const revisada=modelo!=="Original";
-    return `<div class="field"><label>${t}</label><div class="${revisada?'pill':'small'}" style="${revisada?'':'padding:8px 0'}">${esc(modelo)}</div></div>`;
+  const resultados=await Promise.all(COMP_TIPOS.map(t=>sb.rpc("listar_homologados",{p_componente:t,p_modelo_codigo:(originalData&&originalData.modelo)||null})));
+  q("#pecasInstaladasEdit").innerHTML = COMP_TIPOS.map((t,i)=>{
+    const atual=byTipo[t]||"";
+    const rowsR=resultados[i];
+    const rows=rowsR.error?[]:(rowsR.data||[]);
+    const conhecidas=new Set(rows.map(x=>x.modelo_equivalente));
+    const ehOutro=!!atual && atual!=="Integrada" && atual!=="Original" && !conhecidas.has(atual);
+    const opcoes=rows.map(x=>`<option value="${esc(x.modelo_equivalente)}"${atual===x.modelo_equivalente?" selected":""}>${esc(x.modelo_equivalente)}${x.fabricante_equivalente?" — "+esc(x.fabricante_equivalente):""}</option>`).join("");
+    return `<div class="field">
+      <label>${t}</label>
+      <select id="pi_${t}" onchange="onPecaInstaladaChange('${t}')">
+        <option value=""${!atual||atual==="Original"?" selected":""}>— não sei / não definido —</option>
+        <option value="Integrada"${atual==="Integrada"?" selected":""}>Integrada (não é peça separada)</option>
+        ${opcoes}
+        <option value="__outro__"${ehOutro?" selected":""}>Outro modelo (digitar)</option>
+      </select>
+      <input type="text" id="pi_${t}_outro" placeholder="Modelo instalado" value="${ehOutro?esc(atual):""}" class="${ehOutro?"":"hidden"}" style="margin-top:6px">
+    </div>`;
   }).join("");
   await mostrarDicaSpecsRetrofit(byTipo.LED);
+}
+
+function onPecaInstaladaChange(tipo){
+  q(`#pi_${tipo}_outro`).classList.toggle("hidden",q(`#pi_${tipo}`).value!=="__outro__");
+}
+
+async function salvarPecasInstaladas(){
+  if(!LID) return msg("Selecione um ativo primeiro.",false);
+  const avisos=[];
+  let mudou=false;
+  for(const tipo of COMP_TIPOS){
+    const sel=q(`#pi_${tipo}`);
+    if(!sel) continue;
+    let valor=sel.value;
+    if(valor==="__outro__") valor=q(`#pi_${tipo}_outro`).value.trim();
+    if(!valor) continue;
+    const compR=await sb.from("componentes").select("id,modelo").eq("luminaria_id",luminariaDbId).eq("tipo",tipo).eq("ativo_atual",true).maybeSingle();
+    const modeloAnterior=compR.data?compR.data.modelo:null;
+    if(modeloAnterior===valor) continue;
+    const w=compR.data
+      ? await sb.from("componentes").update({modelo:valor}).eq("id",compR.data.id)
+      : await sb.from("componentes").insert({luminaria_id:luminariaDbId,tipo,modelo:valor,original:true,ativo_atual:true});
+    if(w.error){ avisos.push(`Erro em ${tipo}: ${w.error.message}`); continue; }
+    await logAudit("componente_"+tipo,modeloAnterior||"—",valor);
+    mudou=true;
+  }
+  await loadComponents();
+  await loadAudit();
+  if(avisos.length) return msg(avisos.join(" "),false);
+  msg(mudou?"Peças instaladas salvas.":"Nada mudou.");
 }
 
 // Em modelos Retrofit, potência/CCT/fluxo/facho ficam vazios na própria
@@ -78,6 +127,8 @@ q("#formLum").onsubmit=async e=>{
   originalData={...orig,...p};
   await loadAudit();
   await renderModeloEObra(originalData);
+  await renderResumoPeca(originalData);
+  mostrarModoLeitura();
   msg(LID+" salva."+(avisos.length?" "+avisos.join(" "):""),!avisos.some(a=>a.startsWith("Atenção")));
 };
 

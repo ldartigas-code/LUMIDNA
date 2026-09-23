@@ -257,7 +257,7 @@ async function criarCopias(){
 async function openAsset(data){
   LID=data.lumidna_id; luminariaDbId=data.id;
   originalData={...data};
-  q("#formLum").classList.remove("hidden");
+  mostrarModoLeitura();
   fill(data);
   q("input[name=lumidna_id]").value=LID;
   q("#publicLink").value=data.public_code?`${LUMIDNA_SITE_BASE}/ativo/?c=${data.public_code}`:"(salve a luminária para gerar o link)";
@@ -266,5 +266,51 @@ async function openAsset(data){
   ["foto_principal_url","foto_instalada_url","foto_etiqueta_url"].forEach(k=>updatePhotoPreview(k,data[k]));
   await renderModeloEObra(data);
   await Promise.all([loadComponents(),loadWarranties(),loadMaintenance(),loadReplacement(),loadAudit()]);
+  await renderResumoPeca(data);
+}
+
+// ---- Ficha de leitura (modo padrão) x formulário técnico (modo edição) ----
+// Quem abre uma peça vê primeiro um resumo em linguagem simples; só quem
+// clica em "Editar peça" chega ao formulário técnico completo.
+function mostrarModoEdicao(){
+  q("#pecaResumo").classList.add("hidden");
+  q("#formLum").classList.remove("hidden");
+}
+function mostrarModoLeitura(){
+  q("#formLum").classList.add("hidden");
+  q("#pecaResumo").classList.remove("hidden");
+}
+
+const PECA_STATUS_LABEL={"Ativa":"🟢 Funcionando","Em manutenção":"🟠 Em manutenção","Falha":"🔴 Com falha","Desativada":"⚪ Desativada"};
+
+async function renderResumoPeca(data){
+  const box=q("#pecaResumo");
+  if(!box) return;
+  const local=[data.edificio,data.andar,data.ambiente,data.posicao].filter(Boolean).join(" / ");
+  const [garR,manR]=await Promise.all([
+    sb.from("garantias").select("*").eq("luminaria_id",luminariaDbId).order("id",{ascending:false}).limit(1).maybeSingle(),
+    sb.from("manutencoes").select("*").eq("luminaria_id",luminariaDbId).order("id",{ascending:false}).limit(1).maybeSingle()
+  ]);
+  const gar=garR.data, man=manR.data;
+  const publicUrl=data.public_code?`${LUMIDNA_SITE_BASE}/ativo/?c=${data.public_code}`:null;
+  box.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+      <div>
+        <h2 style="margin:0 0 4px">${esc(data.lumidna_id)}</h2>
+        <div class="small">${esc(data.fabricante)||"—"} — ${esc(data.modelo)||"—"}</div>
+      </div>
+      <button type="button" class="primary" onclick="mostrarModoEdicao()">✏️ Editar peça</button>
+    </div>
+    <div class="ro" style="margin-top:16px">
+      <div class="field"><label>Situação</label><div style="font-weight:600">${PECA_STATUS_LABEL[data.status]||esc(data.status)||"—"}</div></div>
+      <div class="field wide"><label>Onde está</label><div style="font-weight:600">${esc(local)||"Local ainda não informado"}</div></div>
+      <div class="field"><label>Obra</label><div style="font-weight:600">${esc(data.empreendimento)||"—"}</div></div>
+      <div class="field"><label>Cliente</label><div style="font-weight:600">${esc(data.cliente)||"—"}</div></div>
+      <div class="field"><label>Garantia</label><div style="font-weight:600">${gar?`${esc(gar.status)}${gar.fim?" até "+new Date(gar.fim+"T00:00:00").toLocaleDateString("pt-BR"):""}`:"Nenhuma cadastrada"}</div></div>
+      <div class="field"><label>Última manutenção</label><div style="font-weight:600">${man?`${new Date(man.data+"T00:00:00").toLocaleDateString("pt-BR")} — ${esc(man.tipo)}`:"Nenhuma registrada"}</div></div>
+    </div>
+    <div class="actions" style="margin-top:16px">
+      <button type="button" class="secondary"${publicUrl?` onclick="window.open('${publicUrl}','_blank')"`:" disabled"}>🔗 Ver página pública</button>
+    </div>`;
 }
 

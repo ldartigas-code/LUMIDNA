@@ -317,15 +317,19 @@ async function carregarComponentesDoItem(idx){
   box.innerHTML = WIZ_TIPOS_COMPONENTE.map((tipo,i)=>{
     const r=resultados[i];
     const rows=r.error?[]:(r.data||[]);
-    const atual=(item.compSelecionado&&item.compSelecionado[tipo])?item.compSelecionado[tipo].modelo_equivalente:"";
-    const opcoes = rows.length
-      ? rows.map(x=>`<option value="${esc(x.modelo_equivalente)}">${esc(x.modelo_equivalente)}${x.fabricante_equivalente?" — "+esc(x.fabricante_equivalente):""}${x.especificacao?" ("+esc(x.especificacao)+")":""}</option>`).join("")
-      : `<option value="" disabled>— nenhuma peça compatível verificada cadastrada —</option>`;
-    return `<div class="field"><label>${tipo}</label><select id="wizComp${idx}_${tipo}" onchange="wizEscolherComponente(${idx},'${tipo}',this.value)"><option value="">— não definir agora —</option>${opcoes}</select></div>`;
+    const opcoes=rows.map(x=>`<option value="${esc(x.modelo_equivalente)}">${esc(x.modelo_equivalente)}${x.fabricante_equivalente?" — "+esc(x.fabricante_equivalente):""}${x.especificacao?" ("+esc(x.especificacao)+")":""}</option>`).join("");
+    return `<div class="field"><label>${tipo}</label><select id="wizComp${idx}_${tipo}" onchange="wizEscolherComponente(${idx},'${tipo}',this.value)"><option value="">— não definir agora —</option><option value="Integrada">Integrada (não é peça separada)</option>${opcoes}</select></div>`;
   }).join("");
-  WIZ_TIPOS_COMPONENTE.forEach(tipo=>{
+  WIZ_TIPOS_COMPONENTE.forEach((tipo,i)=>{
     const atual=(item.compSelecionado&&item.compSelecionado[tipo])?item.compSelecionado[tipo].modelo_equivalente:"";
-    if(atual) q(`#wizComp${idx}_${tipo}`).value=atual;
+    const rows=resultados[i].error?[]:(resultados[i].data||[]);
+    if(atual){
+      q(`#wizComp${idx}_${tipo}`).value=atual;
+    }else if(!rows.length){
+      // sem nenhuma peça compatível cadastrada pra este modelo: assume Integrada por padrão
+      q(`#wizComp${idx}_${tipo}`).value="Integrada";
+      wizEscolherComponente(idx,tipo,"Integrada");
+    }
   });
 }
 
@@ -334,6 +338,7 @@ function wizEscolherComponente(idx,tipo,codigo){
   if(!item) return;
   item.compSelecionado=item.compSelecionado||{};
   if(!codigo){ delete item.compSelecionado[tipo]; return; }
+  if(codigo==="Integrada"){ item.compSelecionado[tipo]={modelo_equivalente:"Integrada",especificacao:"Integrada"}; return; }
   const sel=q(`#wizComp${idx}_${tipo}`);
   const opt=sel&&sel.querySelector(`option[value="${CSS.escape(codigo)}"]`);
   item.compSelecionado[tipo]={modelo_equivalente:codigo, especificacao:opt?opt.textContent:codigo};

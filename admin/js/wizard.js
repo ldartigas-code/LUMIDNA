@@ -68,6 +68,7 @@ async function wizEscolherObraExistente(id){
 async function wizCriarNovaObra(){
   const nome=q("#wiz_empreendimento").value.trim();
   if(!nome) return msg("Informe o nome da obra.",false);
+  if(!await confirmarSeParecida(nome)) return;
   const prefixo=normalizarPrefixo(q("#wiz_prefixo").value);
   const erroPrefixo=await validarPrefixoObra(prefixo);
   if(erroPrefixo) return msg(erroPrefixo,false);

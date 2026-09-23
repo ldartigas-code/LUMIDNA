@@ -32,6 +32,40 @@ async function validarPrefixoObra(prefixo,ignorarId){
   return null;
 }
 
+// Aviso de obra com nome parecido (ex: "Parque Cerejeiras" x "Parque das
+// Cerejeiras 2") pra evitar duplicidade por descuido. Ignora maiúsculas,
+// acentos, plural/artigos ("de/da/do/das/dos") e números soltos (ex: "2").
+// Não bloqueia — só avisa e pede confirmação de novo.
+const OBRA_STOPWORDS=new Set(["de","da","do","das","dos","e"]);
+function normalizarNomeObraComp(nome){
+  return (nome||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase()
+    .replace(/[^a-z0-9 ]/g," ").split(/\s+/)
+    .filter(w=>w && !OBRA_STOPWORDS.has(w) && !/^\d+$/.test(w));
+}
+function obraSimilaridade(a,b){
+  const wa=new Set(normalizarNomeObraComp(a)), wb=new Set(normalizarNomeObraComp(b));
+  if(!wa.size||!wb.size) return 0;
+  const inter=[...wa].filter(w=>wb.has(w)).length;
+  const uni=new Set([...wa,...wb]).size;
+  return inter/uni;
+}
+async function obraParecidaComNome(nome,ignorarId){
+  const r=await sb.from("obras").select("id,nome,numero,prefixo").limit(500);
+  if(r.error||!r.data) return null;
+  let melhor=null,melhorScore=0;
+  for(const o of r.data){
+    if(ignorarId&&o.id===ignorarId) continue;
+    const s=obraSimilaridade(nome,o.nome);
+    if(s>melhorScore){melhorScore=s;melhor=o}
+  }
+  return melhorScore>=0.6?melhor:null;
+}
+async function confirmarSeParecida(nome,ignorarId){
+  const parecida=await obraParecidaComNome(nome,ignorarId);
+  if(!parecida) return true;
+  return confirm(`Já existe uma obra parecida: "${parecida.nome}" (Obra ${parecida.numero} · ${parecida.prefixo}).\n\nTem certeza que quer criar "${nome}" mesmo assim?`);
+}
+
 function onNovaObraAutomacaoChange(){
   q("#obra_protocolo_field").classList.toggle("hidden",q("#obra_automacao").value!=="sim");
 }
@@ -50,6 +84,7 @@ async function loadObras(){
 async function criarObra(){
   const nome=q("#obra_nome").value.trim();
   if(!nome) return msg("Informe o nome da obra.",false);
+  if(!await confirmarSeParecida(nome)) return;
   const prefixo=normalizarPrefixo(q("#obra_prefixo").value);
   const erroPrefixo=await validarPrefixoObra(prefixo);
   if(erroPrefixo) return msg(erroPrefixo,false);
@@ -69,6 +104,7 @@ async function abrirObra(id){
   obraAtual=r.data;
   q("#imprimirQRObraCard").classList.add("hidden");
   q("#qrObraFiltro").value="";
+  q("#obraProgresso").innerHTML="";
   goScreen("obraDetalhe");
   q("#obraDetalheHeader").innerHTML=`<h2 style="margin:0 0 8px">${esc(obraAtual.nome)}</h2><div class="small" style="margin-bottom:4px">Obra ${obraAtual.numero} · prefixo <b>${esc(obraAtual.prefixo)}</b> · as peças saem como LD-${esc(obraAtual.prefixo)}-000001</div><div class="small">${obraAtual.cliente?"Cliente: "+esc(obraAtual.cliente)+" · ":""}${obraAtual.tensao_instalacao?"Tensão: "+esc(obraAtual.tensao_instalacao)+" · ":""}${obraAtual.automacao?"Automação: "+esc(obraAtual.protocolo_automacao):"Sem automação"}</div>`;
   loadObraPecas();
@@ -157,13 +193,30 @@ async function imprimirQRDaObra(){
 async function loadObraPecas(){
   const box=q("#obraPecasList");
   const r=await sb.from("luminarias").select("lumidna_id,modelo,fabricante,status,edificio,andar,ambiente,posicao").eq("obra_id",obraAtual.id).order("lumidna_id").limit(2000);
-  if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
+  if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";q("#obraProgresso").innerHTML="";return}
   const rows=r.data||[];
+  renderObraProgresso(rows);
   if(!rows.length){box.innerHTML="<div class='small'>Nenhuma peça cadastrada nesta obra ainda.</div>";return}
   box.innerHTML=`<table><tr><th>ID</th><th>Modelo</th><th>Local</th><th>Status</th><th></th></tr>${rows.map(x=>{
     const local=[x.edificio,x.andar,x.ambiente,x.posicao].filter(Boolean).join(" / ");
     return `<tr><td>${esc(x.lumidna_id)}</td><td>${esc(x.modelo)||"—"}</td><td>${esc(local)||"—"}</td><td>${esc(x.status)||"—"}</td><td><button type="button" class="secondary" onclick="loadById('${x.lumidna_id}')">Abrir</button></td></tr>`;
   }).join("")}</table>`;
+}
+
+// Progresso do cadastro em campo: quantas peças já têm o local (ambiente)
+// preenchido. Ajuda a saber quanto falta sem precisar entender relatórios.
+function renderObraProgresso(rows){
+  const box=q("#obraProgresso");
+  if(!box) return;
+  if(!rows.length){ box.innerHTML=""; return; }
+  const comLocal=rows.filter(x=>x.ambiente&&x.ambiente.trim()).length;
+  const pct=Math.round(comLocal/rows.length*100);
+  box.innerHTML=`
+    <div class="small" style="font-weight:700;margin-bottom:6px">Progresso do cadastro em campo</div>
+    <div class="small" style="margin-bottom:6px">${comLocal} de ${rows.length} peça(s) já com local (ambiente) definido — ${pct}%</div>
+    <div style="background:var(--line);border-radius:6px;height:10px;overflow:hidden">
+      <div style="background:var(--green);height:100%;width:${pct}%"></div>
+    </div>`;
 }
 
 async function loadObraPendentes(){

@@ -56,6 +56,66 @@ async function loadById(id){
   msg(id+" carregada.");
 }
 
+async function abrirPorPublicCode(code){
+  const r=await sb.from("luminarias").select("*").eq("public_code",code).maybeSingle();
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  if(!r.data) return msg("QR lido, mas não encontrei nenhuma peça com esse código.",false);
+  goScreen("detail");
+  await openAsset(r.data);
+  msg(r.data.lumidna_id+" carregada pelo QR.");
+}
+
+// ---- Escanear QR pela câmera (busca direta, sem digitar nada) ----
+let qrScanStream=null, qrScanRAF=null;
+
+async function abrirScanQR(){
+  const overlay=q("#qrScanOverlay"), video=q("#qrScanVideo"), status=q("#qrScanStatus");
+  status.textContent="Abrindo câmera...";
+  overlay.classList.remove("hidden");
+  try{
+    qrScanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
+  }catch(e){
+    status.textContent="Não consegui acessar a câmera: "+(e.message||e)+". Feche e confirme a permissão de câmera no navegador.";
+    return;
+  }
+  video.srcObject=qrScanStream;
+  await video.play();
+  status.textContent="Aponte a câmera pro QR da etiqueta.";
+  const canvas=document.createElement("canvas");
+  const ctx=canvas.getContext("2d",{willReadFrequently:true});
+  const tick=()=>{
+    if(!qrScanStream) return;
+    if(video.readyState===video.HAVE_ENOUGH_DATA){
+      canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+      ctx.drawImage(video,0,0,canvas.width,canvas.height);
+      const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+      const lido=jsQR(img.data,img.width,img.height);
+      if(lido&&lido.data){
+        pararScanQR();
+        processarQRLido(lido.data);
+        return;
+      }
+    }
+    qrScanRAF=requestAnimationFrame(tick);
+  };
+  qrScanRAF=requestAnimationFrame(tick);
+}
+
+function pararScanQR(){
+  if(qrScanRAF) cancelAnimationFrame(qrScanRAF);
+  qrScanRAF=null;
+  if(qrScanStream){ qrScanStream.getTracks().forEach(t=>t.stop()); qrScanStream=null; }
+  q("#qrScanOverlay").classList.add("hidden");
+}
+
+function processarQRLido(texto){
+  let code=null;
+  try{ code=new URL(texto).searchParams.get("c"); }
+  catch(e){ code=(texto||"").trim(); }
+  if(!code) return msg("QR lido, mas não reconheci o formato.",false);
+  abrirPorPublicCode(code);
+}
+
 async function preencherSelectObras(selId,comSemObra,rotuloVazio){
   const sel=q("#"+selId);
   const r=await sb.from("obras").select("id,numero,prefixo,nome").order("numero");

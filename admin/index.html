@@ -300,14 +300,16 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
       </div>
     </div>
 
-    <div class="small" style="margin:16px 0 6px"><a href="#" onclick="toggleWizColar();return false" id="wizColarToggle">Pedido grande? Colar lista (código, quantidade)</a></div>
+    <div class="small" style="margin:16px 0 6px"><a href="#" onclick="toggleWizColar();return false" id="wizColarToggle">Pedido grande? Colar lista (código, quantidade, ambiente)</a></div>
     <div id="wizColarBox" class="hidden">
-      <textarea id="wizColarTexto" style="width:100%;min-height:100px" placeholder="2283.AB.N, 50&#10;4781.FE.S, 30&#10;2785.AB.N, 20"></textarea>
+      <textarea id="wizColarTexto" style="width:100%;min-height:100px" placeholder="Código, Quantidade, Ambiente, Fabricante&#10;2283.AB.N, 50, Sala 101&#10;4781.FE.S, 30, Sala 102&#10;2785.AB.N, 20"></textarea>
+      <div class="small" style="margin-top:4px">Ambiente e fabricante são opcionais (fabricante só é necessário se o código existir em mais de um). Aceita vírgula, ponto-e-vírgula ou tab — dá pra colar direto do Excel. Se colar o cabeçalho junto, ele é ignorado sozinho.</div>
       <div class="actions" style="margin-top:8px"><button type="button" class="secondary" onclick="wizColarProcessar()">Adicionar essas linhas ao pedido</button></div>
       <div id="wizColarMsg" class="small" style="margin-top:6px"></div>
     </div>
 
     <h2 style="margin:20px 0 10px;font-size:16px">Itens do pedido (<span id="wizCarrinhoTotal">0</span> peças)</h2>
+    <datalist id="wizAmbientesList"></datalist>
     <div id="wizCarrinhoList"><div class="small">Nenhum item adicionado ainda.</div></div>
 
     <div class="actions" style="margin-top:16px">

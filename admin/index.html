@@ -400,7 +400,9 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <!-- ===== DETALHE (uma peça) ===== -->
 <div id="screenDetail" class="hidden">
   <button type="button" class="linkback" onclick="goScreen('search')">‹ Voltar à busca</button>
-<form id="formLum">
+  <div class="card" id="pecaResumo"></div>
+<form id="formLum" class="hidden">
+<div class="actions" style="margin-bottom:14px"><button type="button" class="secondary" onclick="mostrarModoLeitura()">‹ Voltar ao resumo</button></div>
 <input type="hidden" name="modelo_id">
 <section class="card">
 <h2 style="margin:0 0 12px;font-size:16px">Identificação</h2>
@@ -462,8 +464,9 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 
 <section class="card">
 <h2 style="margin:0 0 12px;font-size:16px">Peças instaladas</h2>
-<div class="small" style="margin-bottom:8px">Só muda de "Original" pra um código quando uma troca é aprovada em "Aprovações pendentes" ou registrada em "Manutenção" (mais abaixo). Não dá pra editar aqui direto — isso evita dado digitado errado.</div>
-<div id="pecasInstaladasView" class="grid3"></div>
+<div class="small" style="margin-bottom:8px">O que veio de fábrica (ou foi trocado) em cada parte desta luminária. Escolha "Integrada" quando essa peça não existe separada aqui. Isso só vale pra esta peça — não muda o catálogo nem outras peças do mesmo modelo.</div>
+<div id="pecasInstaladasEdit" class="grid3"></div>
+<div class="actions" style="margin-top:12px"><button type="button" class="secondary" onclick="salvarPecasInstaladas()">Salvar peças instaladas</button></div>
 </section>
 
 <section class="card">

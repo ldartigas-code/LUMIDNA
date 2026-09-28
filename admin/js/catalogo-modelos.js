@@ -92,7 +92,7 @@ async function garantirModeloNoCatalogo(c){
   const fab=await sb.from("modelos").select("fabricante").ilike("fabricante",likeLiteral(c.fabricante)).limit(1);
   const grafiaFabricante=(fab.data&&fab.data.length)?fab.data[0].fabricante:c.fabricante;
   const r=await sb.from("modelos").insert({
-    fabricante:grafiaFabricante,codigo:c.codigo,
+    fabricante:grafiaFabricante,codigo:c.codigo,descricao:c.descricao??null,
     potencia_w:c.potencia_w??null,cct_k:c.cct_k??null,irc:c.irc??null,fluxo_lm:c.fluxo_lm??null,facho_graus:c.facho_graus??null,
     ip:c.ip??null,ik:c.ik??null,tipo_montagem:c.tipo_montagem??null
   }).select("id").single();

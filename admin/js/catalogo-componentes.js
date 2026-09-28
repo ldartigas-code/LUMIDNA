@@ -98,6 +98,35 @@ async function addComponenteCatalogo(){
   loadComponentesCatalogo();
 }
 
+// Garante que um componente (Driver/LED/Óptica) existe no Catálogo central
+// (tabela "equivalentes"), criando se for novo. Usado pela Importação
+// completa — como ali a origem é um pedido real (fabricante/código
+// conferidos), entra direto como "Compatível Verificado", não como palpite.
+// Se já existir, só acrescenta o modelo de luminária ao "compatível com",
+// sem sobrescrever specs que alguém já tenha ajustado manualmente.
+async function garantirComponenteNoCatalogo(c){
+  if(!c.codigo) return {erro:"sem código"};
+  const ex=await sb.from("equivalentes").select("id,modelo_original").eq("componente_origem",c.tipo).ilike("modelo_equivalente",likeLiteral(c.codigo)).limit(1);
+  if(ex.error) return {erro:ex.error.message};
+  if(ex.data&&ex.data.length){
+    const atual=ex.data[0].modelo_original;
+    const lista=atual?atual.split(",").map(s=>s.trim()):[];
+    if(c.modelo_original && !lista.includes(c.modelo_original)){
+      await sb.from("equivalentes").update({modelo_original:[...lista,c.modelo_original].filter(Boolean).join(", ")}).eq("id",ex.data[0].id);
+    }
+    return {id:ex.data[0].id,criado:false};
+  }
+  const r=await sb.from("equivalentes").insert({
+    componente_origem:c.tipo, modelo_equivalente:c.codigo, modelo_original:c.modelo_original||null,
+    fabricante_equivalente:c.fabricante||null,
+    potencia_w:c.potencia_w??null, corrente_ma:c.corrente_ma??null, cct_k:c.cct_k??null,
+    fluxo_lm:c.fluxo_lm??null, facho_graus:c.facho_graus??null,
+    nivel:"Compatível Verificado", disponibilidade:"Sob consulta", homologado_por:"Importação"
+  }).select("id").single();
+  if(r.error) return {erro:r.error.message};
+  return {id:r.data.id,criado:true};
+}
+
 function parseCSV(text){
   const firstLine=text.trim().split(/\r?\n/)[0]||"";
   const delim=(firstLine.split(";").length>firstLine.split(",").length)?";":",";

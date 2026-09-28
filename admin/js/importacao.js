@@ -105,16 +105,26 @@ async function processarImportacaoCompleta(){
   if(ins.erro){ resBox.innerHTML=""; return msg("Erro ao criar as peças: "+ins.erro,false); }
   const criadas=ins.criadas;
 
-  // 5) Componentes (Driver/LED/Óptica) de cada peça
+  // 5) Componentes (Driver/LED/Óptica) de cada peça — e, quando vem com
+  // fabricante+código (não só "Integrada"), garante também no Catálogo de
+  // componentes central, já que veio de um pedido real conferido.
   const compRows=[];
-  faixas.forEach(({startIdx,qty,item})=>{
+  for(const {startIdx,qty,item} of faixas){
     const ids=criadas.slice(startIdx,startIdx+qty);
-    [["led","LED"],["driver","Driver"],["optica","Óptica"]].forEach(([campo,tipo])=>{
-      const texto=formatarComponenteTexto(item[campo]);
-      if(!texto) return;
+    for(const [campo,tipo] of [["led","LED"],["driver","Driver"],["optica","Óptica"]]){
+      const val=item[campo];
+      const texto=formatarComponenteTexto(val);
+      if(!texto) continue;
       ids.forEach(l=>compRows.push({luminaria_id:l.id,tipo,modelo:texto,original:true,ativo_atual:true}));
-    });
-  });
+      if(val&&typeof val==="object"&&val.codigo){
+        await garantirComponenteNoCatalogo({
+          tipo, fabricante:val.fabricante||null, codigo:val.codigo, modelo_original:item.codigo,
+          potencia_w:val.potencia_w??null, corrente_ma:val.corrente_ma??null, cct_k:val.cct_k??null,
+          fluxo_lm:val.fluxo_lm??null, facho_graus:val.facho_graus??null
+        });
+      }
+    }
+  }
   let avisoComp="";
   if(compRows.length){
     for(let i=0;i<compRows.length;i+=500){

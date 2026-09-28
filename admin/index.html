@@ -697,8 +697,8 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
     <div class="alert">Preenchendo "Modelos compatíveis", esse componente já aparece sozinho como opção compatível verificada assim que essa luminária for usada numa obra — no cadastro (lâmpada de Retrofit), no "Reportar problema" e em "Peças pra comprar". Deixe em branco se for compatível com qualquer modelo, ou se ainda não souber.</div>
     <div class="grid3">
       <div class="field"><label>Tipo</label><select id="comp_tipo" onchange="onCompTipoChange()"><option>Driver</option><option>LED</option><option>Óptica</option></select></div>
-      <div class="field"><label>Fabricante</label><input id="comp_fabricante"></div>
-      <div class="field"><label>Código / Modelo</label><input id="comp_codigo"></div>
+      <div class="field"><label>Fabricante</label><input id="comp_fabricante" list="comp_fabricantes_dl" autocomplete="off"><datalist id="comp_fabricantes_dl"></datalist></div>
+      <div class="field"><label>Código / Modelo</label><input id="comp_codigo" list="comp_codigos_dl" autocomplete="off"><datalist id="comp_codigos_dl"></datalist></div>
       <div class="field span2">
         <label>Modelos compatíveis (opcional)</label>
         <input id="comp_modelos_busca" placeholder="Buscar modelo por fabricante ou código..." oninput="onCompModelosBuscaInput()">

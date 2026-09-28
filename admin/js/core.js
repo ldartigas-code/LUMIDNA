@@ -36,7 +36,7 @@ async function fetchAllRows(montarConsulta){
 // Cada troca de tela vira uma entrada no histórico do navegador, senão o
 // botão "voltar" do celular não tem pra onde voltar dentro do app e acaba
 // saindo direto do site.
-const SCREENS=["home","obras","obraDetalhe","wizard","copiar","search","detail","aprovacoes","catalogo","componentes","reposicao"];
+const SCREENS=["home","obras","obraDetalhe","wizard","copiar","search","detail","campo","aprovacoes","catalogo","componentes","reposicao"];
 function renderScreen(name){
   if(!SCREENS.includes(name)) name="home";
   SCREENS.forEach(s=>q("#screen"+s[0].toUpperCase()+s.slice(1)).classList.toggle("hidden",s!==name));

@@ -60,9 +60,69 @@ async function abrirPorPublicCode(code){
   const r=await sb.from("luminarias").select("*").eq("public_code",code).maybeSingle();
   if(r.error) return msg("Erro: "+r.error.message,false);
   if(!r.data) return msg("QR lido, mas não encontrei nenhuma peça com esse código.",false);
+  abrirModoCampo(r.data);
+}
+
+// ---- Modo de campo: só o essencial pra completar uma peça já instalada,
+// aberto direto ao escanear o QR. Guarda ambiente/andar da última peça
+// completada na sessão pra sugerir de novo (mesma sala, várias peças
+// seguidas) sem precisar redigitar.
+let campoData=null, campoFotoUrl=null;
+let campoUltimoAndar="", campoUltimoAmbiente="";
+
+function abrirModoCampo(data){
+  campoData=data;
+  campoFotoUrl=null;
+  LID=data.lumidna_id; luminariaDbId=data.id; originalData={...data};
+  q("#campoFotoPreview").classList.add("hidden");
+  q("#campoForm").classList.remove("hidden");
+  q("#campoSucesso").classList.add("hidden");
+  q("#campoHeader").innerHTML=`<h2 style="margin:0 0 4px">${esc(data.lumidna_id)}</h2><div class="small">${esc(data.fabricante)||"—"} — ${esc(data.modelo)||"—"}${data.empreendimento?" · "+esc(data.empreendimento):""}</div>`;
+  q("#campo_andar").value=data.andar||campoUltimoAndar||"";
+  q("#campo_ambiente").value=data.ambiente||campoUltimoAmbiente||"";
+  q("#campo_posicao").value=data.posicao||"";
+  q("#campo_serie").value=data.numero_serie||"";
+  goScreen("campo");
+}
+
+async function uploadFotoCampo(e){
+  const file=e.target.files[0]; if(!file||!campoData) return;
+  if(!file.type.startsWith("image/")) return msg("Escolha um arquivo de imagem.",false);
+  msg("Enviando foto...");
+  const path=`${campoData.lumidna_id}/foto_instalada_${Date.now()}_${file.name}`.replace(/\s+/g,"_");
+  const up=await sb.storage.from("fotos").upload(path,file,{upsert:true});
+  if(up.error) return msg("Erro no upload: "+up.error.message,false);
+  campoFotoUrl=sb.storage.from("fotos").getPublicUrl(path).data.publicUrl;
+  q("#campoFotoPreview").src=campoFotoUrl;
+  q("#campoFotoPreview").classList.remove("hidden");
+  msg("Foto enviada.");
+}
+
+async function salvarModoCampo(){
+  if(!campoData) return;
+  const p={
+    andar:norm(q("#campo_andar").value.trim()),
+    ambiente:norm(q("#campo_ambiente").value.trim()),
+    posicao:norm(q("#campo_posicao").value.trim()),
+    numero_serie:norm(q("#campo_serie").value.trim())
+  };
+  if(campoFotoUrl) p.foto_instalada_url=campoFotoUrl;
+  const r=await sb.from("luminarias").update(p).eq("id",campoData.id);
+  if(r.error) return msg("Erro ao salvar: "+r.error.message,false);
+  for(const k of Object.keys(p)) await logAudit(k,campoData[k],p[k]);
+  campoUltimoAndar=p.andar||"";
+  campoUltimoAmbiente=p.ambiente||"";
+  q("#campoForm").classList.add("hidden");
+  q("#campoSucesso").classList.remove("hidden");
+  q("#campoSucessoTexto").textContent=`${campoData.lumidna_id} salva.`;
+}
+
+async function abrirFichaCompletaDoCampo(){
+  if(!campoData) return;
+  await salvarModoCampo(); // não perde o que já foi digitado aqui antes de trocar de tela
+  const r=await sb.from("luminarias").select("*").eq("id",campoData.id).maybeSingle();
   goScreen("detail");
-  await openAsset(r.data);
-  msg(r.data.lumidna_id+" carregada pelo QR.");
+  await openAsset(r.data||campoData);
 }
 
 // ---- Escanear QR pela câmera (busca direta, sem digitar nada) ----

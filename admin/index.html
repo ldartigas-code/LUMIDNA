@@ -130,6 +130,10 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
     <span class="ic">➕</span>
     <span><b>Cadastrar peças novas</b><small>Escolher a obra e o modelo (ou criar um modelo novo ali mesmo) e gerar as peças com QR</small></span>
   </button>
+  <button type="button" class="bigOption" onclick="goScreen('importacao')">
+    <span class="ic">📥</span>
+    <span><b>Importar pedido completo</b><small>Cole a lista que o Claude preparou a partir de um PDF/Excel — cria obra, modelos, peças e Driver/LED/Óptica de uma vez, sem passar pelo Supabase</small></span>
+  </button>
   <button type="button" class="bigOption" onclick="goScreen('search')">
     <span class="ic">🔍</span>
     <span><b>Buscar peça existente</b><small>Encontrar e editar uma luminária já cadastrada</small></span>
@@ -397,6 +401,16 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
       <button type="button" class="primary" onclick="wizImprimirQR()">🖨 Imprimir QR das novas</button>
     </div>
   </div>
+</div>
+
+<!-- ===== IMPORTAÇÃO COMPLETA (cole o JSON que o Claude prepara a partir de um PDF/Excel) ===== -->
+<div id="screenImportacao" class="hidden">
+  <button type="button" class="linkback" onclick="goScreen('home')">‹ Início</button>
+  <h2 style="margin:14px 0 12px">Importar pedido completo</h2>
+  <div class="alert">Cole aqui o bloco de dados que o Claude prepara depois de ler um PDF/Excel de pedido. Cria a obra (se não existir), os modelos no catálogo, todas as peças já numeradas e o Driver/LED/Óptica de cada uma — tudo numa vez só, sem precisar do Supabase.</div>
+  <textarea id="importJson" style="width:100%;min-height:220px;font-family:monospace;font-size:13px" placeholder='{"obra":{"nome":"..."},"itens":[{"fabricante":"...","codigo":"...","quantidade":1,...}]}'></textarea>
+  <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="processarImportacaoCompleta()" style="font-size:16px;padding:12px 24px">Processar e criar tudo</button></div>
+  <div id="importResultado" style="margin-top:14px"></div>
 </div>
 
 <!-- ===== BUSCA ===== -->
@@ -734,6 +748,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <script src="js/fotos.js"></script>
 <script src="js/auditoria.js"></script>
 <script src="js/obras.js"></script>
+<script src="js/importacao.js"></script>
 <script src="js/aprovacoes.js"></script>
 <script src="js/reposicao.js"></script>
 <script src="js/relatorios.js"></script>

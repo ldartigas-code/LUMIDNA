@@ -42,6 +42,7 @@ async function processarImportacaoCompleta(){
   if(existente.data){
     obra=existente.data;
   }else{
+    if(!await confirmarSeParecida(nomeObra)){ resBox.innerHTML=""; return; }
     const prefixo=normalizarPrefixo((dados.obra.prefixo||sugerirPrefixo(nomeObra)));
     const erroPrefixo=await validarPrefixoObra(prefixo);
     if(erroPrefixo){ resBox.innerHTML=""; return msg(erroPrefixo,false); }

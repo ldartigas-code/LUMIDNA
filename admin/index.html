@@ -164,12 +164,17 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
       <div class="field"><label>Nome da obra / empreendimento</label><input id="obra_nome" oninput="onObraNomeInput(obra_nome,obra_prefixo)"></div>
       <div class="field"><label>Prefixo do ID (2 a 6 letras ou números)</label><input id="obra_prefixo" maxlength="6" placeholder="ex: PDC" style="text-transform:uppercase" oninput="onObraPrefixoInput(obra_prefixo)"></div>
       <div class="field span2"><div class="small">As peças desta obra saem como <b>LD-PDC-000001</b>, <b>000002</b>... O número da obra (1, 2, 3...) é gerado sozinho.</div></div>
-      <div class="field"><label>Cliente (opcional)</label><input id="obra_cliente"></div>
-      <div class="field"><label>E-mail do cliente (opcional)</label><input type="email" id="obra_cliente_email" placeholder="pra avisos de manutenção não aprovada"></div>
-      <div class="field"><label>Tensão da instalação</label><select id="obra_tensao"><option value="">— selecione —</option><option>127V</option><option>220V</option></select></div>
-      <div class="field"><label>Tem automação?</label><select id="obra_automacao" onchange="onNovaObraAutomacaoChange()"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
-      <div class="field hidden" id="obra_protocolo_field"><label>Protocolo</label><select id="obra_protocolo"><option>DALI</option><option>TRIAC</option><option>0-10V</option></select></div>
     </div>
+    <details style="margin-top:10px">
+      <summary class="small" style="cursor:pointer;font-weight:700">Detalhes da obra (opcional — dá pra completar depois)</summary>
+      <div class="grid" style="margin-top:10px">
+        <div class="field"><label>Cliente (opcional)</label><input id="obra_cliente"></div>
+        <div class="field"><label>E-mail do cliente (opcional)</label><input type="email" id="obra_cliente_email" placeholder="pra avisos de manutenção não aprovada"></div>
+        <div class="field"><label>Tensão da instalação</label><select id="obra_tensao"><option value="">— selecione —</option><option>127V</option><option>220V</option></select></div>
+        <div class="field"><label>Tem automação?</label><select id="obra_automacao" onchange="onNovaObraAutomacaoChange()"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
+        <div class="field hidden" id="obra_protocolo_field"><label>Protocolo</label><select id="obra_protocolo"><option>DALI</option><option>TRIAC</option><option>0-10V</option></select></div>
+      </div>
+    </details>
     <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="criarObra()">Criar obra</button></div>
   </div>
 </div>
@@ -244,12 +249,17 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
         <div class="grid">
           <div class="field"><label>Nome da obra / empreendimento</label><input id="wiz_empreendimento" oninput="onObraNomeInput(wiz_empreendimento,wiz_prefixo)"></div>
           <div class="field"><label>Prefixo do ID (2 a 6 letras ou números)</label><input id="wiz_prefixo" maxlength="6" placeholder="ex: PDC" style="text-transform:uppercase" oninput="onObraPrefixoInput(wiz_prefixo)"></div>
-          <div class="field"><label>Cliente (opcional)</label><input id="wiz_cliente"></div>
-          <div class="field"><label>E-mail do cliente (opcional)</label><input type="email" id="wiz_cliente_email" placeholder="pra avisos de manutenção não aprovada"></div>
-          <div class="field"><label>Tensão da instalação</label><select id="wiz_tensao"><option value="">— selecione —</option><option>127V</option><option>220V</option></select></div>
-          <div class="field"><label>Tem automação?</label><select id="wiz_automacao" onchange="onWizAutomacaoChange()"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
-          <div class="field hidden" id="wiz_protocolo_field"><label>Protocolo</label><select id="wiz_protocolo"><option>DALI</option><option>TRIAC</option><option>0-10V</option></select></div>
         </div>
+        <details style="margin-top:10px">
+          <summary class="small" style="cursor:pointer;font-weight:700">Detalhes da obra (opcional — dá pra completar depois)</summary>
+          <div class="grid" style="margin-top:10px">
+            <div class="field"><label>Cliente (opcional)</label><input id="wiz_cliente"></div>
+            <div class="field"><label>E-mail do cliente (opcional)</label><input type="email" id="wiz_cliente_email" placeholder="pra avisos de manutenção não aprovada"></div>
+            <div class="field"><label>Tensão da instalação</label><select id="wiz_tensao"><option value="">— selecione —</option><option>127V</option><option>220V</option></select></div>
+            <div class="field"><label>Tem automação?</label><select id="wiz_automacao" onchange="onWizAutomacaoChange()"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
+            <div class="field hidden" id="wiz_protocolo_field"><label>Protocolo</label><select id="wiz_protocolo"><option>DALI</option><option>TRIAC</option><option>0-10V</option></select></div>
+          </div>
+        </details>
         <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="wizCriarNovaObra()">Criar e usar esta obra</button></div>
       </div>
     </div>
@@ -268,45 +278,57 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
     <h2 style="margin:0 0 12px">2. Montar o pedido</h2>
     <div class="alert" id="wizObraResumo" style="margin-bottom:16px"></div>
 
-    <div id="wizFabBar" class="hidden" style="display:flex;align-items:center;gap:10px;margin:0 0 10px">
-      <button type="button" class="secondary" onclick="wizVoltarFabricantes()">‹ Fabricantes</button>
-      <b id="wizFabNome"></b>
-    </div>
-    <input id="wizModeloSearch" placeholder="Buscar em todos os fabricantes (nome ou código)" oninput="onWizSearchInput()" style="width:100%;margin-bottom:8px">
-    <div id="wizListaModelos"></div>
-    <div style="margin-top:12px"><button type="button" class="secondary" onclick="wizAbrirModeloNovo()">+ Modelo novo (não está na lista)</button></div>
-    <div id="wizModeloNovo" class="card hidden" style="margin-top:12px">
-      <h2 style="margin:0 0 4px;font-size:16px">Modelo novo</h2>
-      <div class="small" style="margin-bottom:12px">Fica salvo no catálogo e já entra neste pedido. Só fabricante e código são obrigatórios.</div>
+    <div class="card" style="margin-bottom:16px">
+      <h2 style="margin:0 0 10px;font-size:16px">Padrão desta remessa (opcional, mas poupa repetição)</h2>
       <div class="grid">
-        <div class="field"><label>Fabricante</label><input id="mn_fabricante" list="mn_fabricantes" autocomplete="off"><datalist id="mn_fabricantes"></datalist></div>
-        <div class="field"><label>Código do modelo</label><input id="mn_codigo" autocomplete="off"></div>
+        <div class="field"><label>Ambiente padrão</label><input id="wizAmbientePadrao" list="wizAmbientesList" placeholder="ex: Sala 101 — todo item novo já nasce com este ambiente" oninput="wizAtualizarAmbientePadrao(this.value)"></div>
+        <div class="field"><label>Kit desta remessa (Driver + LED + Óptica)</label><select id="wizKitSelect" onchange="wizEscolherKit()"><option value="">— não definir agora —</option></select></div>
       </div>
-      <details style="margin-top:10px">
-        <summary class="small" style="cursor:pointer;font-weight:700">Dados técnicos (opcional — dá pra completar depois no Catálogo)</summary>
-        <div class="grid3" style="margin-top:10px">
-          <div class="field"><label>Potência (W)</label><input type="number" step="0.01" id="mn_potencia"></div>
-          <div class="field"><label>CCT (K)</label><input type="number" id="mn_cct"></div>
-          <div class="field"><label>IRC</label><input type="number" step="0.1" id="mn_irc"></div>
-          <div class="field"><label>Fluxo (lm)</label><input type="number" step="0.1" id="mn_fluxo"></div>
-          <div class="field"><label>Facho (graus)</label><input type="number" step="0.1" id="mn_facho"></div>
-          <div class="field"><label>IP</label><input id="mn_ip"></div>
-          <div class="field"><label>IK</label><input id="mn_ik"></div>
-          <div class="field"><label>Tipo de montagem</label><select id="mn_tipo"><option value="">— não classificado —</option><option>Retrofit</option><option>COB</option></select></div>
-        </div>
-      </details>
-      <div class="actions" style="margin-top:12px">
-        <button type="button" class="secondary" onclick="wizFecharModeloNovo()">Cancelar</button>
-        <button type="button" class="primary" onclick="wizSalvarModeloNovo()">Salvar e adicionar ao pedido</button>
-      </div>
+      <div class="small" style="margin-top:6px">Define uma vez aqui e todo item adicionado na sessão já nasce com esses valores. Dá pra trocar linha a linha se uma peça específica vier diferente.</div>
     </div>
 
-    <div class="small" style="margin:16px 0 6px"><a href="#" onclick="toggleWizColar();return false" id="wizColarToggle">Pedido grande? Colar lista (código, quantidade, ambiente)</a></div>
-    <div id="wizColarBox" class="hidden">
+    <div class="card" style="margin-bottom:16px">
+      <h2 style="margin:0 0 10px;font-size:16px">Colar lista (o jeito mais rápido pra pedido grande)</h2>
       <textarea id="wizColarTexto" style="width:100%;min-height:100px" placeholder="Código, Quantidade, Ambiente, Fabricante&#10;2283.AB.N, 50, Sala 101&#10;4781.FE.S, 30, Sala 102&#10;2785.AB.N, 20"></textarea>
       <div class="small" style="margin-top:4px">Ambiente e fabricante são opcionais (fabricante só é necessário se o código existir em mais de um). Aceita vírgula, ponto-e-vírgula ou tab — dá pra colar direto do Excel. Se colar o cabeçalho junto, ele é ignorado sozinho.</div>
-      <div class="actions" style="margin-top:8px"><button type="button" class="secondary" onclick="wizColarProcessar()">Adicionar essas linhas ao pedido</button></div>
+      <div class="actions" style="margin-top:8px"><button type="button" class="primary" onclick="wizColarProcessar()">Adicionar essas linhas ao pedido</button></div>
       <div id="wizColarMsg" class="small" style="margin-top:6px"></div>
+    </div>
+
+    <div class="small" style="margin:0 0 10px"><a href="#" onclick="toggleWizManual();return false" id="wizManualToggle">Ou adicione modelo por modelo</a></div>
+    <div id="wizManualBox" class="hidden">
+      <div id="wizFabBar" class="hidden" style="display:flex;align-items:center;gap:10px;margin:0 0 10px">
+        <button type="button" class="secondary" onclick="wizVoltarFabricantes()">‹ Fabricantes</button>
+        <b id="wizFabNome"></b>
+      </div>
+      <input id="wizModeloSearch" placeholder="Buscar em todos os fabricantes (nome ou código)" oninput="onWizSearchInput()" style="width:100%;margin-bottom:8px">
+      <div id="wizListaModelos"></div>
+      <div style="margin-top:12px"><button type="button" class="secondary" onclick="wizAbrirModeloNovo()">+ Modelo novo (não está na lista)</button></div>
+      <div id="wizModeloNovo" class="card hidden" style="margin-top:12px">
+        <h2 style="margin:0 0 4px;font-size:16px">Modelo novo</h2>
+        <div class="small" style="margin-bottom:12px">Fica salvo no catálogo e já entra neste pedido. Só fabricante e código são obrigatórios.</div>
+        <div class="grid">
+          <div class="field"><label>Fabricante</label><input id="mn_fabricante" list="mn_fabricantes" autocomplete="off"><datalist id="mn_fabricantes"></datalist></div>
+          <div class="field"><label>Código do modelo</label><input id="mn_codigo" autocomplete="off"></div>
+        </div>
+        <details style="margin-top:10px">
+          <summary class="small" style="cursor:pointer;font-weight:700">Dados técnicos (opcional — dá pra completar depois no Catálogo)</summary>
+          <div class="grid3" style="margin-top:10px">
+            <div class="field"><label>Potência (W)</label><input type="number" step="0.01" id="mn_potencia"></div>
+            <div class="field"><label>CCT (K)</label><input type="number" id="mn_cct"></div>
+            <div class="field"><label>IRC</label><input type="number" step="0.1" id="mn_irc"></div>
+            <div class="field"><label>Fluxo (lm)</label><input type="number" step="0.1" id="mn_fluxo"></div>
+            <div class="field"><label>Facho (graus)</label><input type="number" step="0.1" id="mn_facho"></div>
+            <div class="field"><label>IP</label><input id="mn_ip"></div>
+            <div class="field"><label>IK</label><input id="mn_ik"></div>
+            <div class="field"><label>Tipo de montagem</label><select id="mn_tipo"><option value="">— não classificado —</option><option>Retrofit</option><option>COB</option></select></div>
+          </div>
+        </details>
+        <div class="actions" style="margin-top:12px">
+          <button type="button" class="secondary" onclick="wizFecharModeloNovo()">Cancelar</button>
+          <button type="button" class="primary" onclick="wizSalvarModeloNovo()">Salvar e adicionar ao pedido</button>
+        </div>
+      </div>
     </div>
 
     <h2 style="margin:20px 0 10px;font-size:16px">Itens do pedido (<span id="wizCarrinhoTotal">0</span> peças)</h2>
@@ -643,6 +665,20 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
       <div class="field span2"><label>Observações / especificação</label><input id="comp_obs"></div>
     </div>
     <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="addComponenteCatalogo()">Salvar componente</button></div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 12px;font-size:16px">Kits (Driver + LED + Óptica de uma remessa)</h2>
+    <div class="small" style="margin-bottom:12px">Um kit junta os 3 num atalho só, pra escolher de uma vez no cadastro em lote (assistente) em vez de configurar cada um separado toda vez que a mesma remessa se repetir.</div>
+    <div class="grid3">
+      <div class="field"><label>Nome do kit</label><input id="kit_nome" placeholder="ex: Kit VG20 padrão"></div>
+      <div class="field"><label>Driver</label><input id="kit_driver" list="kit_driver_opcoes" placeholder="código, ou Integrada"><datalist id="kit_driver_opcoes"></datalist></div>
+      <div class="field"><label>LED</label><input id="kit_led" list="kit_led_opcoes" placeholder="código, ou Integrada"><datalist id="kit_led_opcoes"></datalist></div>
+      <div class="field"><label>Óptica</label><input id="kit_optica" list="kit_optica_opcoes" placeholder="código, ou Integrada"><datalist id="kit_optica_opcoes"></datalist></div>
+      <div class="field"><label>Modelo de luminária (opcional)</label><input id="kit_modelo_luminaria" placeholder="ex: VG20 — só pra lembrete"></div>
+    </div>
+    <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="addKit()">Salvar kit</button></div>
+    <div id="kitsList" style="margin-top:14px"></div>
   </div>
 </div>
 

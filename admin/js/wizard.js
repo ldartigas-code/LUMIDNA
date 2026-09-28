@@ -98,24 +98,44 @@ function wizEntrarNoCarrinho(){
   wizFecharModeloNovo();
   q("#wizObraResumo").innerHTML=`Obra: <b>${esc(wizObra.empreendimento)}</b>${wizObraPrefixo?" ("+esc(wizObraPrefixo)+")":""}${wizObra.cliente?" · "+esc(wizObra.cliente):""}`;
   q("#wizAmbientePadrao").value="";
-  q("#wizManualBox").classList.add("hidden");
-  q("#wizManualToggle").textContent="Ou adicione modelo por modelo";
+  q("#wizPadraoDetails").open=false;
+  wizEscolherModo("colar");
   wizFiltrarModelos();
   renderWizCarrinho();
   wizCarregarAmbientesDaObra();
   wizCarregarKits();
+  wizAtualizarPadraoResumo();
   wizStep(2);
   if(wizPendingModeloId){const id=wizPendingModeloId;wizPendingModeloId=null;wizAdicionarAoCarrinho(id)}
 }
 
-function toggleWizManual(){
-  const box=q("#wizManualBox");
-  box.classList.toggle("hidden");
-  q("#wizManualToggle").textContent=box.classList.contains("hidden")?"Ou adicione modelo por modelo":"Esconder";
+// Só um jeito de adicionar por vez na tela — colar lista OU buscar modelo —
+// em vez de empilhar os dois sempre visíveis.
+function wizEscolherModo(modo){
+  q("#wizPainelColar").classList.toggle("hidden",modo!=="colar");
+  q("#wizPainelBuscar").classList.toggle("hidden",modo!=="buscar");
+  q("#wizModoColarBtn").className=modo==="colar"?"primary":"secondary";
+  q("#wizModoBuscarBtn").className=modo==="buscar"?"primary":"secondary";
 }
 
 function wizAtualizarAmbientePadrao(v){
   wizAmbientePadrao=norm(v.trim());
+  wizAtualizarPadraoResumo();
+}
+
+// Resumo de 1 linha do que está definido como padrão da remessa — o
+// detalhe fica escondido até alguém clicar, só a frase-resumo é visível.
+function wizAtualizarPadraoResumo(){
+  const partes=[];
+  if(wizAmbientePadrao) partes.push("Ambiente: "+wizAmbientePadrao);
+  if(wizKitAtual){
+    const sel=q("#wizKitSelect");
+    const opt=sel&&sel.options[sel.selectedIndex];
+    partes.push("Kit: "+(opt&&opt.value?opt.textContent:"definido"));
+  }
+  q("#wizPadraoResumo").textContent = partes.length
+    ? "Padrão desta remessa: "+partes.join(" · ")+" — clique pra trocar"
+    : "Padrão desta remessa: nenhum definido — clique pra definir";
 }
 
 async function wizCarregarKits(){
@@ -131,13 +151,14 @@ async function wizCarregarKits(){
 
 function wizEscolherKit(){
   const id=q("#wizKitSelect").value;
-  if(!id||!wizKitsCache){ wizKitAtual=null; return; }
+  if(!id||!wizKitsCache){ wizKitAtual=null; wizAtualizarPadraoResumo(); return; }
   const k=wizKitsCache.find(x=>String(x.id)===id);
-  if(!k){ wizKitAtual=null; return; }
+  if(!k){ wizKitAtual=null; wizAtualizarPadraoResumo(); return; }
   wizKitAtual={};
   if(k.driver_modelo) wizKitAtual.Driver={modelo_equivalente:k.driver_modelo,especificacao:k.driver_modelo};
   if(k.led_modelo) wizKitAtual.LED={modelo_equivalente:k.led_modelo,especificacao:k.led_modelo};
   if(k.optica_modelo) wizKitAtual.Óptica={modelo_equivalente:k.optica_modelo,especificacao:k.optica_modelo};
+  wizAtualizarPadraoResumo();
 }
 
 // Sugestões de ambiente (autocompletar) com os nomes já usados nesta obra,
@@ -297,8 +318,11 @@ function ambienteKey(a){return (a||"").trim().toLowerCase()}
 function wizAddOrMergeItem(modelo,qty,ambiente){
   const ambienteFinal=norm((ambiente||"").trim())||wizAmbientePadrao||null;
   const existing=wizCarrinho.find(x=>x.modelo.id===modelo.id && ambienteKey(x.ambiente)===ambienteKey(ambienteFinal));
-  if(existing) existing.qty+=qty;
-  else wizCarrinho.push({modelo,qty,ambiente:ambienteFinal,compSelecionado:wizKitAtual?JSON.parse(JSON.stringify(wizKitAtual)):undefined});
+  if(existing){ existing.qty+=qty; }
+  else{
+    wizCarrinho.push({modelo,qty,ambiente:ambienteFinal,compSelecionado:wizKitAtual?JSON.parse(JSON.stringify(wizKitAtual)):undefined});
+    wizAplicarDefaultsComponentes(wizCarrinho.length-1);
+  }
   renderWizCarrinho();
 }
 
@@ -316,6 +340,50 @@ function wizAtualizarQtd(idx,val){
 }
 function wizAtualizarAmbiente(idx,val){
   wizCarrinho[idx].ambiente=norm(val.trim());
+  wizAtualizarResumoLinha(idx);
+}
+
+// Frase-resumo de uma linha do carrinho (o que aparece sempre visível,
+// sem precisar abrir "Editar").
+function wizLinhaResumoTexto(item){
+  const compTxt=Object.entries(item.compSelecionado||{}).filter(([,v])=>v&&v.modelo_equivalente).map(([tipo,v])=>`${tipo}: ${esc(v.especificacao||v.modelo_equivalente)}`).join(" · ");
+  return `${item.ambiente?esc(item.ambiente):"sem ambiente definido"}${compTxt?" · "+compTxt:""}`;
+}
+function wizAtualizarResumoLinha(idx){
+  const el=q(`#wizItemResumo${idx}`);
+  if(el&&wizCarrinho[idx]) el.innerHTML=wizLinhaResumoTexto(wizCarrinho[idx]);
+}
+
+// Item novo sem Driver/LED/Óptica definido (nem por kit): confere em segundo
+// plano se existe alguma peça compatível homologada pro modelo — se não
+// existir nenhuma, assume "Integrada" sozinho, sem abrir tela nenhuma pro
+// usuário. Atualiza só a frase-resumo daquela linha (não redesenha o
+// carrinho inteiro, pra não fechar um "Editar" que esteja aberto noutra linha).
+async function wizAplicarDefaultsComponentes(idx){
+  const item=wizCarrinho[idx];
+  if(!item) return;
+  const faltando=WIZ_TIPOS_COMPONENTE.filter(t=>!(item.compSelecionado&&item.compSelecionado[t]));
+  if(!faltando.length) return;
+  const resultados=await Promise.all(faltando.map(tipo=>sb.rpc("listar_homologados",{p_componente:tipo,p_modelo_codigo:item.modelo.codigo})));
+  let mudou=false;
+  faltando.forEach((tipo,i)=>{
+    const r=resultados[i];
+    const rows=r.error?[]:(r.data||[]);
+    if(!rows.length){
+      item.compSelecionado=item.compSelecionado||{};
+      item.compSelecionado[tipo]={modelo_equivalente:"Integrada",especificacao:"Integrada"};
+      mudou=true;
+    }
+  });
+  if(mudou) wizAtualizarResumoLinha(idx);
+}
+
+function wizToggleEditarItem(idx){
+  const box=q(`#wizItemEdit${idx}`);
+  if(!box) return;
+  const abrir=box.classList.contains("hidden");
+  box.classList.toggle("hidden");
+  if(abrir) carregarComponentesDoItem(idx);
 }
 
 function renderWizCarrinho(){
@@ -325,17 +393,20 @@ function renderWizCarrinho(){
     <div class="card" style="padding:12px 14px">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         ${item.modelo.imagem_url?`<img src="${esc(item.modelo.imagem_url)}" alt="" style="width:36px;height:36px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:""}
-        <div style="flex:1;min-width:160px"><b>${esc(item.modelo.fabricante)||""} — ${esc(item.modelo.codigo)}</b>${item.modelo.tipo_montagem==="Retrofit"?` <span class="pill" style="background:#edf3ff;color:#355fa8">Retrofit</span>`:""}</div>
-        <input type="text" placeholder="Ambiente (opcional)" list="wizAmbientesList" value="${esc(item.ambiente||"")}" style="width:170px" onchange="wizAtualizarAmbiente(${idx},this.value)">
+        <div style="flex:1;min-width:160px">
+          <b>${esc(item.modelo.fabricante)||""} — ${esc(item.modelo.codigo)}</b>${item.modelo.tipo_montagem==="Retrofit"?` <span class="pill" style="background:#edf3ff;color:#355fa8">Retrofit</span>`:""}
+          <div class="small" id="wizItemResumo${idx}">${wizLinhaResumoTexto(item)}</div>
+        </div>
         <input type="number" min="1" value="${item.qty}" style="width:80px" onchange="wizAtualizarQtd(${idx},this.value)">
+        <button type="button" class="secondary" onclick="wizToggleEditarItem(${idx})">✏️ Editar</button>
         <button type="button" class="secondary" onclick="wizRemoverItem(${idx})">Remover</button>
       </div>
-      <div style="margin-top:10px">
+      <div id="wizItemEdit${idx}" class="hidden" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
+        <div class="field" style="margin-bottom:10px"><label>Ambiente</label><input type="text" list="wizAmbientesList" value="${esc(item.ambiente||"")}" onchange="wizAtualizarAmbiente(${idx},this.value)"></div>
         <div class="small" style="font-weight:700;margin-bottom:6px">Driver / LED / Óptica instalados</div>
         <div class="grid3" id="wizComp${idx}"><div class="small">Carregando...</div></div>
       </div>
     </div>`).join("") : "<div class='small'>Nenhum item adicionado ainda.</div>";
-  wizCarrinho.forEach((item,idx)=>carregarComponentesDoItem(idx));
 }
 
 const WIZ_TIPOS_COMPONENTE=["Driver","LED","Óptica"];
@@ -404,11 +475,14 @@ function wizEscolherComponente(idx,tipo,codigo){
   const item=wizCarrinho[idx];
   if(!item) return;
   item.compSelecionado=item.compSelecionado||{};
-  if(!codigo){ delete item.compSelecionado[tipo]; return; }
-  if(codigo==="Integrada"){ item.compSelecionado[tipo]={modelo_equivalente:"Integrada",especificacao:"Integrada"}; return; }
-  const sel=q(`#wizComp${idx}_${tipo}`);
-  const opt=sel&&sel.querySelector(`option[value="${CSS.escape(codigo)}"]`);
-  item.compSelecionado[tipo]={modelo_equivalente:codigo, especificacao:opt?opt.textContent:codigo};
+  if(!codigo){ delete item.compSelecionado[tipo]; }
+  else if(codigo==="Integrada"){ item.compSelecionado[tipo]={modelo_equivalente:"Integrada",especificacao:"Integrada"}; }
+  else{
+    const sel=q(`#wizComp${idx}_${tipo}`);
+    const opt=sel&&sel.querySelector(`option[value="${CSS.escape(codigo)}"]`);
+    item.compSelecionado[tipo]={modelo_equivalente:codigo, especificacao:opt?opt.textContent:codigo};
+  }
+  wizAtualizarResumoLinha(idx);
 }
 
 function wizDetectarSeparador(linha){

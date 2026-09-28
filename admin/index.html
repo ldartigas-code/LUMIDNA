@@ -569,6 +569,40 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 </form>
 </div>
 
+<!-- ===== MODO DE CAMPO (abre ao escanear o QR — só o essencial pra completar no local) ===== -->
+<div id="screenCampo" class="hidden">
+  <button type="button" class="linkback" onclick="goScreen('search')">‹ Voltar à busca</button>
+  <div class="card" id="campoHeader" style="margin-top:14px"></div>
+
+  <div class="card" id="campoForm">
+    <h2 style="margin:0 0 12px;font-size:16px">Completar no local</h2>
+    <div class="grid">
+      <div class="field"><label>Andar</label><input id="campo_andar"></div>
+      <div class="field"><label>Ambiente</label><input id="campo_ambiente"></div>
+      <div class="field"><label>Posição</label><input id="campo_posicao" placeholder="ex: acima da mesa 3"></div>
+      <div class="field"><label>Número de série</label><input id="campo_serie"></div>
+    </div>
+    <div class="field" style="margin-top:10px">
+      <label>Foto (opcional)</label>
+      <input type="file" accept="image/*" capture="environment" onchange="uploadFotoCampo(event)">
+      <img id="campoFotoPreview" class="fotoPreview hidden">
+    </div>
+    <div class="actions" style="margin-top:14px">
+      <button type="button" class="primary" onclick="salvarModoCampo()" style="font-size:16px;padding:12px 24px">💾 Salvar</button>
+      <button type="button" class="secondary" onclick="abrirFichaCompletaDoCampo()">Ver ficha completa</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="campoSucesso" style="text-align:center;padding:24px 0">
+    <div style="font-size:36px;color:var(--green)">✓</div>
+    <div id="campoSucessoTexto" style="margin:10px 0 18px;font-weight:700"></div>
+    <div class="actions" style="justify-content:center">
+      <button type="button" class="primary" onclick="abrirScanQR()" style="font-size:16px;padding:12px 24px">📷 Escanear próxima</button>
+      <button type="button" class="secondary" onclick="goScreen('search')">Voltar à busca</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== APROVAÇÕES PENDENTES ===== -->
 <div id="screenAprovacoes" class="hidden">
   <button type="button" class="linkback" onclick="goScreen('home')">‹ Início</button>

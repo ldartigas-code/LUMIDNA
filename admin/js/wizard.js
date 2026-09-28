@@ -1,12 +1,14 @@
 // ---- Assistente: cadastrar peças novas (pedido / carrinho) ----
 let wizObra=null, wizObraId=null, wizObraPrefixo=null, wizCarrinho=[], wizPendingModeloId=null, wizUltimaCriacao=[], wizPularParaCarrinho=false;
 let wizColarPendentes=[], wizPendenteAtual=null;
+let wizAmbientePadrao="", wizKitAtual=null, wizKitsCache=null;
 
 function wizStep(n){
   ["wz-1","wz-2","wz-3","wz-4"].forEach((id,i)=>q("#"+id).classList.toggle("hidden",i!==n-1));
   q("#wizSteps").innerHTML=["Obra","Pedido","Confirmar"].map((l,i)=>(i===n-1?`<b>${i+1}. ${l}</b>`:`${i+1}. ${l}`)).join("  →  ");
   if(n===1){
     wizObra=null;wizObraId=null;wizObraPrefixo=null;wizCarrinho=[];wizColarPendentes=[];wizPendenteAtual=null;
+    wizAmbientePadrao="";wizKitAtual=null;
     q("#wiz_prefixo").value="";q("#wiz_prefixo").dataset.manual="";
     q("#wizObraSearch").value="";
     q("#wizObraBusca").classList.remove("hidden");
@@ -95,11 +97,47 @@ function wizEntrarNoCarrinho(){
   wizFabricantesCache=null;
   wizFecharModeloNovo();
   q("#wizObraResumo").innerHTML=`Obra: <b>${esc(wizObra.empreendimento)}</b>${wizObraPrefixo?" ("+esc(wizObraPrefixo)+")":""}${wizObra.cliente?" · "+esc(wizObra.cliente):""}`;
+  q("#wizAmbientePadrao").value="";
+  q("#wizManualBox").classList.add("hidden");
+  q("#wizManualToggle").textContent="Ou adicione modelo por modelo";
   wizFiltrarModelos();
   renderWizCarrinho();
   wizCarregarAmbientesDaObra();
+  wizCarregarKits();
   wizStep(2);
   if(wizPendingModeloId){const id=wizPendingModeloId;wizPendingModeloId=null;wizAdicionarAoCarrinho(id)}
+}
+
+function toggleWizManual(){
+  const box=q("#wizManualBox");
+  box.classList.toggle("hidden");
+  q("#wizManualToggle").textContent=box.classList.contains("hidden")?"Ou adicione modelo por modelo":"Esconder";
+}
+
+function wizAtualizarAmbientePadrao(v){
+  wizAmbientePadrao=norm(v.trim());
+}
+
+async function wizCarregarKits(){
+  const sel=q("#wizKitSelect");
+  if(!sel) return;
+  if(!wizKitsCache){
+    const r=await sb.from("kits_componentes").select("*").order("nome");
+    wizKitsCache=r.error?[]:(r.data||[]);
+  }
+  sel.innerHTML=`<option value="">— não definir agora —</option>`+wizKitsCache.map(k=>`<option value="${k.id}">${esc(k.nome)}${k.modelo_luminaria?" ("+esc(k.modelo_luminaria)+")":""}</option>`).join("");
+  sel.value="";
+}
+
+function wizEscolherKit(){
+  const id=q("#wizKitSelect").value;
+  if(!id||!wizKitsCache){ wizKitAtual=null; return; }
+  const k=wizKitsCache.find(x=>String(x.id)===id);
+  if(!k){ wizKitAtual=null; return; }
+  wizKitAtual={};
+  if(k.driver_modelo) wizKitAtual.Driver={modelo_equivalente:k.driver_modelo,especificacao:k.driver_modelo};
+  if(k.led_modelo) wizKitAtual.LED={modelo_equivalente:k.led_modelo,especificacao:k.led_modelo};
+  if(k.optica_modelo) wizKitAtual.Óptica={modelo_equivalente:k.optica_modelo,especificacao:k.optica_modelo};
 }
 
 // Sugestões de ambiente (autocompletar) com os nomes já usados nesta obra,
@@ -257,10 +295,10 @@ async function wizSalvarModeloNovo(){
 // soma a quantidade; mesmo código em ambiente diferente vira outra linha.
 function ambienteKey(a){return (a||"").trim().toLowerCase()}
 function wizAddOrMergeItem(modelo,qty,ambiente){
-  ambiente=norm((ambiente||"").trim());
-  const existing=wizCarrinho.find(x=>x.modelo.id===modelo.id && ambienteKey(x.ambiente)===ambienteKey(ambiente));
+  const ambienteFinal=norm((ambiente||"").trim())||wizAmbientePadrao||null;
+  const existing=wizCarrinho.find(x=>x.modelo.id===modelo.id && ambienteKey(x.ambiente)===ambienteKey(ambienteFinal));
   if(existing) existing.qty+=qty;
-  else wizCarrinho.push({modelo,qty,ambiente});
+  else wizCarrinho.push({modelo,qty,ambiente:ambienteFinal,compSelecionado:wizKitAtual?JSON.parse(JSON.stringify(wizKitAtual)):undefined});
   renderWizCarrinho();
 }
 
@@ -292,22 +330,21 @@ function renderWizCarrinho(){
         <input type="number" min="1" value="${item.qty}" style="width:80px" onchange="wizAtualizarQtd(${idx},this.value)">
         <button type="button" class="secondary" onclick="wizRemoverItem(${idx})">Remover</button>
       </div>
-      <details class="wizCompDetails" ontoggle="onWizCompToggle(${idx},this)">
-        <summary class="small" style="cursor:pointer;font-weight:700;margin-top:8px">Definir Driver / LED / Óptica instalados (opcional)</summary>
-        <div class="grid3" id="wizComp${idx}" style="margin-top:10px"><div class="small">Abrindo...</div></div>
-      </details>
+      <div style="margin-top:10px">
+        <div class="small" style="font-weight:700;margin-bottom:6px">Driver / LED / Óptica instalados</div>
+        <div class="grid3" id="wizComp${idx}"><div class="small">Carregando...</div></div>
+      </div>
     </div>`).join("") : "<div class='small'>Nenhum item adicionado ainda.</div>";
+  wizCarrinho.forEach((item,idx)=>carregarComponentesDoItem(idx));
 }
 
 const WIZ_TIPOS_COMPONENTE=["Driver","LED","Óptica"];
 
-function onWizCompToggle(idx,detailsEl){
-  if(detailsEl.open) carregarComponentesDoItem(idx);
-}
-
 // Carrega, pra este item do pedido, as peças compatíveis verificadas de cada
 // tipo (Driver/LED/Óptica) já cadastradas no Catálogo de componentes — quem
 // monta o pedido escolhe o que veio de fábrica em cada peça, sem digitar nada.
+// Sempre visível (não escondido atrás de clique) porque é o dado mais
+// importante do cadastro pra manutenção futura.
 async function carregarComponentesDoItem(idx){
   const item=wizCarrinho[idx];
   const box=q(`#wizComp${idx}`);
@@ -317,20 +354,50 @@ async function carregarComponentesDoItem(idx){
   box.innerHTML = WIZ_TIPOS_COMPONENTE.map((tipo,i)=>{
     const r=resultados[i];
     const rows=r.error?[]:(r.data||[]);
+    const atual=(item.compSelecionado&&item.compSelecionado[tipo])?item.compSelecionado[tipo].modelo_equivalente:"";
+    const conhecidas=new Set(rows.map(x=>x.modelo_equivalente));
+    const ehOutro=!!atual && atual!=="Integrada" && !conhecidas.has(atual);
     const opcoes=rows.map(x=>`<option value="${esc(x.modelo_equivalente)}">${esc(x.modelo_equivalente)}${x.fabricante_equivalente?" — "+esc(x.fabricante_equivalente):""}${x.especificacao?" ("+esc(x.especificacao)+")":""}</option>`).join("");
-    return `<div class="field"><label>${tipo}</label><select id="wizComp${idx}_${tipo}" onchange="wizEscolherComponente(${idx},'${tipo}',this.value)"><option value="">— não definir agora —</option><option value="Integrada">Integrada (não é peça separada)</option>${opcoes}</select></div>`;
+    return `<div class="field"><label>${tipo}</label>
+      <select id="wizComp${idx}_${tipo}" onchange="wizOnCompSelectChange(${idx},'${tipo}')">
+        <option value="">— não definir agora —</option>
+        <option value="Integrada">Integrada (não é peça separada)</option>
+        ${opcoes}
+        <option value="__outro__">Outro modelo (digitar)</option>
+      </select>
+      <input type="text" id="wizComp${idx}_${tipo}_outro" placeholder="Modelo instalado" value="${ehOutro?esc(atual):""}" class="${ehOutro?"":"hidden"}" style="margin-top:6px;width:100%" oninput="wizOnCompOutroInput(${idx},'${tipo}',this.value)">
+    </div>`;
   }).join("");
   WIZ_TIPOS_COMPONENTE.forEach((tipo,i)=>{
     const atual=(item.compSelecionado&&item.compSelecionado[tipo])?item.compSelecionado[tipo].modelo_equivalente:"";
     const rows=resultados[i].error?[]:(resultados[i].data||[]);
-    if(atual){
+    const conhecidas=new Set(rows.map(x=>x.modelo_equivalente));
+    if(atual&&(atual==="Integrada"||conhecidas.has(atual))){
       q(`#wizComp${idx}_${tipo}`).value=atual;
+    }else if(atual){
+      q(`#wizComp${idx}_${tipo}`).value="__outro__";
     }else if(!rows.length){
       // sem nenhuma peça compatível cadastrada pra este modelo: assume Integrada por padrão
       q(`#wizComp${idx}_${tipo}`).value="Integrada";
       wizEscolherComponente(idx,tipo,"Integrada");
     }
   });
+}
+
+function wizOnCompSelectChange(idx,tipo){
+  const sel=q(`#wizComp${idx}_${tipo}`);
+  const outro=q(`#wizComp${idx}_${tipo}_outro`);
+  if(sel.value==="__outro__"){
+    outro.classList.remove("hidden");
+    wizEscolherComponente(idx,tipo,outro.value.trim());
+  }else{
+    outro.classList.add("hidden");
+    wizEscolherComponente(idx,tipo,sel.value);
+  }
+}
+
+function wizOnCompOutroInput(idx,tipo,val){
+  wizEscolherComponente(idx,tipo,val.trim());
 }
 
 function wizEscolherComponente(idx,tipo,codigo){
@@ -342,12 +409,6 @@ function wizEscolherComponente(idx,tipo,codigo){
   const sel=q(`#wizComp${idx}_${tipo}`);
   const opt=sel&&sel.querySelector(`option[value="${CSS.escape(codigo)}"]`);
   item.compSelecionado[tipo]={modelo_equivalente:codigo, especificacao:opt?opt.textContent:codigo};
-}
-
-function toggleWizColar(){
-  const box=q("#wizColarBox");
-  box.classList.toggle("hidden");
-  q("#wizColarToggle").textContent=box.classList.contains("hidden")?"Pedido grande? Colar lista (código, quantidade, ambiente)":"Esconder colagem de lista";
 }
 
 function wizDetectarSeparador(linha){

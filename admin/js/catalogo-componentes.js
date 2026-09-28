@@ -126,6 +126,52 @@ function parseCSV(text){
   });
 }
 
+// ---- Kits (Driver + LED + Óptica que costumam vir juntos numa remessa) ----
+async function carregarOpcoesKit(){
+  const tipos=[["Driver","kit_driver_opcoes"],["LED","kit_led_opcoes"],["Óptica","kit_optica_opcoes"]];
+  for(const [tipo,dlId] of tipos){
+    const dl=q("#"+dlId);
+    if(!dl) continue;
+    const r=await sb.from("equivalentes").select("modelo_equivalente").eq("componente_origem",tipo);
+    const distintos=[...new Set((r.data||[]).map(x=>x.modelo_equivalente).filter(Boolean))];
+    dl.innerHTML=`<option value="Integrada">`+distintos.map(x=>`<option value="${esc(x)}">`).join("");
+  }
+}
+
+async function addKit(){
+  const nome=q("#kit_nome").value.trim();
+  if(!nome) return msg("Informe o nome do kit.",false);
+  const p={
+    nome,
+    driver_modelo:norm(q("#kit_driver").value.trim()),
+    led_modelo:norm(q("#kit_led").value.trim()),
+    optica_modelo:norm(q("#kit_optica").value.trim()),
+    modelo_luminaria:norm(q("#kit_modelo_luminaria").value.trim())
+  };
+  const r=await sb.from("kits_componentes").insert(p);
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  q("#kit_nome").value="";q("#kit_driver").value="";q("#kit_led").value="";q("#kit_optica").value="";q("#kit_modelo_luminaria").value="";
+  msg("Kit salvo.");
+  loadKits();
+}
+
+async function loadKits(){
+  const box=q("#kitsList");
+  if(!box) return;
+  const r=await sb.from("kits_componentes").select("*").order("nome");
+  if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
+  const rows=r.data||[];
+  box.innerHTML=rows.length?`<table><tr><th>Nome</th><th>Driver</th><th>LED</th><th>Óptica</th><th>Modelo</th><th></th></tr>${rows.map(k=>`<tr><td>${esc(k.nome)}</td><td>${esc(k.driver_modelo)||"—"}</td><td>${esc(k.led_modelo)||"—"}</td><td>${esc(k.optica_modelo)||"—"}</td><td>${esc(k.modelo_luminaria)||"—"}</td><td><button type="button" class="secondary" onclick="excluirKit(${k.id})">Excluir</button></td></tr>`).join("")}</table>`:"<div class='small'>Nenhum kit cadastrado ainda.</div>";
+}
+
+async function excluirKit(id){
+  if(!confirm("Excluir este kit? Isso não afeta peças já cadastradas com ele.")) return;
+  const r=await sb.from("kits_componentes").delete().eq("id",id);
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  msg("Kit excluído.");
+  loadKits();
+}
+
 async function importModelosCSV(){
   const text=q("#modelosCsvInput").value.trim();
   if(!text) return msg("Cole o CSV primeiro.",false);

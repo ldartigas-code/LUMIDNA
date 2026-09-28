@@ -278,25 +278,19 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
     <h2 style="margin:0 0 12px">2. Montar o pedido</h2>
     <div class="alert" id="wizObraResumo" style="margin-bottom:16px"></div>
 
-    <div class="card" style="margin-bottom:16px">
-      <h2 style="margin:0 0 10px;font-size:16px">Padrão desta remessa (opcional, mas poupa repetição)</h2>
-      <div class="grid">
-        <div class="field"><label>Ambiente padrão</label><input id="wizAmbientePadrao" list="wizAmbientesList" placeholder="ex: Sala 101 — todo item novo já nasce com este ambiente" oninput="wizAtualizarAmbientePadrao(this.value)"></div>
-        <div class="field"><label>Kit desta remessa (Driver + LED + Óptica)</label><select id="wizKitSelect" onchange="wizEscolherKit()"><option value="">— não definir agora —</option></select></div>
-      </div>
-      <div class="small" style="margin-top:6px">Define uma vez aqui e todo item adicionado na sessão já nasce com esses valores. Dá pra trocar linha a linha se uma peça específica vier diferente.</div>
+    <div class="actions" style="margin-bottom:16px">
+      <button type="button" id="wizModoColarBtn" class="primary" onclick="wizEscolherModo('colar')">📋 Colar lista</button>
+      <button type="button" id="wizModoBuscarBtn" class="secondary" onclick="wizEscolherModo('buscar')">🔍 Buscar modelo</button>
     </div>
 
-    <div class="card" style="margin-bottom:16px">
-      <h2 style="margin:0 0 10px;font-size:16px">Colar lista (o jeito mais rápido pra pedido grande)</h2>
+    <div id="wizPainelColar" class="card hidden" style="margin-bottom:16px">
       <textarea id="wizColarTexto" style="width:100%;min-height:100px" placeholder="Código, Quantidade, Ambiente, Fabricante&#10;2283.AB.N, 50, Sala 101&#10;4781.FE.S, 30, Sala 102&#10;2785.AB.N, 20"></textarea>
       <div class="small" style="margin-top:4px">Ambiente e fabricante são opcionais (fabricante só é necessário se o código existir em mais de um). Aceita vírgula, ponto-e-vírgula ou tab — dá pra colar direto do Excel. Se colar o cabeçalho junto, ele é ignorado sozinho.</div>
       <div class="actions" style="margin-top:8px"><button type="button" class="primary" onclick="wizColarProcessar()">Adicionar essas linhas ao pedido</button></div>
       <div id="wizColarMsg" class="small" style="margin-top:6px"></div>
     </div>
 
-    <div class="small" style="margin:0 0 10px"><a href="#" onclick="toggleWizManual();return false" id="wizManualToggle">Ou adicione modelo por modelo</a></div>
-    <div id="wizManualBox" class="hidden">
+    <div id="wizPainelBuscar" class="card hidden" style="margin-bottom:16px">
       <div id="wizFabBar" class="hidden" style="display:flex;align-items:center;gap:10px;margin:0 0 10px">
         <button type="button" class="secondary" onclick="wizVoltarFabricantes()">‹ Fabricantes</button>
         <b id="wizFabNome"></b>
@@ -330,6 +324,15 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
         </div>
       </div>
     </div>
+
+    <details id="wizPadraoDetails" style="margin-bottom:16px">
+      <summary id="wizPadraoResumo" class="small" style="cursor:pointer;font-weight:700">Padrão desta remessa: nenhum definido — clique pra definir</summary>
+      <div class="grid" style="margin-top:10px">
+        <div class="field"><label>Ambiente padrão</label><input id="wizAmbientePadrao" list="wizAmbientesList" placeholder="ex: Sala 101 — todo item novo já nasce com este ambiente" oninput="wizAtualizarAmbientePadrao(this.value)"></div>
+        <div class="field"><label>Kit desta remessa (Driver + LED + Óptica)</label><select id="wizKitSelect" onchange="wizEscolherKit()"><option value="">— nenhum —</option></select></div>
+      </div>
+      <div class="small" style="margin-top:6px">Todo item adicionado dali pra frente já nasce com esses valores. Dá pra trocar linha a linha se uma peça específica vier diferente.</div>
+    </details>
 
     <h2 style="margin:20px 0 10px;font-size:16px">Itens do pedido (<span id="wizCarrinhoTotal">0</span> peças)</h2>
     <datalist id="wizAmbientesList"></datalist>

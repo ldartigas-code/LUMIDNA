@@ -62,7 +62,12 @@ async function processarImportacaoCompleta(){
   const itensProntos=[];
   for(const item of dados.itens){
     if(!item.codigo||!item.fabricante){ resBox.innerHTML=""; return msg("Item sem código/fabricante: "+JSON.stringify(item),false); }
-    const g=await garantirModeloNoCatalogo({fabricante:item.fabricante,codigo:item.codigo,descricao:item.descricao||null});
+    const g=await garantirModeloNoCatalogo({
+      fabricante:item.fabricante,codigo:item.codigo,descricao:item.descricao||null,
+      potencia_w:item.potencia_w??null,cct_k:item.cct_k??null,irc:item.irc??null,
+      fluxo_lm:item.fluxo_lm??null,facho_graus:item.facho_graus??null,
+      ip:item.ip??null,ik:item.ik??null,tipo_montagem:item.tipo_montagem??null
+    });
     if(g.erro){ resBox.innerHTML=""; return msg(`Erro no modelo ${item.codigo}: ${g.erro}`,false); }
     const mFull=await sb.from("modelos").select("*").eq("id",g.id).single();
     if(mFull.error){ resBox.innerHTML=""; return msg(`Erro ao ler o modelo ${item.codigo}: ${mFull.error.message}`,false); }

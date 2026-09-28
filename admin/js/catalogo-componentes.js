@@ -51,6 +51,26 @@ function onCompTipoChange(){
   q("#comp_cct_field").classList.toggle("hidden", tipo!=="LED");
   q("#comp_fluxo_field").classList.toggle("hidden", tipo!=="LED");
   q("#comp_facho_field").classList.toggle("hidden", tipo!=="Óptica");
+  carregarCodigosComponentes();
+}
+
+// Sugestões (autocompletar) de fabricante e código já usados no catálogo de
+// componentes, pra não precisar lembrar/digitar tudo do zero toda vez.
+async function carregarFabricantesComponentes(){
+  const dl=q("#comp_fabricantes_dl");
+  if(!dl) return;
+  const r=await sb.from("equivalentes").select("fabricante_equivalente").not("fabricante_equivalente","is",null);
+  const distintos=[...new Set((r.data||[]).map(x=>x.fabricante_equivalente).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  dl.innerHTML=distintos.map(f=>`<option value="${esc(f)}">`).join("");
+}
+
+async function carregarCodigosComponentes(){
+  const dl=q("#comp_codigos_dl");
+  if(!dl) return;
+  const tipo=q("#comp_tipo").value;
+  const r=await sb.from("equivalentes").select("modelo_equivalente").eq("componente_origem",tipo);
+  const distintos=[...new Set((r.data||[]).map(x=>x.modelo_equivalente).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  dl.innerHTML=distintos.map(c=>`<option value="${esc(c)}">`).join("");
 }
 
 let compSearchTimer=null;

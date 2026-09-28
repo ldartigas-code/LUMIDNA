@@ -47,7 +47,7 @@ function renderScreen(name){
   if(name==="reposicao"){loadReposicoes();loadReposicoesResolvidas();}
   if(name==="obras"){q("#obrasSearch").value="";loadObras();}
   if(name==="copiar") prepararTelaCopia();
-  if(name==="componentes"){q("#compSearch").value="";q("#compList").innerHTML="<div class='small'>Digite algo acima pra buscar.</div>";onCompTipoChange();limparCompModelos();carregarModelosParaCompat();carregarOpcoesKit();loadKits();}
+  if(name==="componentes"){q("#compSearch").value="";q("#compList").innerHTML="<div class='small'>Digite algo acima pra buscar.</div>";onCompTipoChange();limparCompModelos();carregarModelosParaCompat();carregarOpcoesKit();loadKits();carregarFabricantesComponentes();}
   if(name==="home"){checkPendentesBadge();checkReposicaoBadge();}
   if(name==="importacao"){q("#importJson").value="";q("#importResultado").innerHTML="";}
 }

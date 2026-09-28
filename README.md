@@ -63,6 +63,27 @@ assets/supabase-config.js    → URL e chave pública do Supabase (compartilhada
   reservada de forma atômica no banco (sem risco de duas peças saírem com o
   mesmo ID em cadastros simultâneos). Trocar o prefixo de uma obra só afeta as
   peças novas; as já cadastradas mantêm o ID que têm.
+  Cada item do carrinho tem um campo **Ambiente** (sugere os já usados nessa
+  obra, pra não nascer "Sala Reunião" numa peça e "Sala de Reunião" noutra).
+  **Colar lista** aceita `código, quantidade, ambiente, fabricante` (fabricante
+  só é necessário se o código existir em mais de um fabricante), separado por
+  vírgula, ponto-e-vírgula ou tab — dá pra colar direto do Excel, e uma linha
+  de cabeçalho colada junto é detectada e ignorada. Código igual + mesmo
+  ambiente soma quantidade na mesma linha; ambiente diferente vira linha
+  separada. Código não encontrado no catálogo vira um botão que abre
+  "+ Modelo novo" já preenchido e, ao salvar, entra sozinho no pedido com a
+  quantidade e o ambiente certos.
+- **Aviso de obra parecida** — ao criar uma obra (na tela Obras ou no
+  assistente), se o nome bater com uma já existente (ignorando acento,
+  maiúscula, "de/da/do" e números soltos — ex: "Parque Cerejeiras" x "Parque
+  das Cerejeiras 2"), aparece um aviso pedindo confirmação de novo antes de
+  criar. Não bloqueia, só evita duplicidade por descuido.
+- **Progresso da obra** — na tela de cada obra, uma barra mostra "X de Y
+  peças já com local (ambiente) definido", calculada a partir do que já foi
+  preenchido em campo.
+- **Escanear QR na busca** — botão "📷 Escanear QR" em Buscar peça abre a
+  câmera (traseira no celular) e lê o QR da etiqueta pra abrir a peça direto,
+  sem digitar nada.
 - **Catálogo de modelos** — luminárias (Retrofit ou COB), com edição (botão
   Editar em cada modelo) e importação em massa por CSV.
 - **Catálogo de componentes** — Driver/LED/Óptica com compatibilidade
@@ -78,6 +99,11 @@ assets/supabase-config.js    → URL e chave pública do Supabase (compartilhada
   leitura**, com atalhos "Editar este modelo no Catálogo" e "Editar a obra".
   Quando um modelo é editado no Catálogo (ou reimportado por CSV), todas as
   peças ligadas a ele acompanham.
+- **Ficha de leitura x edição** — ao abrir uma peça, aparece primeiro um
+  resumo simples (situação, onde está, obra, cliente, garantia, última
+  manutenção, link público) pensado pra quem não é técnico. Só quem clica em
+  "✏️ Editar peça" chega ao formulário técnico completo; ao SALVAR, volta
+  sozinho pro resumo.
 - **Um único caminho para cadastrar peças** — Cadastrar peças novas: Obra ->
   Modelo -> Quantidade. Se o modelo não existe, o botão **"+ Modelo novo"** do
   próprio pedido (fabricante e código; dados técnicos opcionais) salva no
@@ -115,6 +141,19 @@ assets/supabase-config.js    → URL e chave pública do Supabase (compartilhada
 - **Peças pra comprar** — cada "Reportar problema" vira um pedido de
   reposição, com preço de referência, opção de trocar por outra peça
   compatível verificada, e botão pra gerar e-mail de compra.
+- **Peças instaladas (Driver/LED/Óptica)** — na tela da peça, cada tipo é uma
+  caixa de seleção com as peças compatíveis já homologadas no Catálogo de
+  componentes, mais **"Integrada"** (não existe separada nesta luminária,
+  vem marcada sozinha quando não há nenhuma opção homologada pro modelo) e
+  **"Outro modelo"** (texto livre, pra peça ainda não homologada). Botão
+  próprio "Salvar peças instaladas" — grava só nessa peça (tabela
+  `componentes`), nunca no catálogo central. Se o código digitado em "Outro
+  modelo" ainda não está no Catálogo de componentes, o sistema pergunta se
+  quer cadastrar já pelo menos o código lá (nível "Alternativa possível" —
+  dá pra completar fabricante/preço/nível depois). O botão **"📤 Aplicar a
+  todas as peças iguais desta obra"** replica o Driver/LED/Óptica dessa peça
+  pras outras peças do **mesmo modelo** nesta obra (não mexe em peças de
+  outro modelo nem no catálogo).
 - **Registrar manutenção** — enviado pela página pública, fica pendente até o
   Admin aprovar em "Aprovações pendentes"; só depois disso vira histórico
   oficial da peça. Registrada direto pelo Admin (na tela da peça), a troca de

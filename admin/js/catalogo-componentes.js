@@ -84,10 +84,48 @@ async function loadComponentesCatalogo(){
   const r=await query;
   if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
   const rows=r.data||[];
-  box.innerHTML = rows.length ? `<table><tr><th>Tipo</th><th>Fabricante</th><th>Código</th><th>Specs</th><th>Nível</th><th>Modelos compatíveis</th></tr>${rows.map(c=>{
+  box.innerHTML = rows.length ? `<table><tr><th>Foto</th><th>Tipo</th><th>Fabricante</th><th>Código</th><th>Specs</th><th>Nível</th><th>Preço</th><th>Modelos compatíveis</th><th></th></tr>${rows.map(c=>{
     const specs=[c.potencia_w?c.potencia_w+"W":"",c.corrente_ma?c.corrente_ma+"mA":"",c.cct_k?c.cct_k+"K":"",c.fluxo_lm?c.fluxo_lm+"lm":"",c.facho_graus?c.facho_graus+"°":""].filter(Boolean).join(" · ");
-    return `<tr><td>${esc(c.componente_origem)}</td><td>${esc(c.fabricante_equivalente)||"—"}</td><td>${esc(c.modelo_equivalente)}</td><td>${specs||"—"}</td><td>${esc(c.nivel)||"—"}</td><td>${esc(c.modelo_original)||"— qualquer modelo —"}</td></tr>`;
+    return `<tr><td>${c.imagem_url?`<img src="${esc(c.imagem_url)}" alt="" style="width:40px;height:40px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:`<span class="small" style="color:#bbb">—</span>`}</td><td>${esc(c.componente_origem)}</td><td>${esc(c.fabricante_equivalente)||"—"}</td><td>${esc(c.modelo_equivalente)}</td><td>${specs||"—"}</td><td>${esc(c.nivel)||"—"}</td><td>${fmtPreco(c.preco_referencia)||"—"}</td><td>${esc(c.modelo_original)||"— qualquer modelo —"}</td><td><button type="button" class="secondary" onclick="editarComponente(${c.id})">Editar</button></td></tr>`;
   }).join("")}</table>` : "<div class='small'>Nenhum componente encontrado.</div>";
+}
+
+let compEditId=null;
+
+async function editarComponente(id){
+  const r=await sb.from("equivalentes").select("*").eq("id",id).single();
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  const c=r.data;
+  compEditId=id;
+  q("#comp_tipo").value=c.componente_origem; onCompTipoChange();
+  q("#comp_fabricante").value=c.fabricante_equivalente||"";
+  q("#comp_codigo").value=c.modelo_equivalente||"";
+  q("#comp_potencia").value=c.potencia_w??"";
+  q("#comp_corrente").value=c.corrente_ma??"";
+  q("#comp_cct").value=c.cct_k??"";
+  q("#comp_fluxo").value=c.fluxo_lm??"";
+  q("#comp_facho").value=c.facho_graus??"";
+  q("#comp_nivel").value=c.nivel||"Compatível Verificado";
+  q("#comp_preco").value=c.preco_referencia??"";
+  q("#comp_disp").value=c.disponibilidade||"";
+  q("#comp_obs").value=c.especificacao||"";
+  q("#comp_foto_preview").innerHTML=c.imagem_url?`<img src="${esc(c.imagem_url)}" alt="" style="width:60px;height:60px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:"";
+  compModelosSelecionados=new Set(c.modelo_original?c.modelo_original.split(",").map(s=>s.trim()):[]);
+  renderCompModelosLista();atualizarResumoCompModelos();
+  q("#comp_titulo").textContent=`Editando: ${c.fabricante_equivalente||""} ${c.modelo_equivalente}`;
+  q("#comp_salvar_btn").textContent="Salvar alterações";
+  q("#comp_cancelar_btn").classList.remove("hidden");
+  q("#comp_titulo").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function cancelarEdicaoComponente(){
+  compEditId=null;
+  q("#comp_fabricante").value="";q("#comp_codigo").value="";q("#comp_potencia").value="";q("#comp_corrente").value="";q("#comp_cct").value="";q("#comp_fluxo").value="";q("#comp_facho").value="";q("#comp_obs").value="";q("#comp_preco").value="";q("#comp_disp").value="Sob consulta";
+  q("#comp_foto").value="";q("#comp_foto_preview").innerHTML="";
+  limparCompModelos();
+  q("#comp_titulo").textContent="Cadastrar componente";
+  q("#comp_salvar_btn").textContent="Salvar componente";
+  q("#comp_cancelar_btn").classList.add("hidden");
 }
 
 async function addComponenteCatalogo(){
@@ -110,11 +148,19 @@ async function addComponenteCatalogo(){
     especificacao:norm(q("#comp_obs").value.trim()),
     homologado_por:"LumiDNA"
   };
-  const r=await sb.from("equivalentes").insert(p);
+  const file=q("#comp_foto").files[0];
+  if(file){
+    if(!file.type.startsWith("image/")) return msg("O arquivo da foto precisa ser uma imagem.",false);
+    const path=`componentes/${tipo}_${codigo}_${Date.now()}_${file.name}`.replace(/\s+/g,"_");
+    const up=await sb.storage.from("fotos").upload(path,file,{upsert:true});
+    if(up.error) return msg("Erro ao enviar foto: "+up.error.message,false);
+    p.imagem_url=sb.storage.from("fotos").getPublicUrl(path).data.publicUrl;
+  }
+  const r=compEditId ? await sb.from("equivalentes").update(p).eq("id",compEditId) : await sb.from("equivalentes").insert(p);
   if(r.error) return msg("Erro: "+r.error.message,false);
-  q("#comp_fabricante").value="";q("#comp_codigo").value="";q("#comp_potencia").value="";q("#comp_corrente").value="";q("#comp_cct").value="";q("#comp_fluxo").value="";q("#comp_facho").value="";q("#comp_obs").value="";
-  limparCompModelos();
-  msg("Componente salvo no catálogo.");
+  const eraEdicao=!!compEditId;
+  cancelarEdicaoComponente();
+  msg(eraEdicao?"Componente atualizado.":"Componente salvo no catálogo.");
   loadComponentesCatalogo();
 }
 

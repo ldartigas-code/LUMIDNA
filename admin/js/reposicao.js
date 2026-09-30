@@ -1,10 +1,13 @@
 // ---- Peças pra comprar (pedidos de reposição, Fase 2 do "Reportar problema") ----
 async function checkReposicaoBadge(){
-  const r=await sb.from("solicitacoes_reposicao").select("id",{count:"exact",head:true}).eq("status","Aguardando compra");
-  const n=r.count||0;
+  const [r,rl]=await Promise.all([
+    sb.from("solicitacoes_reposicao").select("id",{count:"exact",head:true}).eq("status","Aguardando compra"),
+    sb.from("pedidos_pecas").select("id",{count:"exact",head:true}).eq("status","Novo")
+  ]);
+  const n=(r.count||0)+(rl.count||0);
   const resumo=q("#reposicaoResumo");
   if(!resumo) return;
-  resumo.innerHTML = n>0 ? `<b style="color:var(--red)">${n} peça(s) aguardando compra</b>` : "Pedidos de reposição reportados pela página pública, antes da manutenção";
+  resumo.innerHTML = n>0 ? `<b style="color:var(--red)">${n} pedido(s) de peça aguardando</b>` : "Pedidos de reposição e da Loja de peças, reportados pela página pública";
 }
 
 function fmtPreco(v){
@@ -125,6 +128,73 @@ async function marcarReposicaoComprada(id){
   if(r.error) return msg("Erro: "+r.error.message,false);
   msg("Marcado como comprado. Quando a peça for instalada, confirme em \"Registrar manutenção\".");
   loadReposicoes();loadReposicoesResolvidas();checkReposicaoBadge();
+}
+
+// ---- Pedidos fechados pelo carrinho da Loja de peças (página pública) ----
+function renderPedidoLojaCard(p){
+  const lum=p.luminarias||{};
+  const itens=p.pedidos_pecas_itens||[];
+  const total=itens.reduce((s,i)=>s+(Number(i.preco_unitario)||0)*(i.quantidade||1),0);
+  const atendido=p.status==="Atendido";
+  return `
+    <div class="card" id="pedLoja${p.id}">
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:12px">
+        <div>
+          <b>${esc(lum.lumidna_id)}</b> — ${esc(lum.modelo)||"—"} ${lum.empreendimento?"· "+esc(lum.empreendimento):""}${lum.cliente?" · "+esc(lum.cliente):""}
+          <div class="small">Pedido ${p.solicitante_nome?"de <b>"+esc(p.solicitante_nome)+"</b> ":""}em ${new Date(p.criado_em).toLocaleString('pt-BR')}${p.solicitante_contato?" — contato: "+esc(p.solicitante_contato):""}</div>
+        </div>
+        <span class="pill" style="${atendido?"background:#e9f7ee;color:#257944":"background:#fff4e0;color:#c98a12"}">${atendido?"Atendido":"Novo"}</span>
+      </div>
+      <div class="list" style="margin-top:10px">
+        ${itens.map(i=>`<div class="r"><span class="k">${i.quantidade}x ${esc(i.modelo_equivalente)}${i.fabricante_equivalente?" — "+esc(i.fabricante_equivalente):""}${i.componente_origem?" ("+esc(i.componente_origem)+")":""}</span><span class="val">${fmtPreco(i.preco_unitario)||"a orçar"}</span></div>`).join("")}
+        <div class="r"><span class="k"><b>Total de referência</b></span><span class="val"><b>${fmtPreco(total)||"a orçar"}</b></span></div>
+      </div>
+      ${atendido?"":`<div class="actions" style="margin-top:12px">
+        <button type="button" class="primary" onclick="marcarPedidoLojaAtendido(${p.id})">✓ Marcar como atendido</button>
+        <button type="button" class="secondary" onclick="gerarEmailPedidoLoja(${p.id})">✉ Gerar e-mail de orçamento</button>
+      </div>`}
+    </div>`;
+}
+
+async function loadPedidosLoja(){
+  const box=q("#pedidosLojaList");
+  if(!box) return;
+  const r=await sb.from("pedidos_pecas").select("*,luminarias(lumidna_id,modelo,cliente,empreendimento),pedidos_pecas_itens(*)").order("criado_em",{ascending:false}).limit(200);
+  if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
+  const rows=r.data||[];
+  box.innerHTML = rows.length ? rows.map(renderPedidoLojaCard).join("") : "<div class='small'>Nenhum pedido feito pela Loja de peças ainda.</div>";
+}
+
+async function marcarPedidoLojaAtendido(id){
+  const r=await sb.from("pedidos_pecas").update({status:"Atendido"}).eq("id",id);
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  msg("Pedido marcado como atendido.");
+  loadPedidosLoja();checkReposicaoBadge();
+}
+
+async function gerarEmailPedidoLoja(id){
+  const r=await sb.from("pedidos_pecas").select("*,luminarias(lumidna_id,cliente,empreendimento,edificio,ambiente,posicao),pedidos_pecas_itens(*)").eq("id",id).single();
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  const p=r.data;
+  const lum=p.luminarias||{};
+  const itens=p.pedidos_pecas_itens||[];
+  const total=itens.reduce((s,i)=>s+(Number(i.preco_unitario)||0)*(i.quantidade||1),0);
+  const local=[lum.empreendimento,lum.edificio,lum.ambiente,lum.posicao].filter(Boolean).join(" — ");
+  const assunto=`LumiDNA — orçamento de peças para a luminária ${lum.lumidna_id||""}`;
+  const corpo=`Olá${p.solicitante_nome?", "+p.solicitante_nome:""},
+
+Segue o orçamento das peças solicitadas pela Loja de peças para a luminária ${lum.lumidna_id||""}${local?" ("+local+")":""}:
+
+${itens.map(i=>`- ${i.quantidade}x ${i.modelo_equivalente}${i.fabricante_equivalente?" — "+i.fabricante_equivalente:""} — ${fmtPreco(i.preco_unitario)||"a confirmar"}`).join("\n")}
+
+Total de referência: ${fmtPreco(total)||"a confirmar"}
+
+Por favor, confirme para seguirmos com o pedido.
+
+Atenciosamente,
+LumiDNA`;
+  const destinatario = (p.solicitante_contato&&p.solicitante_contato.includes("@")) ? p.solicitante_contato : "";
+  window.location.href=`mailto:${encodeURIComponent(destinatario)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
 }
 
 async function gerarEmailReposicao(id){

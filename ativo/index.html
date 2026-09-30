@@ -262,11 +262,31 @@ let lojaQtd={};
 let carrinho=[]; // [{codigo,nome,fabricante,componente,preco,foto,qtd}]
 
 function iconeComponente(tipo){
-  return tipo==="Driver"?"🔌":tipo==="LED"?"💡":tipo==="Óptica"?"🔎":"⚙️";
+  return tipo==="Driver"?"🔌":tipo==="LED"?"💡":tipo==="Óptica"?"🔎":tipo==="Luminária completa"?"🛠️":"⚙️";
 }
 
-function renderLojaCards(equivs){
-  const itens=(equivs||[]).filter(e=>e.nivel==="Compatível Verificado");
+function lojaCardHtml(chave,e){
+  const preco=fmtPreco(e.preco_referencia);
+  const qtd=lojaQtd[chave];
+  return `<div class="shop-card">
+      <div class="shop-photo">${e.imagem_url?`<img src="${esc(e.imagem_url)}" alt="">`:iconeComponente(e.componente_origem)}</div>
+      <div class="shop-nome">${esc(e.modelo_equivalente)}</div>
+      <div class="shop-fab">${esc(e.fabricante_equivalente)||"—"}${e.componente_origem?" · "+esc(e.componente_origem):""}</div>
+      <div class="${preco?"shop-preco":"shop-preco consulta"}">${preco||"Sob consulta"}</div>
+      <div class="stepper">
+        <button type="button" onclick="lojaAlterarQtd('${esc(chave)}',-1)">−</button>
+        <span id="lojaQtd_${esc(chave)}">${qtd}</span>
+        <button type="button" onclick="lojaAlterarQtd('${esc(chave)}',1)">+</button>
+      </div>
+      <button type="button" class="addcart" onclick="adicionarAoCarrinho('${esc(chave)}')">Adicionar ao carrinho</button>
+    </div>`;
+}
+
+function renderLojaCards(lum,equivs){
+  // só entram peças "Compatível Verificado" com código de verdade — uma
+  // peça cadastrada sem código (sobra de cadastro incompleto) não é
+  // vendável, então nunca deveria virar item de vitrine.
+  const itens=(equivs||[]).filter(e=>e.nivel==="Compatível Verificado" && (e.modelo_equivalente||"").trim());
   lojaItensMap={};
   const vistos=new Set();
   const unicos=[];
@@ -277,23 +297,22 @@ function renderLojaCards(equivs){
     unicos.push(e);
     if(!(e.modelo_equivalente in lojaQtd)) lojaQtd[e.modelo_equivalente]=1;
   });
-  if(!unicos.length) return `<div class="card small">Nenhuma peça de reposição compatível verificada cadastrada pra essa luminária ainda.</div>`;
-  return `<div class="shop-grid">${unicos.map(e=>{
-    const preco=fmtPreco(e.preco_referencia);
-    const qtd=lojaQtd[e.modelo_equivalente];
-    return `<div class="shop-card">
-      <div class="shop-photo">${e.imagem_url?`<img src="${esc(e.imagem_url)}" alt="">`:iconeComponente(e.componente_origem)}</div>
-      <div class="shop-nome">${esc(e.modelo_equivalente)}</div>
-      <div class="shop-fab">${esc(e.fabricante_equivalente)||"—"}${e.componente_origem?" · "+esc(e.componente_origem):""}</div>
-      <div class="${preco?"shop-preco":"shop-preco consulta"}">${preco||"Sob consulta"}</div>
-      <div class="stepper">
-        <button type="button" onclick="lojaAlterarQtd('${esc(e.modelo_equivalente)}',-1)">−</button>
-        <span id="lojaQtd_${esc(e.modelo_equivalente)}">${qtd}</span>
-        <button type="button" onclick="lojaAlterarQtd('${esc(e.modelo_equivalente)}',1)">+</button>
-      </div>
-      <button type="button" class="addcart" onclick="adicionarAoCarrinho('${esc(e.modelo_equivalente)}')">Adicionar ao carrinho</button>
-    </div>`;
-  }).join("")}</div>`;
+
+  const cards=[];
+  // Luminária completa sempre primeiro (quando o modelo tem preço/foto
+  // cadastrados no Catálogo de modelos) — pra quem quer trocar a peça
+  // inteira em vez de só o Driver/LED/Óptica avulso.
+  if(lum && lum.modelo){
+    const chaveLum="__luminaria__";
+    const itemLum={modelo_equivalente:lum.modelo,fabricante_equivalente:lum.fabricante||null,componente_origem:"Luminária completa",preco_referencia:lum.preco_luminaria_referencia??null,imagem_url:lum.foto_principal_url||lum.foto_catalogo_url||null};
+    lojaItensMap[chaveLum]=itemLum;
+    if(!(chaveLum in lojaQtd)) lojaQtd[chaveLum]=1;
+    cards.push(lojaCardHtml(chaveLum,itemLum));
+  }
+  unicos.forEach(e=>cards.push(lojaCardHtml(e.modelo_equivalente,e)));
+
+  if(!cards.length) return `<div class="card small">Nenhuma peça de reposição compatível verificada cadastrada pra essa luminária ainda.</div>`;
+  return `<div class="shop-grid">${cards.join("")}</div>`;
 }
 
 function lojaAlterarQtd(codigo,delta){
@@ -510,7 +529,7 @@ async function loadAsset(){
     ${compList.length?`<div class="list">${compList.map(c=>`<div class="r"><span class="k">${esc(c.tipo)}</span><span class="val">${esc(c.modelo)||"—"}${c.modelo&&verificados.has(c.modelo)?`<span class="chip">Compatível verificado</span>`:""}</span></div>`).join("")}</div>`:`<div class="card small">Nenhuma peça registrada ainda.</div>`}
 
     <h2 class="sec">Loja de peças</h2>
-    <div id="lojaBox">${renderLojaCards(equivs)}</div>
+    <div id="lojaBox">${renderLojaCards(lum,equivs)}</div>
 
     <h2 class="sec">Histórico de manutenção</h2>
     ${maint.length?`<div class="list" style="padding:18px 16px 18px 20px"><ul class="tl">${maint.map(x=>`<li><b>${esc(x.tipo)||"Manutenção"}</b><span>${fmtData(x.data)}${x.status?" · "+esc(x.status):""}</span></li>`).join("")}</ul></div>`:`<div class="card small">Nenhuma manutenção registrada.</div>`}

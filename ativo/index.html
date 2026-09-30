@@ -56,6 +56,34 @@ details.acc .body{padding:0 16px 16px}
 .eqv{padding:10px 0;border-top:1px solid var(--line)}.eqv:first-child{border-top:0;padding-top:0}
 .foot{padding:28px 0 8px;color:var(--muted);font-size:12px;text-align:center}
 
+.shop-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.shop-card{background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.shop-photo{aspect-ratio:1/1;border-radius:12px;overflow:hidden;background:var(--s2);display:flex;align-items:center;justify-content:center;color:#5d6d84;font-size:26px}
+.shop-photo img{width:100%;height:100%;object-fit:contain;display:block;background:#fff}
+.shop-nome{font-weight:650;font-size:13.5px;line-height:1.25}
+.shop-fab{color:var(--muted);font-size:12px}
+.shop-preco{font-weight:700;color:var(--orange);font-size:15px}
+.shop-preco.consulta{color:var(--muted);font-weight:600;font-size:12px}
+.stepper{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.stepper button{background:var(--s2);border:0;color:var(--ink);width:32px;height:32px;font-size:16px;cursor:pointer}
+.stepper span{font-weight:650;min-width:20px;text-align:center}
+.addcart{background:var(--orange);border:0;color:#1a0d04;font-weight:700;border-radius:10px;padding:9px;font-size:13px;cursor:pointer}
+.addcart:active{transform:scale(.98)}
+.addcart[disabled]{background:var(--s2);color:var(--muted);cursor:default}
+
+.cart-fab{position:fixed;right:18px;bottom:126px;z-index:6;width:54px;height:54px;border-radius:50%;background:var(--orange);border:0;color:#1a0d04;font-size:22px;box-shadow:0 8px 20px rgba(255,122,47,.4);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.cart-fab .cnt{position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:20px;height:20px;border-radius:10px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.overlay{position:fixed;inset:0;background:rgba(5,8,12,.6);z-index:15;display:flex;align-items:flex-end}
+.sheet{background:var(--s1);border-radius:20px 20px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));width:100%;max-height:82vh;overflow-y:auto;border-top:1px solid var(--line)}
+.cart-item{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.cart-item:last-child{border-bottom:0}
+.cart-item .ph{width:48px;height:48px;border-radius:10px;background:var(--s2);flex:none;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#5d6d84;font-size:18px}
+.cart-item .ph img{width:100%;height:100%;object-fit:contain;background:#fff}
+.cart-item .nome{font-weight:650;font-size:13.5px}
+.cart-item .stepper{width:96px}
+.cart-item .rm{background:none;border:0;color:var(--red);font-size:12px;cursor:pointer;padding:4px 0}
+.cart-total{display:flex;justify-content:space-between;font-weight:700;font-size:16px;padding:14px 0}
+
 .bar{position:fixed;left:0;right:0;bottom:0;padding:12px 18px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(10,14,19,0),rgba(10,14,19,.94) 40%);z-index:5}
 .bar .in{max-width:520px;margin:0 auto;display:grid;grid-template-columns:1fr 1.25fr;gap:10px}
 .btn{display:inline-block;width:100%;padding:15px 12px;border-radius:14px;font:650 15px inherit;border:1px solid #2b3a50;background:var(--s2);color:var(--ink);cursor:pointer;transition:filter .12s,transform .05s}
@@ -175,6 +203,39 @@ details.acc .body{padding:0 16px 16px}
   <button type="button" class="btn p" onclick="showManutForm()">Registrar manutenção</button>
 </div></div>
 
+<button type="button" id="cartFab" class="cart-fab hidden" onclick="abrirCarrinho()">🛒<span id="cartFabCnt" class="cnt hidden">0</span></button>
+
+<div id="cartOverlay" class="overlay hidden" onclick="if(event.target===this) fecharCarrinho()">
+  <div class="sheet">
+    <div id="cartView">
+      <h2 style="margin:0 0 14px">Carrinho</h2>
+      <div id="cartItens"></div>
+      <div id="cartVazio" class="small hidden">Nenhuma peça no carrinho ainda. Adicione peças na Loja de peças acima.</div>
+      <div id="cartTotalBox" class="cart-total hidden"><span>Total de referência</span><span id="cartTotalVal"></span></div>
+      <div class="acoes" style="margin-top:6px">
+        <button type="button" class="btn" onclick="fecharCarrinho()">Continuar vendo</button>
+        <button type="button" id="cartCheckoutBtn" class="btn p hidden" onclick="abrirCheckout()">Fazer pedido</button>
+      </div>
+    </div>
+    <div id="checkoutView" class="hidden">
+      <h2 style="margin:0 0 14px">Fazer pedido</h2>
+      <div class="small" style="margin-bottom:14px">Confirma os dados abaixo pra receber o orçamento das peças do carrinho — os preços são de referência, a LumiDNA confirma valor e prazo antes de fechar.</div>
+      <div class="field"><label>Seu nome</label><input id="co_nome"></div>
+      <div class="field"><label>Contato (telefone/e-mail)</label><input id="co_contato"></div>
+      <div id="checkoutMsg"></div>
+      <div class="acoes">
+        <button type="button" class="btn" onclick="voltarParaCarrinho()">Voltar</button>
+        <button type="button" class="btn p" onclick="enviarPedidoLoja()">Confirmar pedido</button>
+      </div>
+    </div>
+    <div id="checkoutSucesso" class="hidden">
+      <h2 style="margin:0 0 14px">Pedido enviado</h2>
+      <div class="small">A LumiDNA vai confirmar o orçamento e entrar em contato pelo contato informado.</div>
+      <button type="button" class="btn" style="margin-top:14px" onclick="fecharCarrinho()">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <script src="../assets/supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -192,6 +253,177 @@ function notFoundCard(){
 
 let assetCode=null;
 let currentLum=null;
+
+// ---- Loja de peças (vitrine com foto + carrinho, inspirada no app da
+// Signify) — só entram peças "Compatível Verificado"; sem preço aparece
+// "sob consulta" mas ainda pode ir pro carrinho, a LumiDNA confirma depois.
+let lojaItensMap={};
+let lojaQtd={};
+let carrinho=[]; // [{codigo,nome,fabricante,componente,preco,foto,qtd}]
+
+function iconeComponente(tipo){
+  return tipo==="Driver"?"🔌":tipo==="LED"?"💡":tipo==="Óptica"?"🔎":"⚙️";
+}
+
+function renderLojaCards(equivs){
+  const itens=(equivs||[]).filter(e=>e.nivel==="Compatível Verificado");
+  lojaItensMap={};
+  const vistos=new Set();
+  const unicos=[];
+  itens.forEach(e=>{
+    if(vistos.has(e.modelo_equivalente)) return;
+    vistos.add(e.modelo_equivalente);
+    lojaItensMap[e.modelo_equivalente]=e;
+    unicos.push(e);
+    if(!(e.modelo_equivalente in lojaQtd)) lojaQtd[e.modelo_equivalente]=1;
+  });
+  if(!unicos.length) return `<div class="card small">Nenhuma peça de reposição compatível verificada cadastrada pra essa luminária ainda.</div>`;
+  return `<div class="shop-grid">${unicos.map(e=>{
+    const preco=fmtPreco(e.preco_referencia);
+    const qtd=lojaQtd[e.modelo_equivalente];
+    return `<div class="shop-card">
+      <div class="shop-photo">${e.imagem_url?`<img src="${esc(e.imagem_url)}" alt="">`:iconeComponente(e.componente_origem)}</div>
+      <div class="shop-nome">${esc(e.modelo_equivalente)}</div>
+      <div class="shop-fab">${esc(e.fabricante_equivalente)||"—"}${e.componente_origem?" · "+esc(e.componente_origem):""}</div>
+      <div class="${preco?"shop-preco":"shop-preco consulta"}">${preco||"Sob consulta"}</div>
+      <div class="stepper">
+        <button type="button" onclick="lojaAlterarQtd('${esc(e.modelo_equivalente)}',-1)">−</button>
+        <span id="lojaQtd_${esc(e.modelo_equivalente)}">${qtd}</span>
+        <button type="button" onclick="lojaAlterarQtd('${esc(e.modelo_equivalente)}',1)">+</button>
+      </div>
+      <button type="button" class="addcart" onclick="adicionarAoCarrinho('${esc(e.modelo_equivalente)}')">Adicionar ao carrinho</button>
+    </div>`;
+  }).join("")}</div>`;
+}
+
+function lojaAlterarQtd(codigo,delta){
+  lojaQtd[codigo]=Math.max(1,(lojaQtd[codigo]||1)+delta);
+  const span=document.getElementById("lojaQtd_"+codigo);
+  if(span) span.textContent=lojaQtd[codigo];
+}
+
+function cartKey(){ return "lumidna_cart_"+assetCode; }
+function salvarCarrinho(){ try{ localStorage.setItem(cartKey(),JSON.stringify(carrinho)); }catch(e){} }
+function carregarCarrinho(){
+  try{ const raw=localStorage.getItem(cartKey()); carrinho=raw?JSON.parse(raw):[]; }catch(e){ carrinho=[]; }
+}
+
+function adicionarAoCarrinho(codigo){
+  const e=lojaItensMap[codigo];
+  if(!e) return;
+  const qtd=lojaQtd[codigo]||1;
+  const existente=carrinho.find(i=>i.codigo===codigo);
+  if(existente) existente.qtd+=qtd;
+  else carrinho.push({codigo,nome:e.modelo_equivalente,fabricante:e.fabricante_equivalente||null,componente:e.componente_origem||null,preco:e.preco_referencia??null,foto:e.imagem_url||null,qtd});
+  salvarCarrinho();
+  atualizarCartFab();
+  msgTemp(`"${e.modelo_equivalente}" adicionado ao carrinho.`);
+}
+
+function msgTemp(texto){
+  const el=document.createElement("div");
+  el.textContent=texto;
+  el.style.cssText="position:fixed;left:50%;bottom:190px;transform:translateX(-50%);background:var(--s2);border:1px solid var(--line);color:var(--ink);padding:10px 16px;border-radius:999px;font-size:13px;z-index:30;box-shadow:0 6px 18px rgba(0,0,0,.35)";
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),1800);
+}
+
+function atualizarCartFab(){
+  const fab=document.getElementById("cartFab");
+  const cnt=document.getElementById("cartFabCnt");
+  if(!fab) return;
+  const total=carrinho.reduce((s,i)=>s+i.qtd,0);
+  fab.classList.remove("hidden");
+  cnt.textContent=total;
+  cnt.classList.toggle("hidden",total===0);
+}
+
+function totalCarrinho(){
+  return carrinho.reduce((s,i)=>s+(Number(i.preco)||0)*i.qtd,0);
+}
+function temPrecoDesconhecido(){
+  return carrinho.some(i=>vazio(i.preco));
+}
+
+function renderCarrinho(){
+  const box=document.getElementById("cartItens");
+  const vazioBox=document.getElementById("cartVazio");
+  const totalBox=document.getElementById("cartTotalBox");
+  const checkoutBtn=document.getElementById("cartCheckoutBtn");
+  if(!carrinho.length){
+    box.innerHTML="";
+    vazioBox.classList.remove("hidden");
+    totalBox.classList.add("hidden");
+    checkoutBtn.classList.add("hidden");
+    return;
+  }
+  vazioBox.classList.add("hidden");
+  totalBox.classList.remove("hidden");
+  checkoutBtn.classList.remove("hidden");
+  box.innerHTML=carrinho.map((i,idx)=>`
+    <div class="cart-item">
+      <div class="ph">${i.foto?`<img src="${esc(i.foto)}" alt="">`:iconeComponente(i.componente)}</div>
+      <div style="flex:1;min-width:0">
+        <div class="nome">${esc(i.nome)}</div>
+        <div class="small">${esc(i.fabricante)||"—"} · ${vazio(i.preco)?"sob consulta":fmtPreco(i.preco)}</div>
+        <button type="button" class="rm" onclick="removerDoCarrinho(${idx})">Remover</button>
+      </div>
+      <div class="stepper">
+        <button type="button" onclick="alterarQtdCarrinho(${idx},-1)">−</button>
+        <span>${i.qtd}</span>
+        <button type="button" onclick="alterarQtdCarrinho(${idx},1)">+</button>
+      </div>
+    </div>`).join("");
+  document.getElementById("cartTotalVal").textContent = temPrecoDesconhecido()
+    ? (totalCarrinho()>0 ? fmtPreco(totalCarrinho())+" + itens sob consulta" : "A confirmar")
+    : fmtPreco(totalCarrinho());
+}
+
+function alterarQtdCarrinho(idx,delta){
+  carrinho[idx].qtd=Math.max(1,carrinho[idx].qtd+delta);
+  salvarCarrinho();renderCarrinho();atualizarCartFab();
+}
+function removerDoCarrinho(idx){
+  carrinho.splice(idx,1);
+  salvarCarrinho();renderCarrinho();atualizarCartFab();
+}
+
+function abrirCarrinho(){
+  document.getElementById("cartView").classList.remove("hidden");
+  document.getElementById("checkoutView").classList.add("hidden");
+  document.getElementById("checkoutSucesso").classList.add("hidden");
+  renderCarrinho();
+  document.getElementById("cartOverlay").classList.remove("hidden");
+}
+function fecharCarrinho(){
+  document.getElementById("cartOverlay").classList.add("hidden");
+}
+function abrirCheckout(){
+  document.getElementById("cartView").classList.add("hidden");
+  document.getElementById("checkoutView").classList.remove("hidden");
+  document.getElementById("checkoutMsg").innerHTML="";
+}
+function voltarParaCarrinho(){
+  document.getElementById("checkoutView").classList.add("hidden");
+  document.getElementById("cartView").classList.remove("hidden");
+}
+
+async function enviarPedidoLoja(){
+  const msgBox=document.getElementById("checkoutMsg");
+  const nome=document.getElementById("co_nome").value.trim();
+  const contato=document.getElementById("co_contato").value.trim();
+  if(!nome||!contato){ msgBox.innerHTML=`<div class="small" style="color:var(--red)">Informe seu nome e um contato.</div>`; return; }
+  if(!carrinho.length){ msgBox.innerHTML=`<div class="small" style="color:var(--red)">Carrinho vazio.</div>`; return; }
+  msgBox.innerHTML=`<div class="small">Enviando pedido...</div>`;
+  const itens=carrinho.map(i=>({componente_origem:i.componente,modelo_equivalente:i.nome,fabricante_equivalente:i.fabricante,quantidade:i.qtd,preco_unitario:i.preco}));
+  const r=await sb.rpc("criar_pedido_pecas",{p_code:assetCode,p_itens:itens,p_solicitante_nome:nome,p_solicitante_contato:contato});
+  if(r.error){ msgBox.innerHTML=`<div class="small" style="color:var(--red)">Erro ao enviar: ${esc(r.error.message)}</div>`; return; }
+  carrinho=[];
+  salvarCarrinho();
+  atualizarCartFab();
+  document.getElementById("checkoutView").classList.add("hidden");
+  document.getElementById("checkoutSucesso").classList.remove("hidden");
+}
 
 // ---- montagem da página do ativo ----
 const vazio=v=>v===null||v===undefined||v==="";
@@ -222,6 +454,7 @@ async function loadAsset(){
   assetCode=code;
   currentLum=lum;
   document.getElementById("actionBar").classList.remove("hidden");
+  carregarCarrinho();
 
   const statusClassMap={"Ativa":"st-ok","Falha":"st-bad","Em manutenção":"st-warn","Desativada":"st-off"};
   const statusClass = statusClassMap[lum.status]||"st-off";
@@ -276,6 +509,9 @@ async function loadAsset(){
     <h2 class="sec">Peças instaladas</h2>
     ${compList.length?`<div class="list">${compList.map(c=>`<div class="r"><span class="k">${esc(c.tipo)}</span><span class="val">${esc(c.modelo)||"—"}${c.modelo&&verificados.has(c.modelo)?`<span class="chip">Compatível verificado</span>`:""}</span></div>`).join("")}</div>`:`<div class="card small">Nenhuma peça registrada ainda.</div>`}
 
+    <h2 class="sec">Loja de peças</h2>
+    <div id="lojaBox">${renderLojaCards(equivs)}</div>
+
     <h2 class="sec">Histórico de manutenção</h2>
     ${maint.length?`<div class="list" style="padding:18px 16px 18px 20px"><ul class="tl">${maint.map(x=>`<li><b>${esc(x.tipo)||"Manutenção"}</b><span>${fmtData(x.data)}${x.status?" · "+esc(x.status):""}</span></li>`).join("")}</ul></div>`:`<div class="card small">Nenhuma manutenção registrada.</div>`}
 
@@ -293,6 +529,7 @@ async function loadAsset(){
       </div>
     </details>
   `;
+  atualizarCartFab();
 }
 loadAsset();
 

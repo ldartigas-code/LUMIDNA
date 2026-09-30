@@ -386,8 +386,8 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
     </div>
     <label class="small" style="display:flex;align-items:flex-start;gap:8px;margin:4px 0 12px"><input type="checkbox" id="copia_pecas" style="margin-top:2px"> Copiar também as peças instaladas hoje (Driver/LED/Óptica). Sem marcar, as novas nascem "Original".</label>
     <div class="small" style="margin-bottom:14px">
-      <b>Vem copiado:</b> modelo, fabricante, dados técnicos (potência, CCT, IRC, fluxo, facho, IP, IK) e criticidade. Cliente, e-mail, tensão e automação vêm da obra de destino.<br>
-      <b>Fica em branco:</b> número de série, lote, datas, fotos, local (edifício, andar, ambiente, posição, quadro, circuito), observações, garantias, manutenções e histórico.
+      <b>Vem copiado:</b> modelo, fabricante, dados técnicos (potência, CCT, IRC, fluxo, facho, IP, IK) e criticidade. Cliente, e-mail, tensão e automação vêm da obra de destino. Data de instalação já entra com a data de hoje.<br>
+      <b>Fica em branco:</b> número de série, lote, fotos, local (edifício, andar, ambiente, posição, quadro, circuito), observações, garantias, manutenções e histórico.
     </div>
     <div class="actions"><button type="button" class="primary" onclick="criarCopias()">Criar cópias</button></div>
   </div>
@@ -445,7 +445,7 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <input type="hidden" name="modelo_id">
 <section class="card">
 <h2 style="margin:0 0 12px;font-size:16px">Identificação</h2>
-<div class="actions" style="margin-bottom:12px"><button type="button" class="secondary" onclick="abrirCopia(LID)">📋 Criar cópia (peça nova) em outra obra</button></div>
+<div class="actions" style="margin-bottom:12px"><button type="button" class="secondary" onclick="abrirCopia(LID)">📋 Repetir esta peça (nova igual)</button></div>
 <div class="grid">
 <div class="field"><label>ID LumiDNA</label><input name="lumidna_id" readonly></div>
 <div class="field"><label>Status</label><select name="status"><option>Ativa</option><option>Em manutenção</option><option>Falha</option><option>Desativada</option></select></div>

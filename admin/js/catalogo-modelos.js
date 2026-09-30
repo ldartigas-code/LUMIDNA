@@ -117,11 +117,12 @@ async function propagarModelosParaPecas(modelos){
 }
 
 // ---- formulário do modelo (novo ou edição) ----
-const MO_CAMPOS={mo_fabricante:"fabricante",mo_linha:"linha",mo_codigo:"codigo",mo_descricao:"descricao",mo_potencia:"potencia_w",mo_cct:"cct_k",mo_irc:"irc",mo_fluxo:"fluxo_lm",mo_facho:"facho_graus",mo_ip:"ip",mo_ik:"ik",mo_tensao:"tensao",mo_vida:"vida_util_h",mo_obs:"observacoes",mo_tipo_montagem:"tipo_montagem"};
+const MO_CAMPOS={mo_fabricante:"fabricante",mo_linha:"linha",mo_codigo:"codigo",mo_descricao:"descricao",mo_potencia:"potencia_w",mo_cct:"cct_k",mo_irc:"irc",mo_fluxo:"fluxo_lm",mo_facho:"facho_graus",mo_ip:"ip",mo_ik:"ik",mo_tensao:"tensao",mo_vida:"vida_util_h",mo_obs:"observacoes",mo_tipo_montagem:"tipo_montagem",mo_preco:"preco_referencia"};
 
 function novoModeloForm(){
   Object.keys(MO_CAMPOS).forEach(id=>{q("#"+id).value=""});
   q("#mo_fabricante").readOnly=false; q("#mo_codigo").readOnly=false;
+  q("#mo_foto").value="";q("#mo_foto_preview").innerHTML="";
   q("#mo_titulo").textContent="Modelo novo";
 }
 
@@ -129,6 +130,8 @@ async function editarModelo(id){
   const r=await sb.from("modelos").select("*").eq("id",id).single();
   if(r.error) return msg("Erro: "+r.error.message,false);
   Object.entries(MO_CAMPOS).forEach(([campo,col])=>{q("#"+campo).value=r.data[col]??""});
+  q("#mo_foto").value="";
+  q("#mo_foto_preview").innerHTML=r.data.imagem_url?`<img src="${esc(r.data.imagem_url)}" alt="" style="width:60px;height:60px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:"";
   // fabricante e código identificam o modelo: pra não criar um segundo por engano, não se mexe neles na edição
   q("#mo_fabricante").readOnly=true; q("#mo_codigo").readOnly=true;
   q("#mo_titulo").textContent=`Editando: ${r.data.fabricante||""} ${r.data.codigo}`;
@@ -154,8 +157,17 @@ async function addModelo(){
     facho_graus:q("#mo_facho").value?Number(q("#mo_facho").value):null,
     ip:norm(q("#mo_ip").value.trim()), ik:norm(q("#mo_ik").value.trim()),
     tensao:norm(q("#mo_tensao").value.trim()), vida_util_h:norm(q("#mo_vida").value.trim()),
-    observacoes:norm(q("#mo_obs").value.trim()), tipo_montagem:norm(q("#mo_tipo_montagem").value)
+    observacoes:norm(q("#mo_obs").value.trim()), tipo_montagem:norm(q("#mo_tipo_montagem").value),
+    preco_referencia:q("#mo_preco").value?Number(q("#mo_preco").value):null
   };
+  const file=q("#mo_foto").files[0];
+  if(file){
+    if(!file.type.startsWith("image/")) return msg("O arquivo da foto precisa ser uma imagem.",false);
+    const path=`modelos/${codigo}_${Date.now()}_${file.name}`.replace(/\s+/g,"_");
+    const up=await sb.storage.from("fotos").upload(path,file,{upsert:true});
+    if(up.error) return msg("Erro ao enviar foto: "+up.error.message,false);
+    p.imagem_url=sb.storage.from("fotos").getPublicUrl(path).data.publicUrl;
+  }
   const r=await sb.from("modelos").upsert(p,{onConflict:"fabricante,codigo"}).select();
   if(r.error) return msg("Erro: "+r.error.message,false);
   let pecas=0;

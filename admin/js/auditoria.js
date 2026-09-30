@@ -292,6 +292,21 @@ async function loadReplacement(){
     : "<div class='small'>Nenhuma peça compatível cadastrada pra esta luminária ainda.</div>";
 }
 
+// Atalho da tela da peça pro Catálogo de componentes: já deixa o modelo desta
+// peça marcado em "Modelos compatíveis", pra cadastrar uma opção nova (ou
+// editar uma existente, pelo botão "Editar" da lista) sem ter que buscar o
+// modelo de novo.
+function abrirCatalogoComponentesDaPeca(){
+  const modelo=((originalData&&originalData.modelo)||"").trim();
+  goScreen('componentes');
+  if(!modelo) return;
+  compModelosSelecionados.add(modelo);
+  q("#comp_modelos_busca").value=modelo;
+  atualizarResumoCompModelos();
+  q("#comp_titulo").scrollIntoView({behavior:"smooth",block:"start"});
+  msg(`Modelo "${modelo}" já marcado em "Modelos compatíveis" — preencha os dados da peça abaixo e salve, ou use "Editar" na lista acima pra ajustar uma peça já cadastrada.`);
+}
+
 // ---- Equivalência por evidência de campo ----
 async function registerFieldEvidence(modeloOriginal,modeloEquivalente){
   const existing=await sb.from("equivalentes").select("*").eq("modelo_original",modeloOriginal).eq("modelo_equivalente",modeloEquivalente).maybeSingle();

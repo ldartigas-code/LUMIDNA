@@ -3,13 +3,19 @@
 // Formato esperado:
 // {
 //   "obra": {"nome":"...", "cliente":"...", "cliente_email":"...", "prefixo":"..."},
+//   "garantia_padrao": {"tipo":"...","responsavel":"...","fornecedor":"...","inicio":"AAAA-MM-DD","fim":"AAAA-MM-DD","status":"Ativa"},
 //   "itens": [
 //     {"fabricante":"...", "codigo":"...", "descricao":"...", "quantidade":1,
-//      "ambiente":"...", "observacoes":"...",
+//      "ambiente":"...", "observacoes":"...", "data_instalacao":"AAAA-MM-DD" (opcional, padrão hoje),
 //      "led":"Integrada" | {"fabricante":"...","codigo":"..."},
-//      "driver": ..., "optica": ...}
+//      "driver": ..., "optica": ...,
+//      "garantia": {...} (opcional, sobrepõe garantia_padrao só pra este item/lote)}
 //   ]
 // }
+// Data de instalação já entra com o dia da importação, a menos que o item
+// informe uma data própria. Garantia é perguntada uma vez (padrão da obra ou
+// por lote/fabricante), não peça por peça — mas cria um registro de garantia
+// por peça criada, porque a tabela de garantias é por peça.
 // Faz tudo direto pelo navegador (obra, modelos, peças, componentes) usando a
 // sessão já autenticada do Admin — não precisa do Supabase Studio.
 
@@ -94,6 +100,7 @@ async function processarImportacaoCompleta(){
         modelo_id:m.id, modelo:m.codigo, fabricante:m.fabricante,
         potencia_w:m.potencia_w, cct_k:m.cct_k, irc:m.irc, fluxo_lm:m.fluxo_lm, facho_graus:m.facho_graus, ip:m.ip, ik:m.ik,
         ambiente:norm(((item.ambiente)||"").toString().trim()), observacoes:norm(((item.observacoes)||"").toString().trim()),
+        data_instalacao:norm(((item.data_instalacao)||"").toString().trim())||hojeLocal(),
         status:"Ativa", criticidade:"Média", obra_id:obra.id, ...obraSpread
       });
     }
@@ -133,12 +140,34 @@ async function processarImportacaoCompleta(){
     }
   }
 
+  // 6) Garantia — perguntada uma vez (padrão da obra, ou por item/lote se
+  // informado), mas grava um registro por peça, já que a tabela é por peça.
+  const garRows=[];
+  faixas.forEach(({startIdx,qty,item})=>{
+    const g=item.garantia||dados.garantia_padrao;
+    if(!g||!g.tipo) return;
+    const ids=criadas.slice(startIdx,startIdx+qty);
+    ids.forEach(l=>garRows.push({
+      luminaria_id:l.id, tipo:g.tipo, responsavel:norm((g.responsavel||"").toString().trim()),
+      fornecedor:norm((g.fornecedor||"").toString().trim()), inicio:norm((g.inicio||"").toString().trim())||hojeLocal(),
+      fim:norm((g.fim||"").toString().trim()), status:g.status||"Ativa"
+    }));
+  });
+  let avisoGar="";
+  if(garRows.length){
+    for(let i=0;i<garRows.length;i+=500){
+      const rg=await sb.from("garantias").insert(garRows.slice(i,i+500));
+      if(rg.error){ avisoGar=" Mas houve erro ao gravar garantias: "+rg.error.message; break; }
+    }
+  }
+
   const ids=criadas.map(x=>x.lumidna_id);
   wizUltimaCriacao=criadas;
-  resBox.innerHTML=`<div class="alert">✓ ${criadas.length} peça(s) criada(s) na obra <b>${esc(obra.nome)}</b>, de <b>${ids[0]}</b> até <b>${ids[ids.length-1]}</b>.${avisoComp?"<br><b>"+esc(avisoComp)+"</b>":""}</div>
+  const avisos=[avisoComp,avisoGar].filter(Boolean).join("");
+  resBox.innerHTML=`<div class="alert">✓ ${criadas.length} peça(s) criada(s) na obra <b>${esc(obra.nome)}</b>, de <b>${ids[0]}</b> até <b>${ids[ids.length-1]}</b>.${avisos?"<br><b>"+esc(avisos)+"</b>":""}</div>
     <div class="actions" style="margin-top:10px">
       <button type="button" class="primary" onclick="wizImprimirQR()">🖨 Imprimir QR de todas</button>
       <button type="button" class="secondary" onclick="abrirObra(${obra.id})">Ver a obra</button>
     </div>`;
-  msg(`Importação concluída: ${criadas.length} peça(s) criada(s).`,!avisoComp);
+  msg(`Importação concluída: ${criadas.length} peça(s) criada(s).`,!avisos);
 }

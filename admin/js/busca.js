@@ -262,8 +262,9 @@ async function prepararTelaCopia(){
   }
   q("#copiaOrigemResumo").innerHTML=`Copiar a partir de: <b>${esc(copiaOrigem.lumidna_id)}</b> — ${esc(copiaOrigem.modelo)||"sem modelo"}${copiaOrigem.fabricante?" ("+esc(copiaOrigem.fabricante)+")":""}`;
   q("#copia_qtd").value=1;
-  q("#copia_pecas").checked=false;
+  q("#copia_pecas").checked=true;
   await preencherSelectObras("copia_obra",false);
+  if(copiaOrigem.obra_id) q("#copia_obra").value=String(copiaOrigem.obra_id);
 }
 
 async function criarCopias(){
@@ -290,7 +291,7 @@ async function criarCopias(){
   COPIA_CAMPOS.forEach(k=>{ if(copiaOrigem[k]!=null) base[k]=copiaOrigem[k]; });
   const rows=[];
   for(let i=0;i<qtd;i++){
-    rows.push({...base, criticidade:base.criticidade||"Média", lumidna_id:buildObraId(obra.prefixo,rq.data+i), status:"Ativa", obra_id:obra.id, ...wizObraDe(obra)});
+    rows.push({...base, criticidade:base.criticidade||"Média", data_instalacao:hojeLocal(), lumidna_id:buildObraId(obra.prefixo,rq.data+i), status:"Ativa", obra_id:obra.id, ...wizObraDe(obra)});
   }
   const ins=await inserirLuminariasEmBlocos(rows);
   if(ins.erro) return msg("Erro ao criar as cópias: "+ins.erro,false);
@@ -370,6 +371,7 @@ async function renderResumoPeca(data){
       <div class="field"><label>Última manutenção</label><div style="font-weight:600">${man?`${new Date(man.data+"T00:00:00").toLocaleDateString("pt-BR")} — ${esc(man.tipo)}`:"Nenhuma registrada"}</div></div>
     </div>
     <div class="actions" style="margin-top:16px">
+      <button type="button" class="secondary" onclick="abrirCopia('${esc(data.lumidna_id)}')">📋 Repetir esta peça (nova igual)</button>
       <button type="button" class="secondary"${publicUrl?` onclick="window.open('${publicUrl}','_blank')"`:" disabled"}>🔗 Ver página pública</button>
     </div>`;
 }

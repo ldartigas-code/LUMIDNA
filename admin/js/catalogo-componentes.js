@@ -225,18 +225,35 @@ function parseCSV(text){
 // Driver/LED/Óptica do kit são escolhidos de uma lista (peças já cadastradas
 // no Catálogo de componentes), não digitados — evita cadastrar sem querer um
 // código novo/errado por causa de um erro de digitação.
+const KIT_SEL_ID={Driver:"kit_driver",LED:"kit_led",Óptica:"kit_optica"};
+let kitOpcoesCache={};
+
+function renderKitSelect(tipo,opcoes){
+  const sel=q("#"+KIT_SEL_ID[tipo]);
+  if(!sel) return;
+  const valorAtual=sel.value;
+  sel.innerHTML=`<option value="">— nenhuma —</option><option value="Integrada">Integrada</option>`
+    +opcoes.map(x=>`<option value="${esc(x.modelo_equivalente)}">${x.fabricante_equivalente?esc(x.fabricante_equivalente)+" — ":""}${esc(x.modelo_equivalente)}</option>`).join("")
+    +(opcoes.length?"":`<option value="" disabled>— nada encontrado —</option>`);
+  if(valorAtual && opcoes.some(x=>x.modelo_equivalente===valorAtual)) sel.value=valorAtual;
+}
+
+// Busca que filtra a lista (já carregada) por fabricante ou código, pra achar
+// rápido mesmo com o Catálogo de componentes grande — sem precisar rolar uma
+// lista enorme toda vez.
+function filtrarKitOpcao(tipo,termo){
+  const t=(termo||"").toLowerCase().trim();
+  const todas=kitOpcoesCache[tipo]||[];
+  const filtradas=t?todas.filter(x=>(x.modelo_equivalente||"").toLowerCase().includes(t)||(x.fabricante_equivalente||"").toLowerCase().includes(t)):todas;
+  renderKitSelect(tipo,filtradas);
+}
+
 async function carregarOpcoesKit(){
-  const tipos=[["Driver","kit_driver"],["LED","kit_led"],["Óptica","kit_optica"]];
-  for(const [tipo,selId] of tipos){
-    const sel=q("#"+selId);
-    if(!sel) continue;
-    const valorAtual=sel.value;
+  for(const tipo of Object.keys(KIT_SEL_ID)){
     const r=await sb.from("equivalentes").select("modelo_equivalente,fabricante_equivalente").eq("componente_origem",tipo).order("fabricante_equivalente").order("modelo_equivalente");
     const vistos=new Set();
-    const opcoes=(r.data||[]).filter(x=>x.modelo_equivalente&&!vistos.has(x.modelo_equivalente)&&vistos.add(x.modelo_equivalente));
-    sel.innerHTML=`<option value="">— nenhuma —</option><option value="Integrada">Integrada</option>`
-      +opcoes.map(x=>`<option value="${esc(x.modelo_equivalente)}">${x.fabricante_equivalente?esc(x.fabricante_equivalente)+" — ":""}${esc(x.modelo_equivalente)}</option>`).join("");
-    if(valorAtual) sel.value=valorAtual;
+    kitOpcoesCache[tipo]=(r.data||[]).filter(x=>x.modelo_equivalente&&!vistos.has(x.modelo_equivalente)&&vistos.add(x.modelo_equivalente));
+    renderKitSelect(tipo,kitOpcoesCache[tipo]);
   }
 }
 
@@ -257,6 +274,8 @@ async function addKit(){
   if(r.error) return msg("Erro: "+r.error.message,false);
   q("#kit_nome").value="";q("#kit_driver").value="";q("#kit_led").value="";q("#kit_optica").value="";q("#kit_modelo_luminaria").value="";
   q("#kit_driver_qtd").value="1";q("#kit_led_qtd").value="1";q("#kit_optica_qtd").value="1";
+  q("#kit_driver_busca").value="";q("#kit_led_busca").value="";q("#kit_optica_busca").value="";
+  Object.keys(KIT_SEL_ID).forEach(tipo=>renderKitSelect(tipo,kitOpcoesCache[tipo]||[]));
   msg("Kit salvo.");
   loadKits();
 }

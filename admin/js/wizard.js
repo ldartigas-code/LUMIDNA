@@ -155,9 +155,9 @@ function wizEscolherKit(){
   const k=wizKitsCache.find(x=>String(x.id)===id);
   if(!k){ wizKitAtual=null; wizAtualizarPadraoResumo(); return; }
   wizKitAtual={};
-  if(k.driver_modelo) wizKitAtual.Driver={modelo_equivalente:k.driver_modelo,especificacao:k.driver_modelo};
-  if(k.led_modelo) wizKitAtual.LED={modelo_equivalente:k.led_modelo,especificacao:k.led_modelo};
-  if(k.optica_modelo) wizKitAtual.Óptica={modelo_equivalente:k.optica_modelo,especificacao:k.optica_modelo};
+  if(k.driver_modelo) wizKitAtual.Driver={modelo_equivalente:k.driver_modelo,especificacao:k.driver_modelo,quantidade:k.driver_qtd||1};
+  if(k.led_modelo) wizKitAtual.LED={modelo_equivalente:k.led_modelo,especificacao:k.led_modelo,quantidade:k.led_qtd||1};
+  if(k.optica_modelo) wizKitAtual.Óptica={modelo_equivalente:k.optica_modelo,especificacao:k.optica_modelo,quantidade:k.optica_qtd||1};
   wizAtualizarPadraoResumo();
 }
 
@@ -627,7 +627,7 @@ async function wizCriar(){
     offset+=item.qty;
     Object.entries(item.compSelecionado||{}).forEach(([tipo,val])=>{
       if(!val||!val.modelo_equivalente) return;
-      idsDoItem.forEach(l=>componenteRows.push({luminaria_id:l.id,tipo,modelo:val.modelo_equivalente,original:true,ativo_atual:true}));
+      idsDoItem.forEach(l=>componenteRows.push({luminaria_id:l.id,tipo,modelo:val.modelo_equivalente,quantidade:val.quantidade||1,original:true,ativo_atual:true}));
     });
   }
   if(componenteRows.length){

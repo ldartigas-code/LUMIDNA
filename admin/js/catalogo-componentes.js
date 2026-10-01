@@ -222,14 +222,21 @@ function parseCSV(text){
 }
 
 // ---- Kits (Driver + LED + Óptica que costumam vir juntos numa remessa) ----
+// Driver/LED/Óptica do kit são escolhidos de uma lista (peças já cadastradas
+// no Catálogo de componentes), não digitados — evita cadastrar sem querer um
+// código novo/errado por causa de um erro de digitação.
 async function carregarOpcoesKit(){
-  const tipos=[["Driver","kit_driver_opcoes"],["LED","kit_led_opcoes"],["Óptica","kit_optica_opcoes"]];
-  for(const [tipo,dlId] of tipos){
-    const dl=q("#"+dlId);
-    if(!dl) continue;
-    const r=await sb.from("equivalentes").select("modelo_equivalente").eq("componente_origem",tipo);
-    const distintos=[...new Set((r.data||[]).map(x=>x.modelo_equivalente).filter(Boolean))];
-    dl.innerHTML=`<option value="Integrada">`+distintos.map(x=>`<option value="${esc(x)}">`).join("");
+  const tipos=[["Driver","kit_driver"],["LED","kit_led"],["Óptica","kit_optica"]];
+  for(const [tipo,selId] of tipos){
+    const sel=q("#"+selId);
+    if(!sel) continue;
+    const valorAtual=sel.value;
+    const r=await sb.from("equivalentes").select("modelo_equivalente,fabricante_equivalente").eq("componente_origem",tipo).order("fabricante_equivalente").order("modelo_equivalente");
+    const vistos=new Set();
+    const opcoes=(r.data||[]).filter(x=>x.modelo_equivalente&&!vistos.has(x.modelo_equivalente)&&vistos.add(x.modelo_equivalente));
+    sel.innerHTML=`<option value="">— nenhuma —</option><option value="Integrada">Integrada</option>`
+      +opcoes.map(x=>`<option value="${esc(x.modelo_equivalente)}">${x.fabricante_equivalente?esc(x.fabricante_equivalente)+" — ":""}${esc(x.modelo_equivalente)}</option>`).join("");
+    if(valorAtual) sel.value=valorAtual;
   }
 }
 
@@ -238,14 +245,18 @@ async function addKit(){
   if(!nome) return msg("Informe o nome do kit.",false);
   const p={
     nome,
-    driver_modelo:norm(q("#kit_driver").value.trim()),
-    led_modelo:norm(q("#kit_led").value.trim()),
-    optica_modelo:norm(q("#kit_optica").value.trim()),
+    driver_modelo:norm(q("#kit_driver").value),
+    led_modelo:norm(q("#kit_led").value),
+    optica_modelo:norm(q("#kit_optica").value),
+    driver_qtd:Math.max(1,Number(q("#kit_driver_qtd").value)||1),
+    led_qtd:Math.max(1,Number(q("#kit_led_qtd").value)||1),
+    optica_qtd:Math.max(1,Number(q("#kit_optica_qtd").value)||1),
     modelo_luminaria:norm(q("#kit_modelo_luminaria").value.trim())
   };
   const r=await sb.from("kits_componentes").insert(p);
   if(r.error) return msg("Erro: "+r.error.message,false);
   q("#kit_nome").value="";q("#kit_driver").value="";q("#kit_led").value="";q("#kit_optica").value="";q("#kit_modelo_luminaria").value="";
+  q("#kit_driver_qtd").value="1";q("#kit_led_qtd").value="1";q("#kit_optica_qtd").value="1";
   msg("Kit salvo.");
   loadKits();
 }
@@ -256,7 +267,8 @@ async function loadKits(){
   const r=await sb.from("kits_componentes").select("*").order("nome");
   if(r.error){box.innerHTML="<div class='small'>Erro: "+esc(r.error.message)+"</div>";return}
   const rows=r.data||[];
-  box.innerHTML=rows.length?`<table><tr><th>Nome</th><th>Driver</th><th>LED</th><th>Óptica</th><th>Modelo</th><th></th></tr>${rows.map(k=>`<tr><td>${esc(k.nome)}</td><td>${esc(k.driver_modelo)||"—"}</td><td>${esc(k.led_modelo)||"—"}</td><td>${esc(k.optica_modelo)||"—"}</td><td>${esc(k.modelo_luminaria)||"—"}</td><td><button type="button" class="secondary" onclick="excluirKit(${k.id})">Excluir</button></td></tr>`).join("")}</table>`:"<div class='small'>Nenhum kit cadastrado ainda.</div>";
+  const peca=(modelo,qtd)=>modelo?`${qtd>1?qtd+"x ":""}${esc(modelo)}`:"—";
+  box.innerHTML=rows.length?`<table><tr><th>Nome</th><th>Driver</th><th>LED</th><th>Óptica</th><th>Modelo</th><th></th></tr>${rows.map(k=>`<tr><td>${esc(k.nome)}</td><td>${peca(k.driver_modelo,k.driver_qtd||1)}</td><td>${peca(k.led_modelo,k.led_qtd||1)}</td><td>${peca(k.optica_modelo,k.optica_qtd||1)}</td><td>${esc(k.modelo_luminaria)||"—"}</td><td><button type="button" class="secondary" onclick="excluirKit(${k.id})">Excluir</button></td></tr>`).join("")}</table>`:"<div class='small'>Nenhum kit cadastrado ainda.</div>";
 }
 
 async function excluirKit(id){

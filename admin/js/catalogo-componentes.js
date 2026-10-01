@@ -54,21 +54,41 @@ function onCompTipoChange(){
   carregarCodigosComponentes();
 }
 
-// Sugestões (autocompletar) de fabricante e código já usados no catálogo de
-// componentes, pra não precisar lembrar/digitar tudo do zero toda vez.
+// Fabricante vira uma lista dos que já existem no catálogo (com setinha,
+// mais fácil de achar), com uma opção "+ Outro" pra cadastrar um fabricante
+// novo digitando. Código/Modelo sugere (autocompletar) só os códigos já
+// usados NESTE tipo e DESTE fabricante, pra não aparecer código de outro
+// fabricante misturado na lista.
 async function carregarFabricantesComponentes(){
-  const dl=q("#comp_fabricantes_dl");
-  if(!dl) return;
+  const sel=q("#comp_fabricante_sel");
+  if(!sel) return;
+  const valorAtual=sel.value;
   const r=await sb.from("equivalentes").select("fabricante_equivalente").not("fabricante_equivalente","is",null);
   const distintos=[...new Set((r.data||[]).map(x=>x.fabricante_equivalente).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
-  dl.innerHTML=distintos.map(f=>`<option value="${esc(f)}">`).join("");
+  sel.innerHTML=`<option value="">— selecione —</option>`+distintos.map(f=>`<option value="${esc(f)}">${esc(f)}</option>`).join("")+`<option value="__outro__">+ Outro (digitar novo)</option>`;
+  if(valorAtual) sel.value=valorAtual;
+}
+
+function fabricanteComponenteAtual(){
+  const sel=q("#comp_fabricante_sel");
+  return sel.value==="__outro__" ? q("#comp_fabricante").value.trim() : sel.value;
+}
+
+function onCompFabricanteSelChange(){
+  const outro=q("#comp_fabricante_sel").value==="__outro__";
+  q("#comp_fabricante").classList.toggle("hidden",!outro);
+  if(outro){ q("#comp_fabricante").value=""; q("#comp_fabricante").focus(); }
+  carregarCodigosComponentes();
 }
 
 async function carregarCodigosComponentes(){
   const dl=q("#comp_codigos_dl");
   if(!dl) return;
   const tipo=q("#comp_tipo").value;
-  const r=await sb.from("equivalentes").select("modelo_equivalente").eq("componente_origem",tipo);
+  const fabricante=fabricanteComponenteAtual();
+  let query=sb.from("equivalentes").select("modelo_equivalente").eq("componente_origem",tipo);
+  if(fabricante) query=query.eq("fabricante_equivalente",fabricante);
+  const r=await query;
   const distintos=[...new Set((r.data||[]).map(x=>x.modelo_equivalente).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
   dl.innerHTML=distintos.map(c=>`<option value="${esc(c)}">`).join("");
 }
@@ -98,7 +118,16 @@ async function editarComponente(id){
   const c=r.data;
   compEditId=id;
   q("#comp_tipo").value=c.componente_origem; onCompTipoChange();
+  const temNaLista=[...q("#comp_fabricante_sel").options].some(o=>o.value===c.fabricante_equivalente);
+  if(c.fabricante_equivalente&&temNaLista){
+    q("#comp_fabricante_sel").value=c.fabricante_equivalente;
+    q("#comp_fabricante").classList.add("hidden");
+  }else{
+    q("#comp_fabricante_sel").value="__outro__";
+    q("#comp_fabricante").classList.remove("hidden");
+  }
   q("#comp_fabricante").value=c.fabricante_equivalente||"";
+  carregarCodigosComponentes();
   q("#comp_codigo").value=c.modelo_equivalente||"";
   q("#comp_potencia").value=c.potencia_w??"";
   q("#comp_corrente").value=c.corrente_ma??"";
@@ -120,7 +149,8 @@ async function editarComponente(id){
 
 function cancelarEdicaoComponente(){
   compEditId=null;
-  q("#comp_fabricante").value="";q("#comp_codigo").value="";q("#comp_potencia").value="";q("#comp_corrente").value="";q("#comp_cct").value="";q("#comp_fluxo").value="";q("#comp_facho").value="";q("#comp_obs").value="";q("#comp_preco").value="";q("#comp_disp").value="Sob consulta";
+  q("#comp_fabricante_sel").value="";q("#comp_fabricante").value="";q("#comp_fabricante").classList.add("hidden");
+  q("#comp_codigo").value="";q("#comp_potencia").value="";q("#comp_corrente").value="";q("#comp_cct").value="";q("#comp_fluxo").value="";q("#comp_facho").value="";q("#comp_obs").value="";q("#comp_preco").value="";q("#comp_disp").value="Sob consulta";
   q("#comp_foto").value="";q("#comp_foto_preview").innerHTML="";
   limparCompModelos();
   q("#comp_titulo").textContent="Cadastrar componente";
@@ -136,7 +166,7 @@ async function addComponenteCatalogo(){
     componente_origem:tipo,
     modelo_equivalente:codigo,
     modelo_original:compModelosSelecionados.size?[...compModelosSelecionados].join(", "):null,
-    fabricante_equivalente:norm(q("#comp_fabricante").value.trim()),
+    fabricante_equivalente:norm(fabricanteComponenteAtual()),
     potencia_w:tipo!=="Óptica"&&q("#comp_potencia").value?Number(q("#comp_potencia").value):null,
     corrente_ma:tipo==="Driver"&&q("#comp_corrente").value?Number(q("#comp_corrente").value):null,
     cct_k:tipo==="LED"&&q("#comp_cct").value?Number(q("#comp_cct").value):null,

@@ -731,9 +731,21 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
     <div class="small" style="margin-bottom:12px">Um kit junta os 3 num atalho só, pra escolher de uma vez no cadastro em lote (assistente) em vez de configurar cada um separado toda vez que a mesma remessa se repetir.</div>
     <div class="grid3">
       <div class="field"><label>Nome do kit</label><input id="kit_nome" placeholder="ex: Kit VG20 padrão"></div>
-      <div class="field"><label>Driver</label><div style="display:flex;gap:6px"><select id="kit_driver" style="flex:1"></select><input type="number" min="1" id="kit_driver_qtd" value="1" style="width:60px" title="Quantidade"></div></div>
-      <div class="field"><label>LED</label><div style="display:flex;gap:6px"><select id="kit_led" style="flex:1"></select><input type="number" min="1" id="kit_led_qtd" value="1" style="width:60px" title="Quantidade"></div></div>
-      <div class="field"><label>Óptica</label><div style="display:flex;gap:6px"><select id="kit_optica" style="flex:1"></select><input type="number" min="1" id="kit_optica_qtd" value="1" style="width:60px" title="Quantidade"></div></div>
+      <div class="field">
+        <label>Driver</label>
+        <input id="kit_driver_busca" placeholder="Buscar por fabricante ou código..." oninput="filtrarKitOpcao('Driver',this.value)">
+        <div style="display:flex;gap:6px;margin-top:6px"><select id="kit_driver" style="flex:1"></select><input type="number" min="1" id="kit_driver_qtd" value="1" style="width:60px" title="Quantidade"></div>
+      </div>
+      <div class="field">
+        <label>LED</label>
+        <input id="kit_led_busca" placeholder="Buscar por fabricante ou código..." oninput="filtrarKitOpcao('LED',this.value)">
+        <div style="display:flex;gap:6px;margin-top:6px"><select id="kit_led" style="flex:1"></select><input type="number" min="1" id="kit_led_qtd" value="1" style="width:60px" title="Quantidade"></div>
+      </div>
+      <div class="field">
+        <label>Óptica</label>
+        <input id="kit_optica_busca" placeholder="Buscar por fabricante ou código..." oninput="filtrarKitOpcao('Óptica',this.value)">
+        <div style="display:flex;gap:6px;margin-top:6px"><select id="kit_optica" style="flex:1"></select><input type="number" min="1" id="kit_optica_qtd" value="1" style="width:60px" title="Quantidade"></div>
+      </div>
       <div class="field"><label>Modelo de luminária (opcional)</label><input id="kit_modelo_luminaria" placeholder="ex: VG20 — só pra lembrete"></div>
     </div>
     <div class="actions" style="margin-top:12px"><button type="button" class="primary" onclick="addKit()">Salvar kit</button></div>

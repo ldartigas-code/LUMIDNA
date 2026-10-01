@@ -526,7 +526,7 @@ async function loadAsset(){
     ${local?`<div class="list">${local}</div>`:`<div class="card small">Localização ainda não informada.</div>`}
 
     <h2 class="sec">Peças instaladas</h2>
-    ${compList.length?`<div class="list">${compList.map(c=>`<div class="r"><span class="k">${esc(c.tipo)}</span><span class="val">${esc(c.modelo)||"—"}${c.modelo&&verificados.has(c.modelo)?`<span class="chip">Compatível verificado</span>`:""}</span></div>`).join("")}</div>`:`<div class="card small">Nenhuma peça registrada ainda.</div>`}
+    ${compList.length?`<div class="list">${compList.map(c=>`<div class="r"><span class="k">${esc(c.tipo)}</span><span class="val">${c.modelo&&c.quantidade>1?esc(c.quantidade)+"x ":""}${esc(c.modelo)||"—"}${c.modelo&&verificados.has(c.modelo)?`<span class="chip">Compatível verificado</span>`:""}</span></div>`).join("")}</div>`:`<div class="card small">Nenhuma peça registrada ainda.</div>`}
 
     <h2 class="sec">Loja de peças</h2>
     <div id="lojaBox">${renderLojaCards(lum,equivs)}</div>

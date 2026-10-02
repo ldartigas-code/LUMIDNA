@@ -163,7 +163,7 @@ async function addModelo(){
   const file=q("#mo_foto").files[0];
   if(file){
     if(!file.type.startsWith("image/")) return msg("O arquivo da foto precisa ser uma imagem.",false);
-    const path=`modelos/${codigo}_${Date.now()}_${file.name}`.replace(/\s+/g,"_");
+    const path="modelos/"+`${codigo}_${Date.now()}_${file.name}`.replace(/[^\w.-]+/g,"_");
     const up=await sb.storage.from("fotos").upload(path,file,{upsert:true});
     if(up.error) return msg("Erro ao enviar foto: "+up.error.message,false);
     p.imagem_url=sb.storage.from("fotos").getPublicUrl(path).data.publicUrl;

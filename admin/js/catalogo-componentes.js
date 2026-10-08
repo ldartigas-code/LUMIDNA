@@ -258,14 +258,25 @@ function parseCSV(text){
 const KIT_SEL_ID={Driver:"kit_driver",LED:"kit_led",Óptica:"kit_optica"};
 let kitOpcoesCache={};
 
-function renderKitSelect(tipo,opcoes){
+// Enquanto há texto na busca, a lista fica ABERTA (vários itens visíveis)
+// mostrando só o que bate; com 1 resultado só, já vem selecionado. Busca
+// vazia volta pra caixa normal fechada com todas as opções.
+function renderKitSelect(tipo,opcoes,buscando){
   const sel=q("#"+KIT_SEL_ID[tipo]);
   if(!sel) return;
   const valorAtual=sel.value;
-  sel.innerHTML=`<option value="">— nenhuma —</option><option value="Integrada">Integrada</option>`
-    +opcoes.map(x=>`<option value="${esc(x.modelo_equivalente)}">${x.fabricante_equivalente?esc(x.fabricante_equivalente)+" — ":""}${esc(x.modelo_equivalente)}</option>`).join("")
-    +(opcoes.length?"":`<option value="" disabled>— nada encontrado —</option>`);
-  if(valorAtual && opcoes.some(x=>x.modelo_equivalente===valorAtual)) sel.value=valorAtual;
+  const itens=opcoes.map(x=>`<option value="${esc(x.modelo_equivalente)}">${x.fabricante_equivalente?esc(x.fabricante_equivalente)+" — ":""}${esc(x.modelo_equivalente)}</option>`).join("");
+  if(buscando){
+    sel.innerHTML=opcoes.length?itens:`<option value="" disabled>— nada encontrado —</option>`;
+    sel.size=Math.max(2,Math.min(opcoes.length,6));
+    if(opcoes.length===1) sel.value=opcoes[0].modelo_equivalente;
+    else if(valorAtual && opcoes.some(x=>x.modelo_equivalente===valorAtual)) sel.value=valorAtual;
+    else sel.selectedIndex=-1;
+  }else{
+    sel.size=1;
+    sel.innerHTML=`<option value="">— nenhuma —</option><option value="Integrada">Integrada</option>`+itens;
+    if(valorAtual && (valorAtual==="Integrada"||opcoes.some(x=>x.modelo_equivalente===valorAtual))) sel.value=valorAtual;
+  }
 }
 
 // Busca que filtra a lista (já carregada) por fabricante ou código, pra achar
@@ -275,7 +286,7 @@ function filtrarKitOpcao(tipo,termo){
   const t=(termo||"").toLowerCase().trim();
   const todas=kitOpcoesCache[tipo]||[];
   const filtradas=t?todas.filter(x=>(x.modelo_equivalente||"").toLowerCase().includes(t)||(x.fabricante_equivalente||"").toLowerCase().includes(t)):todas;
-  renderKitSelect(tipo,filtradas);
+  renderKitSelect(tipo,filtradas,!!t);
 }
 
 async function carregarOpcoesKit(){

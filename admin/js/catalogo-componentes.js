@@ -277,6 +277,29 @@ function renderKitSelect(tipo,opcoes,buscando){
     sel.innerHTML=`<option value="">— nenhuma —</option><option value="Integrada">Integrada</option>`+itens;
     if(valorAtual && (valorAtual==="Integrada"||opcoes.some(x=>x.modelo_equivalente===valorAtual))) sel.value=valorAtual;
   }
+  atualizarKitConfirmacao(tipo);
+}
+
+// Linha verde embaixo do campo mostrando o que está escolhido (o texto
+// completo, que a caixa estreita corta).
+function atualizarKitConfirmacao(tipo){
+  const sel=q("#"+KIT_SEL_ID[tipo]);
+  const ok=q("#"+KIT_SEL_ID[tipo]+"_ok");
+  if(!sel||!ok) return;
+  const opt=sel.selectedIndex>=0?sel.options[sel.selectedIndex]:null;
+  ok.textContent=(opt&&opt.value)?"✓ Selecionado: "+opt.textContent:"";
+}
+
+// Ao clicar num resultado: fecha a lista, limpa a busca e deixa o item
+// escolhido na caixa, com a confirmação verde.
+function kitEscolheu(tipo){
+  const sel=q("#"+KIT_SEL_ID[tipo]);
+  const valor=sel.value;
+  if(!valor) return;
+  q("#"+KIT_SEL_ID[tipo]+"_busca").value="";
+  renderKitSelect(tipo,kitOpcoesCache[tipo]||[],false);
+  sel.value=valor;
+  atualizarKitConfirmacao(tipo);
 }
 
 // Busca que filtra a lista (já carregada) por fabricante ou código, pra achar

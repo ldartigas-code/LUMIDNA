@@ -17,7 +17,7 @@ const COMP_TIPOS=["Driver","LED","Óptica"];
 // (tabela componentes, por luminaria_id) — nunca no catálogo central.
 async function loadComponents(){
   const r=await sb.from("componentes").select("*").eq("luminaria_id",luminariaDbId).eq("ativo_atual",true);
-  const byTipo={};(r.data||[]).forEach(c=>byTipo[c.tipo]=c.modelo);
+  const byTipo={}, qtdByTipo={};(r.data||[]).forEach(c=>{byTipo[c.tipo]=c.modelo;qtdByTipo[c.tipo]=c.quantidade||1});
   const resultados=await Promise.all(COMP_TIPOS.map(t=>sb.rpc("listar_homologados",{p_componente:t,p_modelo_codigo:(originalData&&originalData.modelo)||null})));
   q("#pecasInstaladasEdit").innerHTML = COMP_TIPOS.map((t,i)=>{
     const atual=byTipo[t]||"";
@@ -35,9 +35,45 @@ async function loadComponents(){
         <option value="__outro__"${ehOutro?" selected":""}>Outro modelo (digitar)</option>
       </select>
       <input type="text" id="pi_${t}_outro" placeholder="Modelo instalado" value="${ehOutro?esc(atual):""}" class="${ehOutro?"":"hidden"}" style="margin-top:6px">
+      <div style="display:flex;align-items:center;gap:6px;margin-top:6px"><span class="small">Quantidade</span><input type="number" min="1" id="pi_${t}_qtd" value="${qtdByTipo[t]||1}" style="width:70px"></div>
     </div>`;
   }).join("");
+  await carregarKitsDaPeca();
   await mostrarDicaSpecsRetrofit(byTipo.LED);
+}
+
+// ---- Kits na tela da peça ----
+let kitsDaPeca=[];
+async function carregarKitsDaPeca(){
+  const sel=q("#pecaKitSelect");
+  if(!sel) return;
+  const r=await sb.from("kits_componentes").select("*").order("nome");
+  kitsDaPeca=r.error?[]:(r.data||[]);
+  sel.innerHTML=`<option value="">— escolha o kit —</option>`+kitsDaPeca.map(k=>`<option value="${k.id}">${esc(k.nome)}${k.modelo_luminaria?" ("+esc(k.modelo_luminaria)+")":""}</option>`).join("");
+}
+
+// Preenche Driver/LED/Óptica (e quantidades) desta peça com os do kit e salva.
+// Com paraTodas=true, depois replica pras outras peças do mesmo modelo da obra.
+async function aplicarKitNaPeca(paraTodas){
+  if(!LID||!luminariaDbId) return msg("Abra uma peça primeiro.",false);
+  const id=q("#pecaKitSelect").value;
+  const k=kitsDaPeca.find(x=>String(x.id)===id);
+  if(!k) return msg("Escolha um kit na lista.",false);
+  const partes=[["Driver",k.driver_modelo,k.driver_qtd],["LED",k.led_modelo,k.led_qtd],["Óptica",k.optica_modelo,k.optica_qtd]];
+  for(const [tipo,codigo,qtd] of partes){
+    if(!codigo) continue;
+    const sel=q(`#pi_${tipo}`);
+    if(![...sel.options].some(o=>o.value===codigo)){
+      const op=document.createElement("option");
+      op.value=codigo; op.textContent=codigo;
+      sel.insertBefore(op,sel.querySelector('option[value="__outro__"]'));
+    }
+    sel.value=codigo;
+    onPecaInstaladaChange(tipo);
+    q(`#pi_${tipo}_qtd`).value=qtd||1;
+  }
+  if(paraTodas) return aplicarPecasInstaladasNaObra();
+  await salvarPecasInstaladas();
 }
 
 function onPecaInstaladaChange(tipo){
@@ -57,14 +93,16 @@ async function salvarPecasInstaladas(){
     if(ehOutro) valor=q(`#pi_${tipo}_outro`).value.trim();
     if(!valor) continue;
     if(ehOutro) digitados.push({tipo,codigo:valor});
-    const compR=await sb.from("componentes").select("id,modelo").eq("luminaria_id",luminariaDbId).eq("tipo",tipo).eq("ativo_atual",true).maybeSingle();
+    const qtd=Math.max(1,Number(q(`#pi_${tipo}_qtd`)?.value)||1);
+    const compR=await sb.from("componentes").select("id,modelo,quantidade").eq("luminaria_id",luminariaDbId).eq("tipo",tipo).eq("ativo_atual",true).maybeSingle();
     const modeloAnterior=compR.data?compR.data.modelo:null;
-    if(modeloAnterior===valor) continue;
+    const qtdAnterior=compR.data?(compR.data.quantidade||1):1;
+    if(modeloAnterior===valor&&qtdAnterior===qtd) continue;
     const w=compR.data
-      ? await sb.from("componentes").update({modelo:valor}).eq("id",compR.data.id)
-      : await sb.from("componentes").insert({luminaria_id:luminariaDbId,tipo,modelo:valor,original:true,ativo_atual:true});
+      ? await sb.from("componentes").update({modelo:valor,quantidade:qtd}).eq("id",compR.data.id)
+      : await sb.from("componentes").insert({luminaria_id:luminariaDbId,tipo,modelo:valor,quantidade:qtd,original:true,ativo_atual:true});
     if(w.error){ avisos.push(`Erro em ${tipo}: ${w.error.message}`); continue; }
-    await logAudit("componente_"+tipo,modeloAnterior||"—",valor);
+    await logAudit("componente_"+tipo,modeloAnterior||"—",qtd>1?qtd+"x "+valor:valor);
     mudou=true;
   }
   await loadComponents();
@@ -99,7 +137,7 @@ async function aplicarPecasInstaladasNaObra(){
   if(!originalData||!originalData.obra_id) return msg("Esta peça não está em nenhuma obra.",false);
   if(!originalData.modelo_id) return msg("Esta peça ainda não está ligada a um modelo do catálogo.",false);
   await salvarPecasInstaladas();
-  const compR=await sb.from("componentes").select("tipo,modelo").eq("luminaria_id",luminariaDbId).eq("ativo_atual",true);
+  const compR=await sb.from("componentes").select("tipo,modelo,quantidade").eq("luminaria_id",luminariaDbId).eq("ativo_atual",true);
   const atuais=(compR.data||[]).filter(c=>c.modelo);
   if(!atuais.length) return msg("Defina ao menos um componente (Driver/LED/Óptica) antes de aplicar às outras.",false);
 
@@ -108,7 +146,7 @@ async function aplicarPecasInstaladasNaObra(){
   const outras=alvoR.data||[];
   if(!outras.length) return msg(`Não há outra peça do modelo ${originalData.modelo} nesta obra.`,false);
 
-  const resumo=atuais.map(c=>`${c.tipo}: ${c.modelo}`).join(" · ");
+  const resumo=atuais.map(c=>`${c.tipo}: ${(c.quantidade||1)>1?c.quantidade+"x ":""}${c.modelo}`).join(" · ");
   if(!confirm(`Aplicar "${resumo}" em ${outras.length} outra(s) peça(s) do modelo ${originalData.modelo} nesta obra?\n\nIsso substitui o que estiver definido nelas agora. Não afeta o catálogo nem peças de outro modelo.`)) return;
 
   const idsAlvo=outras.map(o=>o.id);
@@ -122,8 +160,8 @@ async function aplicarPecasInstaladasNaObra(){
   idsAlvo.forEach(lid=>{
     atuais.forEach(c=>{
       const existenteId=mapExistente[lid+"|"+c.tipo];
-      if(existenteId) toUpdate.push({id:existenteId,modelo:c.modelo});
-      else toInsert.push({luminaria_id:lid,tipo:c.tipo,modelo:c.modelo,original:true,ativo_atual:true});
+      if(existenteId) toUpdate.push({id:existenteId,modelo:c.modelo,quantidade:c.quantidade||1});
+      else toInsert.push({luminaria_id:lid,tipo:c.tipo,modelo:c.modelo,quantidade:c.quantidade||1,original:true,ativo_atual:true});
     });
   });
 

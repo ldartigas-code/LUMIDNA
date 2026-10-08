@@ -709,10 +709,10 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
         <select id="comp_fabricante_sel" onchange="onCompFabricanteSelChange()"></select>
         <input id="comp_fabricante" placeholder="Nome do fabricante novo" class="hidden" style="margin-top:6px">
       </div>
-      <div class="field"><label>Código / Modelo</label><input id="comp_codigo" list="comp_codigos_dl" placeholder="Digite ou escolha da lista" autocomplete="off"><datalist id="comp_codigos_dl"></datalist></div>
+      <div class="field"><label>Nome / código do componente (obrigatório)</label><input id="comp_codigo" list="comp_codigos_dl" placeholder="ex: LF/FMR120YSIII75-H" autocomplete="off"><datalist id="comp_codigos_dl"></datalist></div>
       <div class="field span2">
-        <label>Modelos compatíveis (opcional)</label>
-        <input id="comp_modelos_busca" placeholder="Buscar modelo por fabricante ou código..." oninput="onCompModelosBuscaInput()">
+        <label>Compatível com quais luminárias? (opcional — NÃO é o nome do componente)</label>
+        <input id="comp_modelos_busca" placeholder="Buscar luminária (ex: DIP50) pra marcar abaixo..." oninput="onCompModelosBuscaInput()">
         <div id="comp_modelos_selecionados" class="small" style="margin:8px 0 4px">Nenhum selecionado = compatível com qualquer modelo.</div>
         <div id="comp_modelos_lista" style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:8px"></div>
       </div>

@@ -162,6 +162,10 @@ async function addComponenteCatalogo(){
   const codigo=q("#comp_codigo").value.trim();
   if(!codigo) return msg("Informe o código/modelo do componente.",false);
   const tipo=q("#comp_tipo").value;
+  if(!compEditId){
+    const dup=await sb.from("equivalentes").select("id,fabricante_equivalente,modelo_equivalente").eq("componente_origem",tipo).ilike("modelo_equivalente",likeLiteral(codigo)).limit(1);
+    if(dup.data&&dup.data.length) return msg(`Já existe ${tipo} "${dup.data[0].modelo_equivalente}"${dup.data[0].fabricante_equivalente?" ("+dup.data[0].fabricante_equivalente+")":""} no catálogo — não foi cadastrado de novo. Procure na lista acima e use "Editar" se precisar mudar algo.`,false);
+  }
   const p={
     componente_origem:tipo,
     modelo_equivalente:codigo,
@@ -191,6 +195,73 @@ async function addComponenteCatalogo(){
   const eraEdicao=!!compEditId;
   cancelarEdicaoComponente();
   msg(eraEdicao?"Componente atualizado.":"Componente salvo no catálogo.");
+  loadComponentesCatalogo();
+}
+
+// ---- Importar componentes de uma nota/proposta, sem duplicar ----
+// Chave de comparação: tipo + código, sem diferenciar maiúscula, espaço
+// sobrando nem nota entre parênteses no fim ("X (5 un. nesta linha)" = "X").
+const IMPORT_TIPOS={driver:"Driver",led:"LED","óptica":"Óptica",optica:"Óptica"};
+function chaveComponente(tipo,codigo){
+  const c=String(codigo||"").replace(/\s*\(.*\)\s*$/,"").replace(/\s+/g," ").trim().toLowerCase();
+  return String(tipo||"").toLowerCase()+"|"+c;
+}
+
+// Função pura (sem banco): recebe as linhas lidas e os componentes que já
+// existem e devolve o status de cada linha.
+function classificarImportComponentes(rows,existentes){
+  const mapa=new Map();
+  existentes.forEach(e=>{ const k=chaveComponente(e.componente_origem,e.modelo_equivalente); if(!mapa.has(k)) mapa.set(k,e); });
+  const vistas=new Map();
+  const num=v=>{ if(v==null||v==="") return null; const n=Number(String(v).replace(",",".")); return isNaN(n)?null:n; };
+  return rows.map((r,i)=>{
+    const tipo=IMPORT_TIPOS[String(r.tipo||"").trim().toLowerCase()];
+    const codigo=String(r.codigo||"").trim();
+    const linha={n:i+2,tipo,codigo,fabricante:(r.fabricante||"").trim()||null,especificacao:(r.especificacao||"").trim()||null,
+      potencia_w:num(r.potencia_w),corrente_ma:num(r.corrente_ma),cct_k:num(r.cct_k),fluxo_lm:num(r.fluxo_lm),facho_graus:num(r.facho_graus)};
+    if(!tipo) return {...linha,status:"erro",motivo:"tipo precisa ser Driver, LED ou Óptica"};
+    if(!codigo) return {...linha,status:"erro",motivo:"código vazio"};
+    const k=chaveComponente(tipo,codigo);
+    if(mapa.has(k)){ const e=mapa.get(k); return {...linha,status:"existe",motivo:`já cadastrado${e.fabricante_equivalente?" ("+e.fabricante_equivalente+")":""}`}; }
+    if(vistas.has(k)) return {...linha,status:"repetida",motivo:`repetida na lista (linha ${vistas.get(k)})`};
+    vistas.set(k,linha.n);
+    return {...linha,status:"novo",motivo:"será cadastrado"};
+  });
+}
+
+let compImportLinhas=[];
+
+async function conferirImportComponentes(){
+  const texto=q("#compImportTexto").value.trim();
+  if(!texto) return msg("Cole a lista primeiro.",false);
+  let rows;
+  try{ rows=parseCSV(texto); }catch(e){ return msg("Não consegui ler a lista: "+(e.message||e),false); }
+  if(!rows.length) return msg("Nenhuma linha encontrada — confira se a primeira linha é o cabeçalho.",false);
+  let existentes;
+  try{ existentes=await fetchAllRows((de,ate)=>sb.from("equivalentes").select("id,componente_origem,modelo_equivalente,fabricante_equivalente").in("componente_origem",["Driver","LED","Óptica"]).order("id").range(de,ate)); }
+  catch(e){ return msg("Erro ao ler o catálogo: "+(e.message||e),false); }
+  compImportLinhas=classificarImportComponentes(rows,existentes);
+  const cor={novo:"#257944",existe:"#c98a12",repetida:"#c98a12",erro:"#c0392b"};
+  const rot={novo:"NOVO",existe:"JÁ EXISTE",repetida:"REPETIDA",erro:"ERRO"};
+  const novos=compImportLinhas.filter(l=>l.status==="novo").length;
+  q("#compImportResultado").innerHTML=
+    `<div class="small" style="margin-bottom:8px"><b>${novos}</b> novo(s) pra cadastrar · <b>${compImportLinhas.length-novos}</b> ignorado(s) (já existe, repetida ou com erro).</div>`
+    +`<table><tr><th>Linha</th><th>Tipo</th><th>Fabricante</th><th>Código</th><th>Situação</th></tr>${compImportLinhas.map(l=>`<tr><td>${l.n}</td><td>${esc(l.tipo)||"—"}</td><td>${esc(l.fabricante)||"—"}</td><td>${esc(l.codigo)||"—"}</td><td style="color:${cor[l.status]};font-weight:700">${rot[l.status]} <span class="small" style="font-weight:400">— ${esc(l.motivo)}</span></td></tr>`).join("")}</table>`;
+  q("#compImportBtn").classList.toggle("hidden",novos===0);
+}
+
+async function cadastrarImportComponentes(){
+  const novos=compImportLinhas.filter(l=>l.status==="novo");
+  if(!novos.length) return msg("Não há nenhum componente novo pra cadastrar.",false);
+  const payload=novos.map(l=>({
+    componente_origem:l.tipo,modelo_equivalente:l.codigo,fabricante_equivalente:l.fabricante,especificacao:l.especificacao,
+    potencia_w:l.potencia_w,corrente_ma:l.corrente_ma,cct_k:l.cct_k,fluxo_lm:l.fluxo_lm,facho_graus:l.facho_graus,
+    nivel:"Compatível Verificado",disponibilidade:"Sob consulta",homologado_por:"Importação"
+  }));
+  const r=await sb.from("equivalentes").insert(payload);
+  if(r.error) return msg("Erro ao cadastrar: "+r.error.message+" — nada foi cadastrado. Confira a lista de novo.",false);
+  msg(`${novos.length} componente(s) novo(s) cadastrado(s). O que já existia não foi mexido.`);
+  await conferirImportComponentes();
   loadComponentesCatalogo();
 }
 

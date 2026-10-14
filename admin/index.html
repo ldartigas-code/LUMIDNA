@@ -739,6 +739,17 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
   </div>
 
   <div class="card">
+    <h2 style="margin:0 0 12px;font-size:16px">Importar componentes de uma nota / proposta</h2>
+    <div class="alert">Cole uma linha por componente, nesta ordem, separando por ponto e vírgula (a primeira linha é o cabeçalho). Primeiro clique em <b>Conferir lista</b>: o sistema mostra o que é NOVO e o que JÁ EXISTE no catálogo. Depois, <b>Cadastrar só os novos</b> — o que já existe nunca é cadastrado de novo.</div>
+    <textarea id="compImportTexto" style="min-height:150px;width:100%" placeholder="tipo;fabricante;codigo;especificacao;potencia_w;corrente_ma;cct_k;fluxo_lm&#10;Driver;LUCCHI;LF/FMR080YSII550HDS;Driver de corrente 54-230Vdc 200-550mA 220Vac;;;;"></textarea>
+    <div class="actions" style="margin-top:12px">
+      <button type="button" class="primary" onclick="conferirImportComponentes()">Conferir lista</button>
+      <button type="button" class="secondary hidden" id="compImportBtn" onclick="cadastrarImportComponentes()">Cadastrar só os novos</button>
+    </div>
+    <div id="compImportResultado" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card">
     <h2 style="margin:0 0 12px;font-size:16px">Kits (Driver + LED + Óptica de uma remessa)</h2>
     <div class="small" style="margin-bottom:12px">Um kit junta os 3 num atalho só, pra escolher de uma vez no cadastro em lote (assistente) em vez de configurar cada um separado toda vez que a mesma remessa se repetir.</div>
     <div class="grid3">
@@ -771,17 +782,17 @@ th{background:#fafbfc;color:#5d6670}.small{font-size:12px;color:var(--muted)}.pi
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<script src="js/core.js?v=20261008"></script>
-<script src="js/catalogo-modelos.js?v=20261008"></script>
-<script src="js/catalogo-componentes.js?v=20261008"></script>
-<script src="js/wizard.js?v=20261008"></script>
-<script src="js/dashboard.js?v=20261008"></script>
-<script src="js/busca.js?v=20261008"></script>
-<script src="js/fotos.js?v=20261008"></script>
-<script src="js/auditoria.js?v=20261008"></script>
-<script src="js/obras.js?v=20261008"></script>
-<script src="js/importacao.js?v=20261008"></script>
-<script src="js/aprovacoes.js?v=20261008"></script>
-<script src="js/reposicao.js?v=20261008"></script>
-<script src="js/relatorios.js?v=20261008"></script>
+<script src="js/core.js?v=20261014"></script>
+<script src="js/catalogo-modelos.js?v=20261014"></script>
+<script src="js/catalogo-componentes.js?v=20261014"></script>
+<script src="js/wizard.js?v=20261014"></script>
+<script src="js/dashboard.js?v=20261014"></script>
+<script src="js/busca.js?v=20261014"></script>
+<script src="js/fotos.js?v=20261014"></script>
+<script src="js/auditoria.js?v=20261014"></script>
+<script src="js/obras.js?v=20261014"></script>
+<script src="js/importacao.js?v=20261014"></script>
+<script src="js/aprovacoes.js?v=20261014"></script>
+<script src="js/reposicao.js?v=20261014"></script>
+<script src="js/relatorios.js?v=20261014"></script>
 </body></html>

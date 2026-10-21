@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LumiDNA 2 — Admin</title>
+<style>
+:root{--ink:#2c2c2a;--muted:#5f5e5a;--line:#d3d1c7;--soft:#f6f5f1;--orange:#ff7a2f;--green:#639922;--greent:#3b6d11;--red:#e24b4a;--redt:#a32d2d}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 system-ui,"Segoe UI",Roboto,sans-serif;background:#fff;color:var(--ink)}
+.wrap{max-width:960px;margin:0 auto;padding:16px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+header b{font-size:20px}header b span{color:var(--orange)}
+.small{font-size:13px;color:var(--muted)}
+button,input,select,textarea{font:inherit;color:var(--ink)}
+button{cursor:pointer;background:#fff;border:1px solid #b4b2a9;border-radius:8px;padding:8px 14px}
+button:hover{background:var(--soft)}
+button.p{background:var(--orange);border-color:var(--orange);color:#1a0d04;font-weight:600}
+button.p:hover{filter:brightness(1.06);background:var(--orange)}
+button.danger{color:var(--redt);border-color:#f09595}
+input,select,textarea{width:100%;background:#fff;border:1px solid #b4b2a9;border-radius:8px;padding:8px 10px}
+input[type=checkbox]{width:auto}
+label{font-size:13px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tab{padding:6px 14px;border-radius:8px;border:1px solid var(--line);background:#fff}
+.tab.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.bar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.bar .grow{flex:1;min-width:180px}
+.card{border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px;background:#fff}
+.list{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.row{display:grid;grid-template-columns:14px 44px minmax(0,1.6fr) minmax(0,1fr) 90px minmax(0,1.2fr);gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.row:last-child{border-bottom:0}.row:hover{background:var(--soft)}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+.g{background:var(--green)}.r{background:var(--red)}
+.thumb{width:40px;height:40px;border-radius:6px;background:var(--soft);object-fit:contain;border:1px solid var(--line)}
+.ok{color:var(--greent);font-size:12px}.no{color:var(--redt);font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.field{margin-bottom:12px}
+.msg{padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:14px}
+.msg.e{background:#fcebeb;color:var(--redt)}.msg.s{background:#eaf3de;color:var(--greent)}
+.pills span{display:inline-block;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:2px 10px;margin:2px;font-size:12px}
+.box{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px}
+.box label{font-weight:400;color:var(--ink);font-size:14px;margin:0;padding:3px 4px;display:flex;gap:8px;align-items:center;cursor:pointer}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+@media(max-width:640px){.row{grid-template-columns:14px 40px minmax(0,1fr) 80px}.row .c4,.row .c6{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><b>Lumi<span>DNA</span> 2 · Admin</b><div id="quem" class="small"></div></header>
+<div id="msg"></div>
+<div id="app"><div class="small">Carregando…</div></div>
+</div>
+<script src="../assets/supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+let sb=supabase.createClient(LUMIDNA_SUPABASE_URL,LUMIDNA_SUPABASE_KEY);
+const $=s=>document.querySelector(s);
+const esc=s=>(s??"").toString().replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm=s=>String(s||"").replace(/\s+/g," ").trim().toLowerCase();
+const nv=v=>(v===""||v==null)?null:v;
+const num=v=>{ if(v==null||String(v).trim()==="") return null; const n=Number(String(v).replace(",",".")); return isNaN(n)?null:n; };
+const brl=v=>v==null?"—":"R$ "+Number(v).toFixed(2).replace(".",",");
+const fmt=v=>v==null?"—":String(Number(v)).replace(".",",");
+
+const TIPOS={luminaria:"Luminárias",led:"LEDs",driver:"Drivers",optica:"Ópticas"};
+const TIPO1={luminaria:"Luminária",led:"LED",driver:"Driver",optica:"Óptica"};
+const S={view:"lista",tab:"luminaria",busca:"",vermelhos:false,produtos:[],compat:[],kits:[],itens:[],cur:null,compSel:new Set(),kit:null};
+
+function msg(t,ok=true){ $("#msg").innerHTML=t?`<div class="msg ${ok?"s":"e"}">${esc(t)}</div>`:""; if(t) window.scrollTo({top:0,behavior:"smooth"}); }
+
+// ---- regra do verde/vermelho ----
+function faltas(p){
+  const f=[];
+  if(!p.codigo) f.push("código");
+  if(!p.fabricante) f.push("fabricante");
+  if(p.preco==null) f.push("preço");
+  if(!p.foto_url) f.push("foto");
+  if(p.tipo==="led"){ if(p.potencia_w==null) f.push("potência"); if(!p.cct_k) f.push("temp. de cor"); }
+  if(p.tipo==="driver"){ if(p.potencia_w==null) f.push("potência"); if(p.corrente_ma==null) f.push("corrente"); }
+  if(p.tipo==="optica"){ if(p.facho_graus==null) f.push("facho"); }
+  if(p.tipo==="luminaria"&&p.integrada&&p.potencia_w==null) f.push("potência");
+  return f;
+}
+function specLinha(p){
+  if(p.tipo==="luminaria") return p.integrada?`Lâmpada integrada${p.potencia_w!=null?" · "+fmt(p.potencia_w)+" W":""}`:(p.descricao||"");
+  if(p.tipo==="led") return [p.potencia_w!=null?fmt(p.potencia_w)+" W":"",p.cct_k?p.cct_k+" K":""].filter(Boolean).join(" · ");
+  if(p.tipo==="driver") return [p.potencia_w!=null?fmt(p.potencia_w)+" W":"",p.corrente_ma!=null?fmt(p.corrente_ma)+" mA":""].filter(Boolean).join(" · ");
+  return p.facho_graus!=null?fmt(p.facho_graus)+"°":"";
+}
+const porId=id=>S.produtos.find(p=>p.id===id);
+
+// ---- kits ----
+function kitInfo(k){
+  const its=S.itens.filter(i=>i.kit_id===k.id).map(i=>({...i,p:porId(i.produto_id)})).filter(i=>i.p);
+  const faltaItem=its.filter(i=>faltas(i.p).length);
+  const leds=its.filter(i=>i.p.tipo==="led");
+  const semPot=leds.filter(i=>i.p.potencia_w==null);
+  const total=leds.reduce((s,i)=>s+(i.p.potencia_w||0)*i.quantidade,0);
+  const f=[];
+  if(!k.luminaria_id) f.push("luminária");
+  if(!its.length) f.push("itens");
+  if(faltaItem.length) f.push("itens incompletos");
+  return {its,total,semPot:semPot.length,faltas:f,leds:leds.length};
+}
+
+// ---- carregar tudo ----
+async function pagina(consulta){
+  const out=[]; for(let i=0;;i+=1000){ const r=await consulta().range(i,i+999); if(r.error) throw r.error; out.push(...(r.data||[])); if(!r.data||r.data.length<1000) break; }
+  return out;
+}
+async function carregar(){
+  try{
+    [S.produtos,S.compat,S.kits,S.itens]=await Promise.all([
+      pagina(()=>sb.from("v2_produtos").select("*").order("id")),
+      pagina(()=>sb.from("v2_compatibilidade").select("*").order("componente_id")),
+      pagina(()=>sb.from("v2_kits").select("*").order("id")),
+      pagina(()=>sb.from("v2_kit_itens").select("*").order("kit_id"))
+    ]);
+  }catch(e){ $("#app").innerHTML=`<div class="msg e">Não consegui carregar o catálogo: ${esc(e.message||e)}<br>Se for "relation does not exist", falta rodar o SQL v2_01_catalogo no Supabase.</div>`; return false; }
+  return true;
+}
+
+// ---- login ----
+function telaLogin(m){
+  $("#quem").textContent="";
+  $("#app").innerHTML=`<div class="card" style="max-width:360px;margin:40px auto">
+    <h3 style="margin-top:0">Entrar</h3>${m?`<div class="msg e">${esc(m)}</div>`:""}
+    <div class="field"><label>E-mail</label><input id="lg_email" type="email"></div>
+    <div class="field"><label>Senha</label><input id="lg_senha" type="password"></div>
+    <button class="p" style="width:100%" data-act="entrar">Entrar</button></div>`;
+}
+async function entrar(){
+  const r=await sb.auth.signInWithPassword({email:$("#lg_email").value.trim(),password:$("#lg_senha").value});
+  if(r.error) return telaLogin("E-mail ou senha incorretos.");
+  iniciar();
+}
+
+// ---- lista ----
+function renderLista(){
+  S.view="lista";
+  $("#app").innerHTML=`
+    <div class="bar"><div class="tabs" style="margin:0">${Object.entries(TIPOS).map(([t,n])=>`<button class="tab ${S.tab===t?"on":""}" data-act="aba" data-t="${t}">${n}</button>`).join("")}<button class="tab ${S.tab==="kit"?"on":""}" data-act="aba" data-t="kit">Kits</button></div>
+      <div style="margin-left:auto;display:flex;gap:8px"><button data-act="importar">Importar lista</button><button class="p" data-act="novo">+ Novo ${S.tab==="kit"?"kit":"item"}</button></div></div>
+    <div class="bar"><input class="grow" id="busca" placeholder="Buscar por código ou fabricante" value="${esc(S.busca)}">
+      <label style="display:flex;gap:6px;align-items:center;margin:0;font-weight:400"><input type="checkbox" id="verm" ${S.vermelhos?"checked":""}> Só os vermelhos</label></div>
+    <div id="lista"></div>`;
+  $("#busca").oninput=e=>{S.busca=e.target.value;atualizarLista()};
+  $("#verm").onchange=e=>{S.vermelhos=e.target.checked;atualizarLista()};
+  atualizarLista();
+}
+function atualizarLista(){
+  const t=norm(S.busca);
+  let html="";
+  if(S.tab==="kit"){
+    let ks=S.kits.filter(k=>!t||norm(k.nome).includes(t));
+    const info=k=>kitInfo(k);
+    if(S.vermelhos) ks=ks.filter(k=>info(k).faltas.length);
+    html=ks.length?`<div class="list">${ks.map(k=>{
+      const i=info(k), lum=porId(k.luminaria_id);
+      return `<div class="row" data-act="abrirKit" data-id="${k.id}"><span class="dot ${i.faltas.length?"r":"g"}"></span><div></div>
+        <div style="min-width:0"><b>${esc(k.nome)}</b><div class="small">${lum?"serve em "+esc(lum.codigo):"sem luminária"}</div></div>
+        <div class="small c4">${i.its.map(x=>x.quantidade+"x "+esc(x.p.codigo)).join(" · ")||"sem itens"}</div>
+        <div><b>${i.leds?fmt(Math.round(i.total*100)/100)+" W":"—"}</b></div>
+        <div class="${i.faltas.length?"no":"ok"} c6">${i.faltas.length?"Falta: "+i.faltas.join(", "):"Completo"}</div></div>`}).join("")}</div>`:`<div class="small">Nenhum kit encontrado.</div>`;
+  }else{
+    let ps=S.produtos.filter(p=>p.tipo===S.tab&&(!t||norm(p.codigo).includes(t)||norm(p.fabricante).includes(t)));
+    if(S.vermelhos) ps=ps.filter(p=>faltas(p).length);
+    ps.sort((a,b)=>String(a.codigo).localeCompare(String(b.codigo),"pt-BR",{numeric:true}));
+    const mostrar=ps.slice(0,200);
+    html=ps.length?`<div class="list">${mostrar.map(p=>{
+      const f=faltas(p);
+      return `<div class="row" data-act="abrir" data-id="${p.id}"><span class="dot ${f.length?"r":"g"}"></span>
+        ${p.foto_url?`<img class="thumb" src="${esc(p.foto_url)}" alt="">`:`<div class="thumb"></div>`}
+        <div style="min-width:0"><b>${esc(p.codigo)}</b><div class="small">${esc(p.fabricante)||"sem fabricante"}</div></div>
+        <div class="small c4">${esc(specLinha(p))}</div><div><b>${p.preco!=null?brl(p.preco):"<span class='no'>sem preço</span>"}</b></div>
+        <div class="${f.length?"no":"ok"} c6">${f.length?"Falta: "+f.join(", "):"Completo"}</div></div>`}).join("")}</div>${ps.length>200?`<div class="small" style="margin-top:8px">Mostrando 200 de ${ps.length}. Use a busca pra achar o resto.</div>`:""}`:`<div class="small">Nada encontrado${S.tab!=="kit"?`. Use "+ Novo item" ou "Importar lista".`:"."}</div>`;
+    const tot=S.produtos.filter(p=>p.tipo===S.tab), verm=tot.filter(p=>faltas(p).length).length;
+    html=`<div class="small" style="margin-bottom:8px">${tot.length} item(ns) · <span class="ok">${tot.length-verm} completo(s)</span> · <span class="no">${verm} com falta</span></div>`+html;
+  }
+  $("#lista").innerHTML=html;
+}
+
+// ---- item (editor) ----
+function novoItem(){
+  S.cur={id:null,tipo:S.tab==="kit"?"led":S.tab,fabricante:"",codigo:"",descricao:"",preco:null,foto_url:null,potencia_w:null,cct_k:null,corrente_ma:null,facho_graus:null,integrada:false,detalhes:{}};
+  S.compSel=new Set(); renderItem();
+}
+function abrirItem(id){
+  S.cur=JSON.parse(JSON.stringify(porId(id)));
+  S.compSel=new Set(S.compat.filter(c=>c.componente_id===id).map(c=>c.luminaria_id));
+  renderItem();
+}
+const DET=[["linha","Linha"],["irc","IRC"],["fluxo_lm","Fluxo (lm)"],["ip","IP"],["ik","IK"],["tensao","Tensão"],["vida_util_h","Vida útil (h)"],["observacoes","Observações"]];
+function renderItem(){
+  S.view="item"; const p=S.cur, t=p.tipo, novo=!p.id;
+  const d=p.detalhes||{};
+  const ehComp=t!=="luminaria";
+  const usadoEm=!ehComp&&p.id?S.compat.filter(c=>c.luminaria_id===p.id).map(c=>porId(c.componente_id)).filter(Boolean):[];
+  const kitsDe=!ehComp&&p.id?S.kits.filter(k=>k.luminaria_id===p.id):[];
+  $("#app").innerHTML=`<button data-act="voltar" style="margin-bottom:12px">‹ Voltar</button>
+    <div class="card"><h3 style="margin-top:0">${novo?"Novo item":esc(p.codigo)} <span class="small">· ${TIPO1[t]}</span></h3>
+      ${novo?`<div class="field"><label>Tipo</label><select id="f_tipo" data-act="trocaTipo">${Object.entries(TIPO1).map(([k,n])=>`<option value="${k}" ${t===k?"selected":""}>${n}</option>`).join("")}</select></div>`:""}
+      <div class="grid">
+        <div class="field"><label>Código *</label><input id="f_codigo" value="${esc(p.codigo)}"></div>
+        <div class="field"><label>Fabricante *</label><input id="f_fabricante" value="${esc(p.fabricante)}"></div>
+        <div class="field"><label>Preço de venda (R$) *</label><input id="f_preco" type="number" step="0.01" value="${p.preco??""}"></div>
+        ${t==="led"?`<div class="field"><label>Potência (W) *</label><input id="f_potencia" type="number" step="0.01" value="${p.potencia_w??""}"></div><div class="field"><label>Temperatura de cor (K) *</label><input id="f_cct" type="number" value="${p.cct_k??""}"></div>`:""}
+        ${t==="driver"?`<div class="field"><label>Potência (W) *</label><input id="f_potencia" type="number" step="0.01" value="${p.potencia_w??""}"></div><div class="field"><label>Corrente (mA) *</label><input id="f_corrente" type="number" step="0.1" value="${p.corrente_ma??""}"></div>`:""}
+        ${t==="optica"?`<div class="field"><label>Ângulo de facho (graus) *</label><input id="f_facho" type="number" step="0.1" value="${p.facho_graus??""}"></div>`:""}
+      </div>
+      ${t==="luminaria"?`<label style="display:flex;gap:8px;align-items:center;font-weight:400;color:var(--ink);margin:4px 0 12px"><input type="checkbox" id="f_integrada" data-act="trocaIntegrada" ${p.integrada?"checked":""}> Lâmpada integrada (vende só a peça completa, sem acessórios separados)</label>
+        <div id="blocoInteg" class="grid" style="${p.integrada?"":"display:none"}"><div class="field"><label>Potência da luminária (W) *</label><input id="f_potencia" type="number" step="0.01" value="${p.potencia_w??""}"></div><div class="field"><label>Temperatura de cor (K)</label><input id="f_cct" type="number" value="${p.cct_k??""}"></div></div>`:""}
+      <div class="field"><label>Foto *</label>${p.foto_url?`<img id="f_prev" class="thumb" style="width:90px;height:90px" src="${esc(p.foto_url)}" alt="">`:`<img id="f_prev" class="thumb" style="width:90px;height:90px;display:none" alt="">`}<input id="f_foto" type="file" accept="image/*" style="margin-top:6px"></div>
+      <details style="margin-bottom:12px"><summary style="cursor:pointer;font-weight:600;color:var(--muted)">Mais detalhes (opcionais)</summary>
+        <div class="grid" style="margin-top:10px"><div class="field" style="grid-column:1/-1"><label>Descrição</label><input id="f_descricao" value="${esc(p.descricao)}"></div>
+        ${DET.map(([k,n])=>`<div class="field"><label>${n}</label><input data-det="${k}" value="${esc(d[k]??"")}"></div>`).join("")}</div></details>
+      ${ehComp?`<div class="field"><label>Serve em quais luminárias? (opcional — em branco vale pra qualquer uma)</label>
+        <input id="c_busca" placeholder="Buscar luminária (ex: DIP50)"><div class="small" id="c_resumo" style="margin:6px 0"></div><div class="box" id="c_lista"></div></div>`:""}
+      ${!ehComp&&p.integrada?`<div class="small">Luminária com lâmpada integrada: não tem Driver, LED nem kit separados.</div>`:""}
+      ${!ehComp&&!p.integrada&&p.id?`<div class="field"><label>Componentes que servem nesta luminária</label><div class="pills">${usadoEm.length?usadoEm.map(c=>`<span>${TIPO1[c.tipo]} ${esc(c.codigo)}</span>`).join(""):'<span class="small">nenhum ligado ainda — marque no cadastro de cada componente</span>'}</div></div>
+        <div class="field"><label>Kits desta luminária</label><div class="pills">${kitsDe.length?kitsDe.map(k=>`<span>${esc(k.nome)}</span>`).join(""):'<span class="small">nenhum kit ainda</span>'}</div></div>`:""}
+      <div class="bar" style="margin-top:8px"><button class="p" data-act="salvarItem">Salvar</button>${novo?"":`<button class="danger" data-act="apagarItem">Excluir</button>`}</div>
+    </div>`;
+  if(ehComp){ $("#c_busca").oninput=listaCompat; listaCompat(); }
+  $("#f_foto").onchange=e=>{ const f=e.target.files[0]; if(f){ const im=$("#f_prev"); im.src=URL.createObjectURL(f); im.style.display=""; } };
+}
+function listaCompat(){
+  const t=norm($("#c_busca").value);
+  const lums=S.produtos.filter(p=>p.tipo==="luminaria"&&!p.integrada&&(!t||norm(p.codigo).includes(t)||norm(p.fabricante).includes(t))).sort((a,b)=>String(a.codigo).localeCompare(String(b.codigo),"pt-BR",{numeric:true})).slice(0,150);
+  $("#c_lista").innerHTML=lums.length?lums.map(l=>`<label><input type="checkbox" data-lum="${l.id}" ${S.compSel.has(l.id)?"checked":""}> ${esc(l.codigo)} <span class="small">${esc(l.fabricante)||""}</span></label>`).join(""):`<div class="small">Nenhuma luminária encontrada.</div>`;
+  $("#c_lista").querySelectorAll("input[data-lum]").forEach(i=>i.onchange=()=>{ const id=Number(i.dataset.lum); i.checked?S.compSel.add(id):S.compSel.delete(id); resumoCompat(); });
+  resumoCompat();
+}
+function resumoCompat(){ const n=S.compSel.size; $("#c_resumo").innerHTML=n?`<b>${n} luminária(s) marcada(s)</b>`:"Nenhuma marcada = serve em qualquer luminária."; }
+
+async function salvarItem(){
+  const p=S.cur, t=p.tipo, g=id=>{const e=$("#"+id);return e?e.value:""};
+  const codigo=g("f_codigo").trim();
+  if(!codigo) return msg("Informe o código do item.",false);
+  const dup=S.produtos.find(x=>x.tipo===t&&norm(x.codigo)===norm(codigo)&&x.id!==p.id);
+  if(dup) return msg(`Já existe ${TIPO1[t]} "${dup.codigo}"${dup.fabricante?" ("+dup.fabricante+")":""}. Procure na lista e edite o existente.`,false);
+  const detalhes={...(p.detalhes||{})}; document.querySelectorAll("[data-det]").forEach(i=>{ const v=i.value.trim(); if(v) detalhes[i.dataset.det]=v; else delete detalhes[i.dataset.det]; });
+  const integ=t==="luminaria"&&$("#f_integrada")&&$("#f_integrada").checked;
+  const row={tipo:t,codigo,fabricante:nv(g("f_fabricante").trim()),descricao:nv(g("f_descricao").trim()),preco:num(g("f_preco")),
+    potencia_w:(t==="led"||t==="driver"||integ)?num(g("f_potencia")):null,
+    cct_k:(t==="led"||integ)?(num(g("f_cct"))==null?null:Math.round(num(g("f_cct")))):null,
+    corrente_ma:t==="driver"?num(g("f_corrente")):null, facho_graus:t==="optica"?num(g("f_facho")):null,
+    integrada:integ, detalhes, foto_url:p.foto_url};
+  const file=$("#f_foto").files[0];
+  if(file){
+    if(!file.type.startsWith("image/")) return msg("O arquivo da foto precisa ser uma imagem.",false);
+    const path="v2/"+`${t}_${codigo}_${Date.now()}_${file.name}`.replace(/[^\w.-]+/g,"_");
+    const up=await sb.storage.from("fotos").upload(path,file,{upsert:true});
+    if(up.error) return msg("Erro ao enviar a foto: "+up.error.message,false);
+    row.foto_url=sb.storage.from("fotos").getPublicUrl(path).data.publicUrl;
+  }
+  const r=p.id?await sb.from("v2_produtos").update(row).eq("id",p.id).select().single():await sb.from("v2_produtos").insert(row).select().single();
+  if(r.error) return msg(r.error.code==="23505"?"Esse código já existe no catálogo.":"Erro ao salvar: "+r.error.message,false);
+  if(t!=="luminaria"){
+    const id=r.data.id, antes=new Set(S.compat.filter(c=>c.componente_id===id).map(c=>c.luminaria_id));
+    const tirar=[...antes].filter(x=>!S.compSel.has(x)), por=[...S.compSel].filter(x=>!antes.has(x));
+    if(tirar.length){ const d=await sb.from("v2_compatibilidade").delete().eq("componente_id",id).in("luminaria_id",tirar); if(d.error) return msg("Salvou o item, mas não consegui atualizar as luminárias: "+d.error.message,false); }
+    if(por.length){ const i=await sb.from("v2_compatibilidade").insert(por.map(l=>({componente_id:id,luminaria_id:l}))); if(i.error) return msg("Salvou o item, mas não consegui ligar às luminárias: "+i.error.message,false); }
+  }
+  await carregar(); S.tab=t; renderLista(); msg(`${TIPO1[t]} "${codigo}" salvo.`);
+}
+async function apagarItem(){
+  const p=S.cur;
+  if(!confirm(`Excluir ${TIPO1[p.tipo]} "${p.codigo}" do catálogo?`)) return;
+  const r=await sb.from("v2_produtos").delete().eq("id",p.id);
+  if(r.error) return msg(r.error.code==="23503"?"Esse item é usado em um kit. Tire ele do kit antes de excluir.":"Erro ao excluir: "+r.error.message,false);
+  await carregar(); renderLista(); msg("Item excluído.");
+}
+
+// ---- kit (editor) ----
+function novoKit(){ S.kit={id:null,nome:"",luminaria_id:null,itens:[]}; renderKit(); }
+function abrirKit(id){ const k=S.kits.find(x=>x.id===id); S.kit={id:k.id,nome:k.nome,luminaria_id:k.luminaria_id,itens:S.itens.filter(i=>i.kit_id===id).map(i=>({produto_id:i.produto_id,quantidade:i.quantidade}))}; renderKit(); }
+function renderKit(){
+  S.view="kit"; const k=S.kit;
+  $("#app").innerHTML=`<button data-act="voltar" style="margin-bottom:12px">‹ Voltar</button>
+    <div class="card"><h3 style="margin-top:0">${k.id?esc(k.nome):"Novo kit"} <span class="small">· Kit</span></h3>
+      <div class="field"><label>Nome do kit *</label><input id="k_nome" value="${esc(k.nome)}"></div>
+      <div class="field"><label>Luminária onde o kit serve *</label><div id="k_lum"></div><input id="k_lbusca" placeholder="Buscar luminária por código ou fabricante" style="margin-top:6px"><div class="box" id="k_lres" style="display:none;margin-top:6px"></div></div>
+      <div class="field"><label>Itens do kit</label><div id="k_itens"></div></div>
+      <div class="field"><label>Adicionar item</label><div class="bar" style="margin-bottom:6px"><select id="k_tipo" style="width:140px"><option value="led">LED</option><option value="driver">Driver</option><option value="optica">Óptica</option></select><input id="k_ibusca" class="grow" placeholder="Digite parte do código ou fabricante"></div><div class="box" id="k_ires" style="display:none"></div></div>
+      <div id="k_total" class="card" style="background:var(--soft)"></div>
+      <div class="bar"><button class="p" data-act="salvarKit">Salvar kit</button>${k.id?`<button class="danger" data-act="apagarKit">Excluir kit</button>`:""}</div></div>`;
+  $("#k_nome").oninput=e=>{S.kit.nome=e.target.value};
+  $("#k_lbusca").oninput=buscaLumKit; $("#k_ibusca").oninput=buscaItemKit; $("#k_tipo").onchange=buscaItemKit;
+  desenhaKit();
+}
+function desenhaKit(){
+  const k=S.kit, lum=porId(k.luminaria_id);
+  $("#k_lum").innerHTML=lum?`<span class="pills"><span><b>${esc(lum.codigo)}</b> ${esc(lum.fabricante)||""}</span></span> <button data-act="tirarLum" style="padding:2px 8px">trocar</button>`:`<span class="no">nenhuma escolhida</span>`;
+  $("#k_itens").innerHTML=k.itens.length?`<table><tr><th>Item</th><th>Potência</th><th style="width:90px">Qtd</th><th></th></tr>${k.itens.map((it,i)=>{const p=porId(it.produto_id);return `<tr><td>${TIPO1[p.tipo]} <b>${esc(p.codigo)}</b> <span class="small">${esc(p.fabricante)||""}</span></td><td>${p.tipo==="led"?(p.potencia_w!=null?fmt(p.potencia_w)+" W":"<span class='no'>falta</span>"):"—"}</td><td><input type="number" min="1" value="${it.quantidade}" data-q="${i}"></td><td><button data-act="tirarItem" data-i="${i}" style="padding:2px 8px">remover</button></td></tr>`}).join("")}</table>`:`<div class="small">Nenhum item ainda.</div>`;
+  $("#k_itens").querySelectorAll("input[data-q]").forEach(inp=>inp.onchange=()=>{ S.kit.itens[Number(inp.dataset.q)].quantidade=Math.max(1,parseInt(inp.value)||1); desenhaKit(); });
+  const its=k.itens.map(i=>({...i,p:porId(i.produto_id)})), leds=its.filter(i=>i.p.tipo==="led");
+  const total=leds.reduce((s,i)=>s+(i.p.potencia_w||0)*i.quantidade,0), sem=leds.filter(i=>i.p.potencia_w==null).length;
+  $("#k_total").innerHTML=`<div style="display:flex;justify-content:space-between;align-items:baseline"><span class="small">Potência total calculada (soma dos LEDs × quantidade)</span><b style="font-size:18px">${leds.length?fmt(Math.round(total*100)/100)+" W":"—"}</b></div>${sem?`<div class="no" style="margin-top:4px">${sem} LED(s) sem potência cadastrada — a soma está incompleta.</div>`:""}`;
+}
+function buscaLumKit(){
+  const t=norm($("#k_lbusca").value), box=$("#k_lres");
+  if(!t){ box.style.display="none"; return; }
+  const r=S.produtos.filter(p=>p.tipo==="luminaria"&&!p.integrada&&(norm(p.codigo).includes(t)||norm(p.fabricante).includes(t))).slice(0,8);
+  box.style.display=""; box.innerHTML=r.length?r.map(p=>`<label style="cursor:pointer" data-act="pickLum" data-id="${p.id}"><b>${esc(p.codigo)}</b> <span class="small">${esc(p.fabricante)||""}</span></label>`).join(""):`<div class="small">Nenhuma luminária encontrada.</div>`;
+}
+function buscaItemKit(){
+  const t=norm($("#k_ibusca").value), tipo=$("#k_tipo").value, box=$("#k_ires");
+  if(!t){ box.style.display="none"; return; }
+  const r=S.produtos.filter(p=>p.tipo===tipo&&(norm(p.codigo).includes(t)||norm(p.fabricante).includes(t))).slice(0,8);
+  box.style.display=""; box.innerHTML=r.length?r.map(p=>`<label style="cursor:pointer" data-act="pickItem" data-id="${p.id}">+ <b>${esc(p.codigo)}</b> <span class="small">${esc(p.fabricante)||""}${p.potencia_w!=null?" · "+fmt(p.potencia_w)+" W":""}</span></label>`).join(""):`<div class="small">Nada encontrado. Cadastre o item no catálogo primeiro.</div>`;
+}
+async function salvarKit(){
+  const k=S.kit, nome=k.nome.trim();
+  if(!nome) return msg("Informe o nome do kit.",false);
+  if(S.kits.find(x=>norm(x.nome)===norm(nome)&&x.id!==k.id)) return msg(`Já existe um kit chamado "${nome}".`,false);
+  if(!k.luminaria_id) return msg("Escolha a luminária onde o kit serve.",false);
+  if(!k.itens.length) return msg("Adicione pelo menos um item ao kit.",false);
+  const r=k.id?await sb.from("v2_kits").update({nome,luminaria_id:k.luminaria_id}).eq("id",k.id).select().single():await sb.from("v2_kits").insert({nome,luminaria_id:k.luminaria_id}).select().single();
+  if(r.error) return msg(r.error.code==="23505"?"Já existe um kit com esse nome.":"Erro ao salvar o kit: "+r.error.message,false);
+  const id=r.data.id;
+  const d=await sb.from("v2_kit_itens").delete().eq("kit_id",id);
+  if(d.error) return msg("Erro ao atualizar os itens: "+d.error.message,false);
+  const i=await sb.from("v2_kit_itens").insert(k.itens.map(x=>({kit_id:id,produto_id:x.produto_id,quantidade:x.quantidade})));
+  if(i.error) return msg("Erro ao gravar os itens do kit: "+i.error.message,false);
+  await carregar(); S.tab="kit"; renderLista(); msg(`Kit "${nome}" salvo.`);
+}
+async function apagarKit(){
+  if(!confirm(`Excluir o kit "${S.kit.nome}"?`)) return;
+  const r=await sb.from("v2_kits").delete().eq("id",S.kit.id);
+  if(r.error) return msg("Erro ao excluir: "+r.error.message,false);
+  await carregar(); S.tab="kit"; renderLista(); msg("Kit excluído.");
+}
+
+// ---- importar lista (sem duplicar) ----
+const IMP_TIPOS={luminaria:"luminaria","luminária":"luminaria",led:"led",driver:"driver",optica:"optica","óptica":"optica"};
+const chaveImp=(tipo,cod)=>tipo+"|"+String(cod||"").replace(/\s*\(.*\)\s*$/,"").replace(/\s+/g," ").trim().toLowerCase();
+function lerCSV(texto){
+  const linhas=texto.trim().split(/\r?\n/).filter(l=>l.trim());
+  if(linhas.length<2) return [];
+  const sep=linhas[0].includes("\t")?"\t":(linhas[0].split(";").length>=linhas[0].split(",").length?";":",");
+  const cab=linhas[0].split(sep).map(h=>h.trim().toLowerCase());
+  return linhas.slice(1).map(l=>{ const c=l.split(sep), o={}; cab.forEach((h,i)=>o[h]=(c[i]??"").trim()); return o; });
+}
+function classificar(rows,existentes){
+  const mapa=new Map(); existentes.forEach(e=>{const k=chaveImp(e.tipo,e.codigo); if(!mapa.has(k)) mapa.set(k,e);});
+  const vistas=new Map();
+  return rows.map((r,i)=>{
+    const tipo=IMP_TIPOS[String(r.tipo||"").trim().toLowerCase()], codigo=String(r.codigo||"").trim();
+    const l={n:i+2,tipo,codigo,fabricante:nv(r.fabricante),descricao:nv(r.descricao),preco:num(r.preco),potencia_w:num(r.potencia_w),corrente_ma:num(r.corrente_ma),cct_k:num(r.cct_k),facho_graus:num(r.facho_graus)};
+    if(!tipo) return {...l,status:"erro",motivo:"tipo precisa ser luminaria, led, driver ou optica"};
+    if(!codigo) return {...l,status:"erro",motivo:"código vazio"};
+    const k=chaveImp(tipo,codigo);
+    if(mapa.has(k)){ const e=mapa.get(k); return {...l,status:"existe",motivo:`já cadastrado${e.fabricante?" ("+e.fabricante+")":""}`}; }
+    if(vistas.has(k)) return {...l,status:"repetida",motivo:`repetida na lista (linha ${vistas.get(k)})`};
+    vistas.set(k,l.n); return {...l,status:"novo",motivo:"será cadastrado"};
+  });
+}
+let IMP=[];
+function renderImport(){
+  S.view="import";
+  $("#app").innerHTML=`<button data-act="voltar" style="margin-bottom:12px">‹ Voltar</button>
+    <div class="card"><h3 style="margin-top:0">Importar lista</h3>
+      <div class="small" style="margin-bottom:8px">Cole uma linha por item, separando por ponto e vírgula (a primeira linha é o cabeçalho). Primeiro clique em <b>Conferir</b>: o sistema mostra o que é novo e o que já existe. O que já existe nunca é cadastrado de novo.</div>
+      <textarea id="i_txt" style="min-height:150px" placeholder="tipo;fabricante;codigo;descricao;preco;potencia_w;corrente_ma;cct_k;facho_graus&#10;driver;LUCCHI;LF/FMR080YSII550HDS;Driver 200-550mA;106,20;;;;"></textarea>
+      <div class="bar" style="margin-top:10px"><button class="p" data-act="conferir">Conferir</button><button id="i_ok" style="display:none" data-act="cadastrarImport">Cadastrar só os novos</button></div>
+      <div id="i_res" style="margin-top:12px"></div></div>`;
+}
+function conferirImport(){
+  const rows=lerCSV($("#i_txt").value);
+  if(!rows.length) return msg("Cole a lista, com o cabeçalho na primeira linha.",false);
+  IMP=classificar(rows,S.produtos);
+  const cor={novo:"ok",existe:"no",repetida:"no",erro:"no"}, rot={novo:"NOVO",existe:"JÁ EXISTE",repetida:"REPETIDA",erro:"ERRO"};
+  const novos=IMP.filter(l=>l.status==="novo").length;
+  $("#i_res").innerHTML=`<div class="small" style="margin-bottom:8px"><b>${novos}</b> novo(s) · <b>${IMP.length-novos}</b> ignorado(s)</div><table><tr><th>Linha</th><th>Tipo</th><th>Código</th><th>Situação</th></tr>${IMP.map(l=>`<tr><td>${l.n}</td><td>${esc(TIPO1[l.tipo]||"—")}</td><td>${esc(l.codigo)||"—"}</td><td class="${cor[l.status]}"><b>${rot[l.status]}</b> — ${esc(l.motivo)}</td></tr>`).join("")}</table>`;
+  $("#i_ok").style.display=novos?"":"none";
+}
+async function cadastrarImport(){
+  const novos=IMP.filter(l=>l.status==="novo");
+  if(!novos.length) return msg("Não há nenhum item novo.",false);
+  const r=await sb.from("v2_produtos").insert(novos.map(l=>({tipo:l.tipo,codigo:l.codigo,fabricante:l.fabricante,descricao:l.descricao,preco:l.preco,potencia_w:l.potencia_w,corrente_ma:l.corrente_ma,cct_k:l.cct_k==null?null:Math.round(l.cct_k),facho_graus:l.facho_graus})));
+  if(r.error) return msg("Erro ao cadastrar: "+r.error.message+" — nada foi cadastrado.",false);
+  await carregar(); const n=novos.length; renderImport(); msg(`${n} item(ns) novo(s) cadastrado(s). O que já existia não foi mexido.`);
+}
+
+// ---- cliques ----
+const ACT={
+  entrar, aba:d=>{S.tab=d.t;renderLista()}, novo:()=>S.tab==="kit"?novoKit():novoItem(), importar:renderImport,
+  abrir:d=>abrirItem(Number(d.id)), abrirKit:d=>abrirKit(Number(d.id)), voltar:()=>{msg("");renderLista()},
+  salvarItem, apagarItem, salvarKit, apagarKit, conferir:conferirImport, cadastrarImport,
+  trocaTipo:()=>{ S.cur.tipo=$("#f_tipo").value; S.compSel=new Set(); renderItem(); },
+  trocaIntegrada:()=>{ S.cur.integrada=$("#f_integrada").checked; $("#blocoInteg").style.display=S.cur.integrada?"":"none"; },
+  tirarLum:()=>{S.kit.luminaria_id=null;desenhaKit()},
+  pickLum:d=>{S.kit.luminaria_id=Number(d.id);$("#k_lbusca").value="";$("#k_lres").style.display="none";desenhaKit()},
+  pickItem:d=>{ const id=Number(d.id); if(S.kit.itens.some(i=>i.produto_id===id)) return msg("Esse item já está no kit.",false); S.kit.itens.push({produto_id:id,quantidade:1}); $("#k_ibusca").value=""; $("#k_ires").style.display="none"; msg(""); desenhaKit(); },
+  tirarItem:d=>{S.kit.itens.splice(Number(d.i),1);desenhaKit()}
+};
+document.addEventListener("click",e=>{ const el=e.target.closest("[data-act]"); if(!el||el.tagName==="SELECT"||el.tagName==="INPUT") return; const f=ACT[el.dataset.act]; if(f){ e.preventDefault(); f(el.dataset); }});
+document.addEventListener("change",e=>{ const el=e.target; if((el.tagName==="SELECT"||el.type==="checkbox")&&el.dataset.act){ const f=ACT[el.dataset.act]; if(f) f(el.dataset); }});
+document.addEventListener("keydown",e=>{ if(e.key==="Enter"&&e.target.id==="lg_senha") entrar(); });
+
+async function iniciar(){
+  const s=await sb.auth.getSession();
+  if(!s.data.session) return telaLogin();
+  $("#quem").innerHTML=`${esc(s.data.session.user.email)} · <a href="#" id="sair">Sair</a>`;
+  $("#sair").onclick=async e=>{e.preventDefault();await sb.auth.signOut();telaLogin()};
+  if(await carregar()) renderLista();
+}
+iniciar();
+</script>
+</body>
+</html>

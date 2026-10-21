@@ -91,7 +91,7 @@ function faltas(p){
 function specLinha(p){
   if(p.tipo==="luminaria") return p.integrada?`Lâmpada integrada${p.potencia_w!=null?" · "+fmt(p.potencia_w)+" W":""}`:(p.descricao||"");
   if(p.tipo==="led") return [p.potencia_w!=null?fmt(p.potencia_w)+" W":"",p.cct_k?p.cct_k+" K":""].filter(Boolean).join(" · ");
-  if(p.tipo==="driver") return p.corrente_ma!=null?fmt(p.corrente_ma)+" mA":"";
+  if(p.tipo==="driver"){ if(p.corrente_ma==null) return ""; const mn=(p.detalhes||{}).corrente_min_ma; return (mn?fmt(mn)+"–":"")+fmt(p.corrente_ma)+" mA"; }
   return p.facho_graus!=null?fmt(p.facho_graus)+"°":"";
 }
 const porId=id=>S.produtos.find(p=>p.id===id);
@@ -215,7 +215,7 @@ function renderItem(){
         <div class="field"><label>Fabricante *</label><input id="f_fabricante" value="${esc(p.fabricante)}"></div>
         <div class="field"><label>Preço de venda (R$) *</label><input id="f_preco" type="number" step="0.01" value="${p.preco??""}"></div>
         ${t==="led"?`<div class="field"><label>Potência (W) *</label><input id="f_potencia" type="number" step="0.01" value="${p.potencia_w??""}"></div><div class="field"><label>Temperatura de cor (K) *</label><input id="f_cct" type="number" value="${p.cct_k??""}"></div>`:""}
-        ${t==="driver"?`<div class="field"><label>Corrente (mA) *</label><input id="f_corrente" type="number" step="0.1" value="${p.corrente_ma??""}"></div>`:""}
+        ${t==="driver"?`<div class="field"><label>Corrente mínima (mA)</label><input id="f_corrente_min" type="number" step="0.1" value="${(d.corrente_min_ma)??""}"></div><div class="field"><label>Corrente máxima (mA) *</label><input id="f_corrente" type="number" step="0.1" value="${p.corrente_ma??""}"></div>`:""}
         ${t==="optica"?`<div class="field"><label>Ângulo de facho (graus) *</label><input id="f_facho" type="number" step="0.1" value="${p.facho_graus??""}"></div>`:""}
       </div>
       ${t==="luminaria"?`<label style="display:flex;gap:8px;align-items:center;font-weight:400;color:var(--ink);margin:4px 0 12px"><input type="checkbox" id="f_integrada" data-act="trocaIntegrada" ${p.integrada?"checked":""}> Lâmpada integrada (vende só a peça completa, sem acessórios separados)</label>
@@ -250,6 +250,7 @@ async function salvarItem(){
   const dup=S.produtos.find(x=>x.tipo===t&&norm(x.codigo)===norm(codigo)&&x.id!==p.id);
   if(dup) return msg(`Já existe ${TIPO1[t]} "${dup.codigo}"${dup.fabricante?" ("+dup.fabricante+")":""}. Procure na lista e edite o existente.`,false);
   const detalhes={...(p.detalhes||{})}; document.querySelectorAll("[data-det]").forEach(i=>{ const v=i.value.trim(); if(v) detalhes[i.dataset.det]=v; else delete detalhes[i.dataset.det]; });
+  if(t==="driver"){ const mn=num(g("f_corrente_min")); if(mn!=null) detalhes.corrente_min_ma=mn; else delete detalhes.corrente_min_ma; }
   const integ=t==="luminaria"&&$("#f_integrada")&&$("#f_integrada").checked;
   const row={tipo:t,codigo,fabricante:nv(g("f_fabricante").trim()),descricao:nv(g("f_descricao").trim()),preco:num(g("f_preco")),
     potencia_w:(t==="led"||integ)?num(g("f_potencia")):(t==="driver"?(p.potencia_w??null):null),

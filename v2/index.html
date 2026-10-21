@@ -483,7 +483,7 @@ const garantiaTxt=p=>!p.garantia_ate?{t:"sem data",c:"small"}:(p.garantia_ate>=h
 const precisaKit=p=>{ const l=porId(p.luminaria_id); return !!l&&!l.integrada; };
 const urlPeca=s=>new URL("peca.html?s="+encodeURIComponent(s),location.href).href;
 function codigoObra(nome){ const s=String(nome||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase(); const c=s.replace(/[^BCDFGHJKLMNPQRSTVWXYZ]/g,""), l=s.replace(/[^A-Z]/g,""); if(c.length>=3) return c.slice(0,3); return (c+l).slice(0,3).padEnd(3,"X"); }
-const navArea=a=>'<div class="tabs noprint" style="border-bottom:1px solid var(--line);padding-bottom:10px"><button class="tab '+(a==="cat"?"on":"")+'" data-act="areaCat">Catálogo</button><button class="tab '+(a==="obras"?"on":"")+'" data-act="areaObras">Obras</button><button class="tab '+(a==="ped"?"on":"")+'" data-act="areaPedidos">Pedidos</button></div>';
+const navArea=a=>'<div class="tabs noprint" style="border-bottom:1px solid var(--line);padding-bottom:10px"><button class="tab '+(a==="cat"?"on":"")+'" data-act="areaCat">Catálogo</button><button class="tab '+(a==="obras"?"on":"")+'" data-act="areaObras">Obras</button><button class="tab '+(a==="ped"?"on":"")+'" data-act="areaPedidos">Pedidos</button><button class="tab '+(a==="rel"?"on":"")+'" data-act="areaRel">Relatórios</button></div>';
 
 async function carregarObras(){
   try{
@@ -807,12 +807,116 @@ async function salvarObsPedido(){
   await carregarPedidos(); renderPedido(); msg("Anotação salva.");
 }
 
+// ---- relatórios (só a empresa) ----
+Object.assign(S,{relTab:"manut",relDe:"",relAte:"",relObra:null,relExp:null});
+const isoLocal=x=>x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0");
+const diaDe=d=>!d?"":(/^\d{4}-\d\d-\d\d$/.test(String(d))?String(d):isoLocal(new Date(d)));
+const noPeriodo=d=>{ const s=diaDe(d); if(!s) return true; return !!((S.relDe&&s<S.relDe)||(S.relAte&&s>S.relAte)); };
+const FALHA=["parou de funcionar","piscando","perdeu brilho"];
+const pcMap=()=>new Map(S.pecas.map(p=>[p.id,p]));
+const pct=(a,b)=>b?Math.round(a*1000/b)/10+"%":"—";
+const mesDe=d=>{ const s=diaDe(d); return s.slice(5,7)+"/"+s.slice(0,4); };
+function baixarCsv(nome,cab,linhas){
+  const q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+  const t="﻿"+[cab].concat(linhas).map(l=>l.map(q).join(";")).join("\r\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([t],{type:"text/csv;charset=utf-8"})); a.download=nome; document.body.appendChild(a); a.click(); a.remove();
+}
+const metrica=(rot,val,sub)=>'<div style="flex:1;min-width:140px;background:var(--soft);border-radius:8px;padding:10px 12px"><div class="small">'+rot+'</div><div style="font-size:20px;font-weight:600">'+val+'</div>'+(sub?'<div class="small">'+sub+'</div>':'')+'</div>';
+
+function eventosManut(){
+  const pm=pcMap(), ev=[];
+  S.pitens.filter(i=>i.removido_em&&!noPeriodo(i.removido_em)).forEach(i=>{
+    const p=pm.get(i.peca_id); if(!p) return; const c=porId(i.produto_id);
+    ev.push({obra:p.obra_id,peca:p.id,data:i.removido_em,serial:p.serial,tipo:"Troca",desc:i.quantidade+"x "+(c?c.codigo:"?"),motivo:i.motivo_remocao||"",un:i.quantidade});
+  });
+  S.pedidos.filter(pd=>!noPeriodo(pd.criado_em)).forEach(pd=>{
+    const p=pm.get(pd.peca_id); if(!p) return;
+    ev.push({obra:p.obra_id,peca:p.id,data:diaDe(pd.criado_em),serial:p.serial,tipo:pd.tipo==="problema"?"Problema":"Pedido de peças",desc:"Pedido #"+pd.id+" · "+ST[pd.status],motivo:pd.motivo||"",un:0});
+  });
+  return ev;
+}
+function relManut(){
+  const ev=eventosManut();
+  if(S.relObra){
+    const o=S.obras.find(x=>x.id===S.relObra), e=ev.filter(x=>x.obra===o.id).sort((a,b)=>a.data<b.data?1:-1);
+    S.relExp={nome:"manutencao-"+o.nome+".csv",cab:["Data","Peça","Ocorrência","Detalhe","Motivo"],rows:e.map(x=>[dmy(x.data),x.serial,x.tipo,x.desc,x.motivo])};
+    const porMotivo={}; e.filter(x=>x.tipo==="Troca").forEach(x=>{ porMotivo[x.motivo||"sem motivo"]=(porMotivo[x.motivo||"sem motivo"]||0)+x.un; });
+    return '<button data-act="relVoltaObra" style="margin-bottom:10px">‹ Todas as obras</button><h3 style="margin:0 0 8px">'+esc(o.nome)+'</h3>'
+     +'<div class="small" style="margin-bottom:8px">Unidades trocadas por motivo: '+(Object.keys(porMotivo).length?Object.entries(porMotivo).map(x=>esc(x[0])+": <b>"+x[1]+"</b>").join(" · "):"nenhuma")+'</div>'
+     +(e.length?'<table><tr><th>Data</th><th>Peça</th><th>Ocorrência</th><th>Detalhe</th><th>Motivo</th></tr>'+e.map(x=>'<tr><td>'+dmy(x.data)+'</td><td>'+esc(x.serial)+'</td><td>'+x.tipo+'</td><td>'+esc(x.desc)+'</td><td>'+esc(x.motivo)+'</td></tr>').join("")+'</table>':'<div class="small">Nenhuma ocorrência no período.</div>');
+  }
+  const linhas=S.obras.map(o=>{
+    const ps=S.pecas.filter(p=>p.obra_id===o.id), e=ev.filter(x=>x.obra===o.id);
+    return {o:o,ps:ps.length,prob:e.filter(x=>x.tipo==="Problema").length,trocas:e.filter(x=>x.tipo==="Troca").reduce((s,x)=>s+x.un,0),ped:e.filter(x=>x.tipo==="Pedido de peças").length,comOc:new Set(e.filter(x=>x.tipo!=="Pedido de peças").map(x=>x.peca)).size};
+  }).sort((a,b)=>b.comOc-a.comOc||b.trocas-a.trocas);
+  S.relExp={nome:"manutencao-por-obra.csv",cab:["Obra","Peças","Peças com ocorrência","% com ocorrência","Avisos de problema","Unidades trocadas","Pedidos de peças"],rows:linhas.map(l=>[l.o.nome,l.ps,l.comOc,pct(l.comOc,l.ps),l.prob,l.trocas,l.ped])};
+  const tot=linhas.reduce((a,l)=>({ps:a.ps+l.ps,oc:a.oc+l.comOc,pr:a.pr+l.prob,tr:a.tr+l.trocas}),{ps:0,oc:0,pr:0,tr:0});
+  return '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'+metrica("Peças instaladas",tot.ps)+metrica("Peças com ocorrência",tot.oc,pct(tot.oc,tot.ps))+metrica("Avisos de problema",tot.pr)+metrica("Unidades trocadas",tot.tr)+'</div>'
+   +(linhas.length?'<table><tr><th>Obra</th><th>Peças</th><th>Com ocorrência</th><th>Avisos</th><th>Unid. trocadas</th><th>Pedidos de peças</th></tr>'+linhas.map(l=>'<tr style="cursor:pointer" data-act="relAbrirObra" data-id="'+l.o.id+'"><td><b>'+esc(l.o.nome)+'</b></td><td>'+l.ps+'</td><td>'+l.comOc+' <span class="small">('+pct(l.comOc,l.ps)+')</span></td><td>'+l.prob+'</td><td>'+l.trocas+'</td><td>'+l.ped+'</td></tr>').join("")+'</table><div class="small" style="margin-top:6px">Clique numa obra para ver as ocorrências.</div>':'<div class="small">Nenhuma obra ainda.</div>');
+}
+
+function relVendas(){
+  const vend=S.pedidos.filter(p=>p.tipo==="compra"&&(p.status==="entregue"||p.status==="instalado")&&!noPeriodo(p.entregue_em));
+  const aberto=S.pedidos.filter(p=>p.tipo==="compra"&&(p.status==="novo"||p.status==="em_atendimento"));
+  const val=p=>totalPed(p.id).total, soma=l=>l.reduce((s,p)=>s+val(p),0);
+  const semPreco=vend.filter(p=>totalPed(p.id).sem).length, emGar=vend.filter(p=>p.em_garantia);
+  const pm=pcMap(), agr=(chave)=>{ const m=new Map(); vend.forEach(p=>{ const k=chave(p); const r=m.get(k)||{n:0,t:0}; r.n++; r.t+=val(p); m.set(k,r); }); return [...m.entries()]; };
+  const porMes=agr(p=>diaDe(p.entregue_em).slice(0,7)).sort((a,b)=>a[0]<b[0]?1:-1);
+  const porObra=agr(p=>{ const pc=pm.get(p.peca_id), o=pc&&S.obras.find(x=>x.id===pc.obra_id); return o?o.nome:"?"; }).sort((a,b)=>b[1].t-a[1].t);
+  const itens=new Map(); S.ped_itens.filter(i=>vend.some(p=>p.id===i.pedido_id)).forEach(i=>{ const r=itens.get(i.descricao)||{q:0,t:0}; r.q+=i.quantidade; r.t+=(i.preco_unit||0)*i.quantidade; itens.set(i.descricao,r); });
+  const porItem=[...itens.entries()].sort((a,b)=>b[1].t-a[1].t);
+  S.relExp={nome:"vendas.csv",cab:["Pedido","Entregue em","Obra","Peça","Cliente","Em garantia","Total"],rows:vend.map(p=>{ const pc=pm.get(p.peca_id), o=pc&&S.obras.find(x=>x.id===pc.obra_id); return [p.id,dmy(diaDe(p.entregue_em)),o?o.nome:"",pc?pc.serial:"",p.contato_nome,p.em_garantia?"sim":"não",val(p).toFixed(2).replace(".",",")]; })};
+  const tab=(tit,cab,linhas)=>'<h4 style="margin:16px 0 6px">'+tit+'</h4>'+(linhas.length?'<table><tr>'+cab.map(c=>'<th>'+c+'</th>').join("")+'</tr>'+linhas.map(l=>'<tr>'+l.map(c=>'<td>'+c+'</td>').join("")+'</tr>').join("")+'</table>':'<div class="small">Sem dados no período.</div>');
+  return '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px">'+metrica("Vendido (entregue)",brl(soma(vend)),vend.length+" pedido(s)")+metrica("Ticket médio",vend.length?brl(soma(vend)/vend.length):"—")+metrica("Dos quais em garantia",brl(soma(emGar)),emGar.length+" pedido(s)")+metrica("Orçamentos em aberto",brl(soma(aberto)),aberto.length+" pedido(s)")+'</div>'
+   +(semPreco?'<div class="no" style="margin-bottom:6px">'+semPreco+' pedido(s) têm item sem preço; o total deles está incompleto.</div>':'')
+   +'<div class="small">Conta como venda o pedido de compra marcado Entregue ou Instalado, pela data da entrega. Pedido em garantia aparece separado porque pode não ser cobrado.</div>'
+   +tab("Por mês",["Mês","Pedidos","Total"],porMes.map(x=>[x[0].slice(5)+"/"+x[0].slice(0,4),x[1].n,brl(x[1].t)]))
+   +tab("Por obra",["Obra","Pedidos","Total"],porObra.map(x=>[esc(x[0]),x[1].n,brl(x[1].t)]))
+   +tab("Por item",["Item","Unidades","Total"],porItem.map(x=>[esc(x[0]),x[1].q,brl(x[1].t)]));
+}
+
+function relFalham(){
+  const m=new Map();
+  S.pitens.forEach(i=>{
+    const r=m.get(i.produto_id)||{id:i.produto_id,inst:0,falha:0,prev:0,outro:0,dias:0,dq:0};
+    r.inst+=i.quantidade;
+    if(i.removido_em&&!noPeriodo(i.removido_em)){
+      if(FALHA.includes(i.motivo_remocao)){ r.falha+=i.quantidade; r.dias+=((new Date(i.removido_em)-new Date(i.instalado_em))/86400000)*i.quantidade; r.dq+=i.quantidade; }
+      else if(i.motivo_remocao==="troca preventiva") r.prev+=i.quantidade; else r.outro+=i.quantidade;
+    }
+    m.set(i.produto_id,r);
+  });
+  const linhas=[...m.values()].filter(r=>porId(r.id)).sort((a,b)=>b.falha-a.falha||(b.falha/b.inst)-(a.falha/a.inst)||b.inst-a.inst);
+  const nome=r=>{ const c=porId(r.id); return TIPO1[c.tipo]+" "+c.codigo+(c.fabricante?" ("+c.fabricante+")":""); };
+  const media=r=>r.dq?Math.round(r.dias/r.dq)+" dias":"—";
+  S.relExp={nome:"componentes-que-mais-falham.csv",cab:["Item","Instalados (total)","Trocados por falha","Taxa de falha","Troca preventiva","Outros motivos","Tempo médio até falhar (dias)"],rows:linhas.map(r=>[nome(r),r.inst,r.falha,pct(r.falha,r.inst),r.prev,r.outro,r.dq?Math.round(r.dias/r.dq):""])};
+  const comFalha=linhas.filter(r=>r.falha>0).length;
+  return '<div class="small" style="margin-bottom:8px">Falha = item trocado por "parou de funcionar", "piscando" ou "perdeu brilho". Troca preventiva e outros motivos aparecem à parte e não entram na taxa. Instalados = todas as unidades que já entraram em peças. Com poucas peças e pouco tempo de uso, os números ainda não dizem muito.</div>'
+   +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'+metrica("Itens diferentes instalados",linhas.length)+metrica("Itens com falha registrada",comFalha)+metrica("Unidades que falharam",linhas.reduce((s,r)=>s+r.falha,0))+'</div>'
+   +(linhas.length?'<table><tr><th>Item</th><th>Instalados</th><th>Falharam</th><th>Taxa</th><th>Tempo médio até falhar</th><th>Preventiva</th><th>Outros</th></tr>'+linhas.map(r=>'<tr><td><b>'+esc(nome(r))+'</b></td><td>'+r.inst+'</td><td class="'+(r.falha?"no":"")+'">'+r.falha+'</td><td>'+pct(r.falha,r.inst)+'</td><td>'+media(r)+'</td><td>'+r.prev+'</td><td>'+r.outro+'</td></tr>').join("")+'</table>':'<div class="small">Nenhum item instalado ainda.</div>');
+}
+
+function renderRel(){
+  S.view="rel";
+  const abas=[["manut","1 · Manutenção por obra"],["vendas","2 · Vendas"],["falham","3 · Componentes que mais falham"]];
+  const corpo=S.relTab==="vendas"?relVendas():(S.relTab==="falham"?relFalham():relManut());
+  $("#app").innerHTML=navArea("rel")
+   +'<div class="bar"><div class="tabs" style="margin:0">'+abas.map(a=>'<button class="tab '+(S.relTab===a[0]?"on":"")+'" data-act="relAba" data-t="'+a[0]+'">'+a[1]+'</button>').join("")+'</div></div>'
+   +'<div class="bar"><div><label>De</label><input id="r_de" type="date" value="'+esc(S.relDe)+'" style="width:160px"></div><div><label>Até</label><input id="r_ate" type="date" value="'+esc(S.relAte)+'" style="width:160px"></div><button data-act="relFiltra" style="align-self:end">Aplicar período</button><button data-act="relLimpa" style="align-self:end">Limpar</button><button data-act="relCsv" style="align-self:end;margin-left:auto">Baixar planilha (CSV)</button></div>'
+   +'<div class="card">'+corpo+'</div>';
+}
+
 // ---- cliques ----
 const ACT={
   nada:()=>{},
   areaCat:()=>{msg("");renderLista()}, areaObras:async()=>{msg(""); if(await carregarObras()) renderObras();},
   areaPedidos:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderPedidos();},
   filtroPed:d=>{S.pedFiltro=d.f;renderPedidos()}, abrirPedido:d=>abrirPedido(Number(d.id)), voltaPedidos:()=>{msg("");renderPedidos()}, mudaStatus, salvarObsPedido,
+  areaRel:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderRel();},
+  relAba:d=>{S.relTab=d.t;S.relObra=null;renderRel()}, relAbrirObra:d=>{S.relObra=Number(d.id);renderRel()}, relVoltaObra:()=>{S.relObra=null;renderRel()},
+  relFiltra:()=>{ const de=$("#r_de").value, ate=$("#r_ate").value; if(de&&ate&&de>ate) return msg("A data inicial é depois da final.",false); msg(""); S.relDe=de; S.relAte=ate; renderRel(); },
+  relLimpa:()=>{S.relDe="";S.relAte="";renderRel()},
+  relCsv:()=>{ if(S.relExp) baixarCsv(S.relExp.nome,S.relExp.cab,S.relExp.rows); },
   novaObra, abrirObra:d=>abrirObra(Number(d.id)), voltaObras:()=>{msg("");renderObras()}, salvarObra, apagarObra,
   conferirLista, criarPecas, trocaKitPeca, abrirPeca:d=>abrirPeca(Number(d.id)),
   voltaObra:()=>{ msg(""); const id=S.view==="peca"?S.pecas.find(x=>x.id===S.peca).obra_id:S.obra.id; abrirObra(id); },

@@ -529,9 +529,13 @@ function blocoPecas(o,ps){
     const sel=pk?'<select data-act="trocaKitPeca" data-id="'+p.id+'"><option value="">— escolher kit —</option>'+kits.map(k=>'<option value="'+k.id+'" '+(p.kit_id===k.id?"selected":"")+'>'+esc(k.nome)+'</option>').join("")+'</select>'+(!kits.length?'<div class="no">nenhum kit cadastrado para esta luminária</div>':''):'<span class="small">lâmpada integrada</span>';
     return '<tr><td><a href="#" data-act="abrirPeca" data-id="'+p.id+'"><b>'+esc(p.serial)+'</b></a></td><td>'+esc(l?l.codigo:"?")+'</td><td>'+sel+'</td><td>'+(esc(p.local)||"—")+'</td><td class="'+g.c+'">'+g.t+'</td></tr>';
   }).join("");
+  const grupos=[...new Set(ps.map(p=>p.luminaria_id))].map(id=>{ const l=porId(id), n=ps.filter(p=>p.luminaria_id===id).length; return '<tr><td><b>'+esc(l?l.codigo:"?")+'</b></td><td>'+n+' peça(s)</td><td><button data-act="maisPeca" data-id="'+id+'" style="padding:2px 10px">+ 1</button> <button data-act="menosPeca" data-id="'+id+'" style="padding:2px 10px">− 1</button></td></tr>'; }).join("");
+  const addRapido='<div class="card"><h3 style="margin-top:0">Adicionar peça nova</h3><div class="grid"><div class="field"><label>Luminária *</label><input id="a_lum" list="dl_lum" placeholder="Digite o código"></div><div class="field"><label>Quantidade</label><input id="a_qtd" type="number" min="1" value="1"></div><div class="field"><label>Local</label><input id="a_loc"></div></div><datalist id="dl_lum">'+S.produtos.filter(p=>p.tipo==="luminaria").map(p=>'<option value="'+esc(p.codigo)+'">').join("")+'</datalist><button class="p" data-act="adicionarPeca">Adicionar</button></div>';
   return '<div class="card"><div class="bar" style="margin-bottom:8px"><h3 style="margin:0">Peças da obra ('+ps.length+')</h3><div style="margin-left:auto">'+(ps.length?'<button data-act="etiquetas">Etiquetas e NFC</button>':'')+'</div></div>'
    +(ps.length?'<table><tr><th>Serial</th><th>Luminária</th><th>Kit</th><th>Local</th><th>Garantia</th></tr>'+linhas+'</table>':'<div class="small">Nenhuma peça ainda.</div>')+'</div>'
-   +'<div class="card"><h3 style="margin-top:0">Colar lista de luminárias</h3>'
+   +(ps.length?'<div class="card"><h3 style="margin-top:0">Quantidade por luminária</h3><div class="small" style="margin-bottom:8px">+ 1 cria mais uma peça igual (mesmo kit e local, serial novo). − 1 exclui a última peça dessa luminária, só se ela não tiver troca no histórico.</div><table>'+grupos+'</table></div>':'')
+   +addRapido
+   +'<div class="card"><h3 style="margin-top:0">Adicionar várias de uma vez (colar lista)</h3>'
    +'<div class="small" style="margin-bottom:8px">Uma linha por tipo: <b>código; quantidade; local</b> (o local é opcional). Exemplo: <code>CART A; 3; Hall</code>. Cada unidade vira uma peça com serial próprio. Nada é criado até você clicar em Criar peças.</div>'
    +'<textarea id="l_txt" style="min-height:110px" placeholder="CART A; 3; Hall&#10;CART B; 2; Sala"></textarea>'
    +'<div class="bar" style="margin-top:10px"><button class="p" data-act="conferirLista">Conferir</button><button id="l_ok" style="display:none" data-act="criarPecas">Criar peças</button></div><div id="l_res"></div></div>';
@@ -556,11 +560,9 @@ async function apagarObra(){
 
 // ---- lista colada -> peças ----
 const chaveCod=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
-function conferirLista(){
-  const linhas=$("#l_txt").value.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-  if(!linhas.length) return msg("Cole a lista primeiro.",false);
+function classificarLinhas(linhas){
   const lums=S.produtos.filter(p=>p.tipo==="luminaria");
-  S.imp=linhas.map((l,i)=>{
+  return linhas.map((l,i)=>{
     const c=l.split(/[;\t]/).map(x=>x.trim()), cod=c[0]||"", qtd=(c[1]===undefined||c[1]==="")?1:parseInt(c[1]), local=c[2]||"";
     let achou=lums.filter(p=>norm(p.codigo)===norm(cod));
     if(!achou.length) achou=lums.filter(p=>chaveCod(p.codigo)===chaveCod(cod)&&chaveCod(cod));
@@ -572,6 +574,11 @@ function conferirLista(){
     const lum=achou[0], kits=lum.integrada?[]:S.kits.filter(k=>k.luminaria_id===lum.id);
     return Object.assign(r,{status:"ok",lum:lum,kit:kits.length===1?kits[0]:null,kits:kits.length,motivo:lum.integrada?"lâmpada integrada (sem kit)":(kits.length===1?"kit "+kits[0].nome+" já escolhido":(kits.length?"escolha o kit depois (há "+kits.length+")":"sem kit cadastrado"))});
   });
+}
+function conferirLista(){
+  const linhas=$("#l_txt").value.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!linhas.length) return msg("Cole a lista primeiro.",false);
+  S.imp=classificarLinhas(linhas);
   const oks=S.imp.filter(l=>l.status==="ok"), total=oks.reduce((s,l)=>s+l.qtd,0);
   $("#l_res").innerHTML='<div class="small" style="margin:10px 0 8px"><b>'+total+'</b> peça(s) serão criadas · <b>'+(S.imp.length-oks.length)+'</b> linha(s) com erro (ignoradas)</div><table><tr><th>Linha</th><th>Código colado</th><th>Luminária</th><th>Qtd</th><th>Local</th><th>Situação</th></tr>'
    +S.imp.map(l=>'<tr><td>'+l.n+'</td><td>'+esc(l.cod)+'</td><td>'+(l.lum?esc(l.lum.codigo):"—")+'</td><td>'+(isNaN(l.qtd)?"?":l.qtd)+'</td><td>'+(esc(l.local)||"—")+'</td><td class="'+(l.status==="ok"?"ok":"no")+'">'+esc(l.motivo)+'</td></tr>').join("")+'</table>';
@@ -596,13 +603,13 @@ async function trocaKitPeca(d){
 async function abrirPeca(id){
   const h=await sb.from("v2_historico").select("*").eq("peca_id",id).order("data",{ascending:false}).order("id",{ascending:false});
   if(h.error) return msg("Não consegui carregar o histórico: "+h.error.message,false);
-  S.hist=h.data; S.peca=id; S.trocando=null; renderPeca();
+  S.hist=h.data; S.peca=id; S.trocando=null; S.qtdItem=null; renderPeca();
 }
 function renderPeca(){
   S.view="peca";
   const p=S.pecas.find(x=>x.id===S.peca), o=S.obras.find(x=>x.id===p.obra_id), l=porId(p.luminaria_id), g=garantiaTxt(p), kit=S.kits.find(k=>k.id===p.kit_id);
   const itens=S.pitens.filter(i=>i.peca_id===p.id), atuais=itens.filter(i=>!i.removido_em), antigos=itens.filter(i=>i.removido_em);
-  const linhaAtual=i=>{ const c=porId(i.produto_id); return '<tr><td>'+TIPO1[c.tipo]+' <b data-act="info" data-id="'+c.id+'" style="cursor:pointer;text-decoration:underline dotted">'+esc(c.codigo)+'</b> <span class="small">'+(esc(c.fabricante)||"")+'</span></td><td>'+i.quantidade+'</td><td>'+dmy(i.instalado_em)+'</td><td><button data-act="trocar" data-id="'+i.id+'" style="padding:2px 8px">Trocar</button></td></tr>'; };
+  const linhaAtual=i=>{ const c=porId(i.produto_id); return '<tr><td>'+TIPO1[c.tipo]+' <b data-act="info" data-id="'+c.id+'" style="cursor:pointer;text-decoration:underline dotted">'+esc(c.codigo)+'</b> <span class="small">'+(esc(c.fabricante)||"")+'</span></td><td>'+(S.qtdItem===i.id?'<input id="q_novo" type="number" min="1" value="'+i.quantidade+'" style="width:80px"> <button data-act="salvarQtd" data-id="'+i.id+'" style="padding:2px 8px">Salvar</button> <button data-act="cancelaQtd" style="padding:2px 8px">Cancelar</button>':i.quantidade+' <button data-act="editarQtd" data-id="'+i.id+'" style="padding:2px 8px">Editar</button>')+'</td><td>'+dmy(i.instalado_em)+'</td><td><button data-act="trocar" data-id="'+i.id+'" style="padding:2px 8px">Trocar</button> <button class="danger" data-act="removerItem" data-id="'+i.id+'" style="padding:2px 8px">Retirar</button></td></tr>'; };
   let formTroca="";
   if(S.trocando){
     const it=itens.find(i=>i.id===S.trocando), c=porId(it.produto_id);
@@ -613,6 +620,8 @@ function renderPeca(){
      +'<div class="field"><label>Observação (opcional)</label><input id="t_obs"></div><div class="bar"><button class="p" data-act="confirmaTroca">Registrar troca</button><button data-act="cancelaTroca">Cancelar</button></div></div>';
   }
   const url=urlPeca(p.serial);
+  const tAdd=S.addTipo||"led", optsAdd=S.produtos.filter(x=>x.tipo===tAdd).sort((a,b)=>String(a.codigo).localeCompare(String(b.codigo),"pt-BR",{numeric:true}));
+  const formAddItem='<h4 style="margin:14px 0 6px">Adicionar item a esta peça</h4><div class="grid"><div class="field"><label>Tipo</label><select id="ad_tipo" data-act="trocaTipoAdd">'+[["led","LED"],["driver","Driver"],["optica","Óptica"]].map(x=>'<option value="'+x[0]+'" '+(x[0]===tAdd?"selected":"")+'>'+x[1]+'</option>').join("")+'</select></div><div class="field"><label>Item</label><select id="ad_prod">'+optsAdd.map(x=>'<option value="'+x.id+'">'+esc(x.codigo)+'</option>').join("")+'</select></div><div class="field"><label>Quantidade</label><input id="ad_qtd" type="number" min="1" value="1"></div></div><button data-act="addItemPeca">Adicionar item</button>';
   $("#app").innerHTML='<button data-act="voltaObra" style="margin-bottom:12px">‹ '+esc(o.nome)+'</button>'
    +'<div class="card"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">'+(l?(l.foto_url?'<img class="thumb" style="width:64px;height:64px" src="'+esc(l.foto_url)+'" alt="">':miniFotos(fotoAuto(l))):'')
    +'<div style="flex:1;min-width:200px"><h3 style="margin:0">'+esc(p.serial)+'</h3><div class="small">'+esc(l?l.codigo:"?")+(kit?' · '+esc(kit.nome):'')+' · obra '+esc(o.nome)+'</div></div><div class="'+g.c+'" style="font-size:14px">'+g.t+'</div></div></div>'
@@ -620,7 +629,7 @@ function renderPeca(){
    +'<div class="field"><label>Observação desta peça (só desta peça)</label><textarea id="p_obs" style="min-height:70px">'+esc(p.observacao||"")+'</textarea></div>'
    +'<div class="bar"><button class="p" data-act="salvarPeca">Salvar peça</button><button class="danger" data-act="apagarPeca">Excluir peça (cadastrada por engano)</button></div></div>'
    +'<div class="card"><h3 style="margin-top:0">Itens instalados agora</h3>'+(atuais.length?'<table><tr><th>Item</th><th>Qtd</th><th>Instalado em</th><th></th></tr>'+atuais.map(linhaAtual).join("")+'</table>':'<div class="small">'+(precisaKit(p)?'Nenhum item. Escolha o kit na lista da obra.':'Lâmpada integrada: não tem itens separados.')+'</div>')+formTroca
-   +(antigos.length?'<h4 style="margin:14px 0 6px">Itens que já saíram</h4><table><tr><th>Item</th><th>Qtd</th><th>Instalado</th><th>Saiu</th><th>Motivo</th></tr>'+antigos.map(i=>{const c=porId(i.produto_id);return '<tr><td>'+esc(c.codigo)+'</td><td>'+i.quantidade+'</td><td>'+dmy(i.instalado_em)+'</td><td>'+dmy(i.removido_em)+'</td><td>'+esc(i.motivo_remocao)+'</td></tr>'}).join("")+'</table>':'')+'</div>'
+   +(antigos.length?'<h4 style="margin:14px 0 6px">Itens que já saíram</h4><table><tr><th>Item</th><th>Qtd</th><th>Instalado</th><th>Saiu</th><th>Motivo</th></tr>'+antigos.map(i=>{const c=porId(i.produto_id);return '<tr><td>'+esc(c.codigo)+'</td><td>'+i.quantidade+'</td><td>'+dmy(i.instalado_em)+'</td><td>'+dmy(i.removido_em)+'</td><td>'+esc(i.motivo_remocao)+'</td></tr>'}).join("")+'</table>':'')+(precisaKit(p)?formAddItem:'')+'</div>'
    +'<div class="card"><h3 style="margin-top:0">Histórico <span class="small">(só acrescenta, nunca se apaga)</span></h3>'+(S.hist.length?'<table>'+S.hist.map(h=>'<tr><td style="width:130px" class="small">'+dmy(h.data)+'</td><td>'+esc(h.descricao||h.tipo)+(h.motivo?' <span class="small">· '+esc(h.motivo)+'</span>':'')+'</td></tr>').join("")+'</table>':'<div class="small">Sem registros.</div>')+'</div>'
    +'<div class="card"><h3 style="margin-top:0">Endereço da etiqueta</h3><div class="small" style="overflow-wrap:anywhere;margin-bottom:8px">'+esc(url)+'</div><div class="bar"><a href="'+esc(url)+'" target="_blank" rel="noopener"><button>Abrir página pública</button></a><button data-act="copiarUrl" data-u="'+esc(url)+'">Copiar endereço</button></div></div>';
 }
@@ -664,6 +673,60 @@ function renderEtiquetas(){
 }
 async function copiarUrl(d){ try{ await navigator.clipboard.writeText(d.u); msg("Endereço copiado."); }catch(e){ msg("Não consegui copiar. Selecione o endereço e copie à mão.",false); } }
 
+// ---- editar peças da obra e itens da peça ----
+async function adicionarPeca(){
+  const cod=$("#a_lum").value.trim(), q=$("#a_qtd").value.trim()||"1", loc=$("#a_loc").value.trim();
+  if(!cod) return msg("Digite o código da luminária.",false);
+  S.imp=classificarLinhas([cod+";"+q+";"+loc]);
+  if(S.imp[0].status!=="ok"){ const m=S.imp[0].motivo; return msg(m.charAt(0).toUpperCase()+m.slice(1)+".",false); }
+  await criarPecas();
+}
+async function maisPeca(d){
+  const id=Number(d.id), ps=S.pecas.filter(p=>p.obra_id===S.obra.id&&p.luminaria_id===id), ult=ps[ps.length-1];
+  const r=await sb.from("v2_pecas").insert({obra_id:S.obra.id,luminaria_id:id,kit_id:ult?ult.kit_id:null,local:ult?ult.local:null});
+  if(r.error) return msg("Erro ao criar a peça: "+r.error.message,false);
+  const oid=S.obra.id; await carregarObras(); abrirObra(oid); msg("Peça criada com serial novo.");
+}
+async function menosPeca(d){
+  const id=Number(d.id), ps=S.pecas.filter(p=>p.obra_id===S.obra.id&&p.luminaria_id===id), ult=ps[ps.length-1];
+  if(!ult) return;
+  const h=await sb.from("v2_historico").select("id").eq("peca_id",ult.id).not("tipo","in","(instalada,kit)").limit(1);
+  if(h.error) return msg("Erro ao conferir o histórico: "+h.error.message,false);
+  if(h.data.length) return msg("A peça "+ult.serial+" já tem troca ou outro registro no histórico. Abra a peça e use Excluir se tiver certeza.",false);
+  if(!confirm("Excluir a peça "+ult.serial+"?")) return;
+  const r=await sb.from("v2_pecas").delete().eq("id",ult.id);
+  if(r.error) return msg("Erro ao excluir: "+r.error.message,false);
+  const oid=S.obra.id; await carregarObras(); abrirObra(oid); msg("Peça "+ult.serial+" excluída.");
+}
+async function recarregaPeca(){ const id=S.peca; await carregarObras(); await abrirPeca(id); }
+async function registraHist(peca,produto,descricao){ const h=await sb.from("v2_historico").insert({peca_id:peca,tipo:"observacao",produto_id:produto,descricao:descricao}); if(h.error) msg("Alteração feita, mas não consegui registrar no histórico: "+h.error.message,false); }
+async function salvarQtd(d){
+  const it=S.pitens.find(i=>i.id===Number(d.id)), q=parseInt($("#q_novo").value);
+  if(isNaN(q)||q<1) return msg("Quantidade precisa ser 1 ou mais.",false);
+  if(q===it.quantidade){ S.qtdItem=null; return renderPeca(); }
+  const r=await sb.from("v2_peca_itens").update({quantidade:q}).eq("id",it.id);
+  if(r.error) return msg("Erro ao salvar: "+r.error.message,false);
+  await registraHist(it.peca_id,it.produto_id,"Quantidade de "+porId(it.produto_id).codigo+" alterada de "+it.quantidade+" para "+q);
+  S.qtdItem=null; await recarregaPeca(); msg("Quantidade atualizada.");
+}
+async function removerItem(d){
+  const it=S.pitens.find(i=>i.id===Number(d.id)), c=porId(it.produto_id);
+  if(!confirm("Retirar "+c.codigo+" desta peça? Ele continua no histórico como item que saiu.")) return;
+  const r=await sb.from("v2_peca_itens").update({removido_em:hoje(),motivo_remocao:"outro",observacao:"Retirado sem substituição"}).eq("id",it.id);
+  if(r.error) return msg("Erro ao retirar: "+r.error.message,false);
+  await registraHist(it.peca_id,it.produto_id,"Item retirado: "+c.codigo);
+  await recarregaPeca(); msg("Item retirado.");
+}
+async function addItemPeca(){
+  const pid=Number($("#ad_prod").value), q=parseInt($("#ad_qtd").value);
+  if(!pid) return msg("Escolha o item.",false);
+  if(isNaN(q)||q<1) return msg("Quantidade precisa ser 1 ou mais.",false);
+  const r=await sb.from("v2_peca_itens").insert({peca_id:S.peca,produto_id:pid,quantidade:q,instalado_em:hoje()});
+  if(r.error) return msg("Erro ao adicionar: "+r.error.message,false);
+  await registraHist(S.peca,pid,"Item adicionado: "+q+"x "+porId(pid).codigo);
+  await recarregaPeca(); msg("Item adicionado.");
+}
+
 // ---- cliques ----
 const ACT={
   nada:()=>{},
@@ -672,6 +735,8 @@ const ACT={
   conferirLista, criarPecas, trocaKitPeca, abrirPeca:d=>abrirPeca(Number(d.id)),
   voltaObra:()=>{ msg(""); const id=S.view==="peca"?S.pecas.find(x=>x.id===S.peca).obra_id:S.obra.id; abrirObra(id); },
   salvarPeca, apagarPeca, trocar:d=>{S.trocando=Number(d.id);renderPeca()}, cancelaTroca:()=>{S.trocando=null;renderPeca()}, confirmaTroca,
+  adicionarPeca, maisPeca, menosPeca, salvarQtd, removerItem, addItemPeca,
+  editarQtd:d=>{S.qtdItem=Number(d.id);renderPeca()}, cancelaQtd:()=>{S.qtdItem=null;renderPeca()}, trocaTipoAdd:()=>{S.addTipo=$("#ad_tipo").value;renderPeca()},
   etiquetas:renderEtiquetas, imprimir:()=>window.print(), copiarUrl,
   info:d=>abrirInfo(Number(d.id)), fechaInfo:()=>{const o=$("#ovInfo"); if(o) o.remove();},
   novoNoKit:abrirNovoNoKit, salvarNoKit:salvarNovoNoKit, cancelaNoKit:()=>{$("#k_novo").style.display="none"},

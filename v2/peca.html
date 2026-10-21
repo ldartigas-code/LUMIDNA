@@ -16,6 +16,13 @@ body{margin:0;font:15px/1.5 Inter,"Segoe UI",Roboto,system-ui,sans-serif;backgro
 .hidden{display:none!important}
 .card{background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:20px}
 .hero{background:linear-gradient(180deg,var(--s2),var(--s1));border:1px solid var(--line);border-radius:20px;padding:20px;margin-top:4px}
+.comp{border-radius:14px;background:radial-gradient(circle at 50% 30%,#2a3a52,#131c29 70%);border:1px solid var(--line);padding:8px;margin-bottom:18px;display:flex;flex-direction:column;gap:8px}
+.comp .main{aspect-ratio:16/9;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:4px}
+.comp .main img,.comp .kb img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.kitrow{display:grid;gap:8px}
+.kb{aspect-ratio:1/1;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:4px}
+.kitrow.solo .kb{aspect-ratio:4/3}
+.comp .cap{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:2px 2px -2px}
 .photo{aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:radial-gradient(circle at 50% 30%,#2a3a52,#131c29 70%);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:18px;padding:6px}
 .photo img{max-width:100%;max-height:100%;object-fit:contain;display:block;background:#fff;border-radius:8px}
 .photo.duo img{max-width:48%}
@@ -150,7 +157,7 @@ function resolve(l){
   const i=itens.find(x=>x.peca_item_id===Number(m[1])); if(!i) return null;
   const sid=Number(m[2])||null, s=sid?(i.similares||[]).find(x=>x.id===sid):null; if(sid&&!s) return null;
   const c=s||i, q=Math.max(1,Math.min(Number(l.q)||1,i.quantidade));
-  return {nome:NOME[i.tipo]+(s?" · similar homologado":""),sub:c.codigo,preco:c.preco,max:i.quantidade,fotos:c.foto_url?[c.foto_url]:[],pl:{escopo:"item",peca_item_id:i.peca_item_id,similar_id:sid,quantidade:q}};
+  return {nome:NOME[i.tipo]+(s?" · similar aprovado":""),sub:c.codigo,preco:c.preco,max:i.quantidade,fotos:c.foto_url?[c.foto_url]:[],pl:{escopo:"item",peca_item_id:i.peca_item_id,similar_id:sid,quantidade:q}};
 }
 function addCart(k,q){
   const novo=resolve({k:k,q:q}); if(!novo) return;
@@ -170,6 +177,13 @@ function atualizaFab(){
 
 // ---- tela principal ----
 function fotosHtml(arr,cls){ return arr.length?arr.map(u=>'<img src="'+esc(u)+'" alt="">').join(""):'<span>—</span>'; }
+// foto da luminária = foto dela + fotos dos itens do kit instalado, cada uma inteira (sem esticar)
+function compFotos(){
+  const lum=P.luminaria.foto_url, kit=[...new Set((P.itens||[]).filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,4);
+  if(!lum&&!kit.length) return '<div class="comp"><div class="main"><span class="small">Foto ainda não cadastrada</span></div></div>';
+  return '<div class="comp">'+(lum?'<div class="main"><img src="'+esc(lum)+'" alt=""></div>':'')
+   +(kit.length?(lum?'<div class="cap">Kit instalado</div>':'')+'<div class="kitrow '+(lum?"":"solo")+'" style="grid-template-columns:repeat('+Math.min(kit.length,lum?4:2)+',1fr)">'+kit.map(u=>'<div class="kb"><img src="'+esc(u)+'" alt=""></div>').join("")+'</div>':'')+'</div>';
+}
 function render(){
   const l=P.luminaria, itens=P.itens||[], g=P.garantia_ate;
   const gOk=g&&g>=hoje();
@@ -178,7 +192,7 @@ function render(){
   const cct=l.integrada?l.cct_k:(leds[0]&&leds[0].cct_k);
   const fotos=l.foto_url?[l.foto_url]:[...new Set(itens.filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,2);
   $("#content").innerHTML=
-   '<div class="hero"><div class="photo '+(fotos.length===2?"duo":"")+'">'+fotosHtml(fotos)+'</div>'
+   '<div class="hero">'+compFotos()
    +'<div class="row"><div><div class="id">'+esc(l.codigo)+'</div><div class="model">'+esc(l.fabricante||"")+'</div></div>'
    +'<span class="status '+(g?(gOk?"st-ok":"st-bad"):"st-off")+'"><span class="dot"></span>'+(g?(gOk?"Em garantia":"Garantia vencida"):"Sem garantia informada")+'</span></div>'
    +'<div class="tags"><span class="tag">'+esc(P.serial)+'</span>'+(P.local?'<span class="tag">'+esc(P.local)+'</span>':'')+(P.kit?'<span class="tag">'+esc(P.kit)+'</span>':'')+'</div></div>'
@@ -199,9 +213,9 @@ function cardKitLum(k,nome,sub,fab,preco,fotos){
 function cardItem(i){
   const base="item:"+i.peca_item_id, sid=VAR[base]||0, s=sid?(i.similares||[]).find(x=>x.id===sid):null, c=s||i, q=Math.min(QTD[base]||1,i.quantidade);
   return '<div class="shop-card"><div class="shop-photo">'+fotosHtml(c.foto_url?[c.foto_url]:[])+'</div>'
-   +'<div class="shop-nome">'+NOME[i.tipo]+'</div><div class="shop-fab"><b style="color:var(--ink)">'+esc(c.codigo)+'</b>'+(s?'<span class="chip">homologado</span>':'')+'</div>'
+   +'<div class="shop-nome">'+NOME[i.tipo]+'</div><div class="shop-fab"><b style="color:var(--ink)">'+esc(c.codigo)+'</b>'+(s?'<span class="chip">aprovado</span>':'')+'</div>'
    +'<div class="shop-fab">'+esc(c.fabricante||"")+(spec(c)?(c.fabricante?' · ':'')+spec(c):'')+'</div>'
-   +((i.similares&&i.similares.length)?'<select class="vsel" data-ch="variante" data-base="'+base+'"><option value="0">Original</option>'+i.similares.map(x=>'<option value="'+x.id+'" '+(x.id===sid?"selected":"")+'>Similar homologado · '+esc(x.codigo)+'</option>').join("")+'</select>':'')
+   +((i.similares&&i.similares.length)?'<select class="vsel" data-ch="variante" data-base="'+base+'"><option value="0">Original</option>'+i.similares.map(x=>'<option value="'+x.id+'" '+(x.id===sid?"selected":"")+'>Similar aprovado pela LDArti · '+esc(x.codigo)+'</option>').join("")+'</select>':'')
    +'<div class="shop-preco '+(c.preco==null?"consulta":"")+'">'+brl(c.preco)+'</div>'
    +(i.quantidade>1?'<div class="small" style="margin:-4px 0 0">Instaladas: '+i.quantidade+'</div><div class="stepper"><button type="button" data-ac="qtd" data-base="'+base+'" data-d="-1">−</button><span>'+q+'</span><button type="button" data-ac="qtd" data-base="'+base+'" data-d="1">+</button></div>':'')
    +'<button type="button" class="addcart" data-ac="add" data-k="'+base+':'+sid+'" data-base="'+base+'">Adicionar ao carrinho</button></div>';
@@ -309,7 +323,7 @@ function manutencao(){
    +'<div class="field"><label>Qual item foi trocado? *</label><select id="m_item">'+itens.map(i=>'<option value="'+i.peca_item_id+'">'+esc(NOME[i.tipo])+' · '+esc(i.codigo)+(i.quantidade>1?' ('+i.quantidade+' instaladas)':'')+'</option>').join("")+'</select></div>'
    +'<div id="m_qtd"></div>'
    +'<div class="field"><label>O que foi instalado no lugar? *</label><div id="m_opc"></div></div>'
-   +'<div id="m_outro" class="hidden"><div class="alert warn">Para modelos que a LDArti ainda não homologou, mande o modelo e uma foto. A LDArti avalia e responde por aqui.</div>'
+   +'<div id="m_outro" class="hidden"><div class="alert warn">Para modelos que a LDArti ainda não aprovou, mande o modelo e uma foto. A LDArti avalia e responde por aqui.</div>'
    +'<div class="field"><label>Modelo instalado *</label><input id="m_modelo"></div><div class="field"><label>Fabricante</label><input id="m_fab"></div>'
    +'<div class="field"><label>Foto do item instalado *</label><input id="m_foto" type="file" accept="image/*"></div></div>'
    +'<div class="field"><label>Por que foi trocado? (opcional)</label><select id="m_motivo"><option value="">—</option>'+MOTIVOS.map(m=>'<option>'+m+'</option>').join("")+'</select></div>'
@@ -323,7 +337,7 @@ function opcoesMan(){
   const i=itemMan(); if(!i) return;
   $("#m_qtd").innerHTML=i.quantidade>1?'<div class="field"><label>Quantas unidades foram trocadas?</label><select id="m_q">'+Array.from({length:i.quantidade},(_,k)=>'<option value="'+(k+1)+'" '+((k+1)===i.quantidade?"selected":"")+'>'+(k+1)+'</option>').join("")+'</select></div>':'';
   $("#m_opc").innerHTML='<label class="rd"><input type="radio" name="m_o" value="original" checked><div><b>O mesmo item</b><div class="small">'+esc(i.codigo)+'</div></div></label>'
-   +(i.similares||[]).map(s=>'<label class="rd"><input type="radio" name="m_o" value="s'+s.id+'"><div><b>Similar homologado · '+esc(s.codigo)+'</b><span class="chip">homologado</span><div class="small">'+esc(s.fabricante||"")+(spec(s)?' · '+spec(s):'')+'</div></div></label>').join("")
+   +(i.similares||[]).map(s=>'<label class="rd"><input type="radio" name="m_o" value="s'+s.id+'"><div><b>Similar aprovado pela LDArti · '+esc(s.codigo)+'</b><span class="chip">aprovado</span><div class="small">'+esc(s.fabricante||"")+(spec(s)?' · '+spec(s):'')+'</div></div></label>').join("")
    +'<label class="rd"><input type="radio" name="m_o" value="outro"><div><b>Outro modelo</b><div class="small">Precisa de modelo e foto para a LDArti aprovar</div></div></label>';
   document.querySelectorAll('input[name="m_o"]').forEach(r=>r.onchange=()=>{ $("#m_outro").classList.toggle("hidden",$('input[name="m_o"]:checked').value!=="outro"); });
   $("#m_outro").classList.add("hidden");

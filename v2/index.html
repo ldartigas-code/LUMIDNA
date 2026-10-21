@@ -917,6 +917,11 @@ function renderRel(){
 
 // ---- similares homologados (cadastro no item) ----
 Object.assign(S,{similares:[],apSel:null});
+function grupoSim(id){
+  const vis=new Set([id]), fila=[id];
+  while(fila.length){ const x=fila.pop(); S.similares.forEach(s=>{ const o=s.original_id===x?s.similar_id:(s.similar_id===x?s.original_id:null); if(o&&!vis.has(o)){ vis.add(o); fila.push(o); } }); }
+  vis.delete(id); return [...vis].map(porId).filter(Boolean);
+}
 function desenhaSimilares(){
   const box=$("#sim_box"); if(!box||!S.cur||!S.cur.id) return;
   const p=S.cur;
@@ -926,7 +931,7 @@ function desenhaSimilares(){
    +(sims.length?sims.map(c=>'<span>'+esc(c.codigo)+' <a href="#" data-act="tirarSimilar" data-id="'+c.id+'" title="Remover">✕</a></span>').join(""):'<span class="small">nenhum ainda</span>')+'</div>'
    +'<input id="sm_busca" placeholder="Buscar no catálogo o item que você homologa como similar" style="margin-top:6px"><div class="box" id="sm_res" style="display:none;margin-top:6px"></div>'
    +'<div class="small" style="margin-top:4px">O similar precisa estar cadastrado no catálogo, do mesmo tipo (LED com LED, driver com driver). Quando o cliente comprar ou informar um similar daqui, a empresa já sabe que é homologado.</div>'
-   +(deQuem.length?'<div class="small" style="margin-top:6px">Este item é similar homologado de: '+deQuem.map(c=>esc(c.codigo)).join(", ")+'</div>':'')+'</div>';
+   +(grupoSim(p.id).length?'<div class="small" style="margin-top:6px">Grupo aprovado (podem trocar uns pelos outros, inclusive o original): <b>'+grupoSim(p.id).map(c=>esc(c.codigo)).join(", ")+'</b></div>':'')+'</div>';
   $("#sm_busca").oninput=()=>{
     const t=norm($("#sm_busca").value), res=$("#sm_res");
     if(!t){ res.style.display="none"; return; }

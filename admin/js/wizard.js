@@ -383,7 +383,13 @@ function wizToggleEditarItem(idx){
   if(!box) return;
   const abrir=box.classList.contains("hidden");
   box.classList.toggle("hidden");
-  if(abrir) carregarComponentesDoItem(idx);
+  if(abrir){
+    const ks=q(`#wizKitItem${idx}`);
+    if(ks&&ks.options.length<=1&&(wizKitsCache||[]).length){
+      ks.innerHTML=`<option value="">— escolher kit —</option>`+wizKitsCache.map(k=>`<option value="${k.id}">${esc(k.nome)}${k.modelo_luminaria?" ("+esc(k.modelo_luminaria)+")":""}</option>`).join("");
+    }
+    carregarComponentesDoItem(idx);
+  }
 }
 
 function renderWizCarrinho(){
@@ -403,6 +409,8 @@ function renderWizCarrinho(){
       </div>
       <div id="wizItemEdit${idx}" class="hidden" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
         <div class="field" style="margin-bottom:10px"><label>Ambiente</label><input type="text" list="wizAmbientesList" value="${esc(item.ambiente||"")}" onchange="wizAtualizarAmbiente(${idx},this.value)"></div>
+        <div class="field" style="margin-bottom:10px"><label>Usar um kit (preenche Driver, LED e Óptica, com as quantidades, de uma vez)</label>
+          <select id="wizKitItem${idx}" onchange="wizAplicarKitNoItem(${idx},this.value)"><option value="">— escolher kit —</option>${(wizKitsCache||[]).map(k=>`<option value="${k.id}">${esc(k.nome)}${k.modelo_luminaria?" ("+esc(k.modelo_luminaria)+")":""}</option>`).join("")}</select></div>
         <div class="small" style="font-weight:700;margin-bottom:6px">Driver / LED / Óptica instalados</div>
         <div class="grid3" id="wizComp${idx}"><div class="small">Carregando...</div></div>
       </div>
@@ -427,8 +435,11 @@ async function carregarComponentesDoItem(idx){
     const rows=r.error?[]:(r.data||[]);
     const atual=(item.compSelecionado&&item.compSelecionado[tipo])?item.compSelecionado[tipo].modelo_equivalente:"";
     const conhecidas=new Set(rows.map(x=>x.modelo_equivalente));
+    const doKit=!!(item.compSelecionado&&item.compSelecionado[tipo]&&item.compSelecionado[tipo].doKit);
+    if(doKit) conhecidas.add(atual);
     const ehOutro=!!atual && atual!=="Integrada" && !conhecidas.has(atual);
-    const opcoes=rows.map(x=>`<option value="${esc(x.modelo_equivalente)}">${esc(x.modelo_equivalente)}${x.fabricante_equivalente?" — "+esc(x.fabricante_equivalente):""}${x.especificacao?" ("+esc(x.especificacao)+")":""}</option>`).join("");
+    const opcaoKit=(doKit&&!rows.some(x=>x.modelo_equivalente===atual))?`<option value="${esc(atual)}">${esc(atual)} (do kit)</option>`:"";
+    const opcoes=opcaoKit+rows.map(x=>`<option value="${esc(x.modelo_equivalente)}">${esc(x.modelo_equivalente)}${x.fabricante_equivalente?" — "+esc(x.fabricante_equivalente):""}${x.especificacao?" ("+esc(x.especificacao)+")":""}</option>`).join("");
     return `<div class="field"><label>${tipo}</label>
       <select id="wizComp${idx}_${tipo}" onchange="wizOnCompSelectChange(${idx},'${tipo}')">
         <option value="">— não definir agora —</option>
@@ -443,6 +454,7 @@ async function carregarComponentesDoItem(idx){
     const atual=(item.compSelecionado&&item.compSelecionado[tipo])?item.compSelecionado[tipo].modelo_equivalente:"";
     const rows=resultados[i].error?[]:(resultados[i].data||[]);
     const conhecidas=new Set(rows.map(x=>x.modelo_equivalente));
+    if(item.compSelecionado&&item.compSelecionado[tipo]&&item.compSelecionado[tipo].doKit) conhecidas.add(atual);
     if(atual&&(atual==="Integrada"||conhecidas.has(atual))){
       q(`#wizComp${idx}_${tipo}`).value=atual;
     }else if(atual){
@@ -453,6 +465,22 @@ async function carregarComponentesDoItem(idx){
       wizEscolherComponente(idx,tipo,"Integrada");
     }
   });
+}
+
+// Aplica um kit (Driver + LED + Óptica, com quantidades) neste item do pedido.
+function wizAplicarKitNoItem(idx,kitId){
+  const item=wizCarrinho[idx];
+  if(!item||!kitId) return;
+  const k=(wizKitsCache||[]).find(x=>String(x.id)===String(kitId));
+  if(!k) return;
+  item.compSelecionado=item.compSelecionado||{};
+  [["Driver",k.driver_modelo,k.driver_qtd],["LED",k.led_modelo,k.led_qtd],["Óptica",k.optica_modelo,k.optica_qtd]].forEach(([tipo,codigo,qtd])=>{
+    if(!codigo) return;
+    const q1=Math.max(1,Number(qtd)||1);
+    item.compSelecionado[tipo]={modelo_equivalente:codigo,especificacao:(q1>1?q1+"x ":"")+codigo,quantidade:q1,doKit:codigo!=="Integrada"};
+  });
+  wizAtualizarResumoLinha(idx);
+  if(q(`#wizComp${idx}`)) carregarComponentesDoItem(idx);
 }
 
 function wizOnCompSelectChange(idx,tipo){

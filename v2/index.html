@@ -51,17 +51,22 @@ label{font-size:13px;font-weight:600;color:var(--muted);display:block;margin-bot
 .box{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px}
 .box label{font-weight:400;color:var(--ink);font-size:14px;margin:0;padding:3px 4px;display:flex;gap:8px;align-items:center;cursor:pointer}
 table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+.etqs{display:flex;flex-wrap:wrap;gap:8px}
+.etq{display:flex;gap:2mm;align-items:center;border:1px dashed #b4b2a9;padding:2mm;overflow:hidden;font-size:9pt;line-height:1.25;background:#fff;break-inside:avoid}
+.etq .qr svg{width:100%;height:100%;display:block}.etq .qr{flex:none}.etq .et{min-width:0;overflow-wrap:anywhere}.etq .et b{font-size:11pt}
+@media print{.noprint,header,#msg{display:none!important}.wrap{max-width:none;padding:0}.etq{border:0;outline:0.1mm dashed #bbb}.etqs{gap:0}}
 @media(max-width:640px){.row{grid-template-columns:14px 40px minmax(0,1fr) 80px}.row .c4,.row .c6{display:none}}
 </style>
 </head>
 <body>
 <div class="wrap">
-<header><b>Lumi<span>DNA</span> 2 · Admin</b><div id="quem" class="small"></div></header>
+<header class="noprint"><b>Lumi<span>DNA</span> 2 · Admin</b><div id="quem" class="small"></div></header>
 <div id="msg"></div>
 <div id="app"><div class="small">Carregando…</div></div>
 </div>
 <script src="../assets/supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script>
 let sb=supabase.createClient(LUMIDNA_SUPABASE_URL,LUMIDNA_SUPABASE_KEY);
 const $=s=>document.querySelector(s);
@@ -158,7 +163,7 @@ async function entrar(){
 // ---- lista ----
 function renderLista(){
   S.view="lista";
-  $("#app").innerHTML=`
+  $("#app").innerHTML=navArea("cat")+`
     <div class="bar"><div class="tabs" style="margin:0">${Object.entries(TIPOS).map(([t,n])=>`<button class="tab ${S.tab===t?"on":""}" data-act="aba" data-t="${t}">${n}</button>`).join("")}<button class="tab ${S.tab==="kit"?"on":""}" data-act="aba" data-t="kit">Kits</button></div>
       <div style="margin-left:auto;display:flex;gap:8px"><button data-act="importar">Importar lista</button><button class="p" data-act="novo">+ Novo ${S.tab==="kit"?"kit":"item"}</button></div></div>
     <div class="bar"><input class="grow" id="busca" placeholder="Buscar por código ou fabricante" value="${esc(S.busca)}">
@@ -469,9 +474,205 @@ async function salvarNovoNoKit(){
   const nome=r.data.codigo; renderKit(); msg('"'+nome+'" cadastrado no catálogo e adicionado ao kit.');
 }
 
+// ---- obras e peças ----
+Object.assign(S,{obras:[],pecas:[],pitens:[],obra:null,peca:null,hist:[],imp:[],trocando:null,etq:{w:60,h:30}});
+const MOTIVOS=["parou de funcionar","piscando","perdeu brilho","troca preventiva","outro"];
+const hoje=()=>{ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+const dmy=d=>{ if(!d) return "—"; const a=String(d).slice(0,10).split("-"); return a[2]+"/"+a[1]+"/"+a[0]; };
+const garantiaTxt=p=>!p.garantia_ate?{t:"sem data",c:"small"}:(p.garantia_ate>=hoje()?{t:"em garantia até "+dmy(p.garantia_ate),c:"ok"}:{t:"garantia vencida em "+dmy(p.garantia_ate),c:"no"});
+const precisaKit=p=>{ const l=porId(p.luminaria_id); return !!l&&!l.integrada; };
+const urlPeca=s=>new URL("peca.html?s="+encodeURIComponent(s),location.href).href;
+function codigoObra(nome){ const s=String(nome||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase(); const c=s.replace(/[^BCDFGHJKLMNPQRSTVWXYZ]/g,""), l=s.replace(/[^A-Z]/g,""); if(c.length>=3) return c.slice(0,3); return (c+l).slice(0,3).padEnd(3,"X"); }
+const navArea=a=>'<div class="tabs noprint" style="border-bottom:1px solid var(--line);padding-bottom:10px"><button class="tab '+(a==="cat"?"on":"")+'" data-act="areaCat">Catálogo</button><button class="tab '+(a==="obras"?"on":"")+'" data-act="areaObras">Obras</button></div>';
+
+async function carregarObras(){
+  try{
+    [S.obras,S.pecas,S.pitens]=await Promise.all([
+      pagina(()=>sb.from("v2_obras").select("*").order("id")),
+      pagina(()=>sb.from("v2_pecas").select("*").order("id")),
+      pagina(()=>sb.from("v2_peca_itens").select("*").order("id"))
+    ]);
+  }catch(e){ $("#app").innerHTML='<div class="msg e">Não consegui carregar as obras: '+esc(e.message||e)+'<br>Se for "relation does not exist", falta rodar o SQL v2_02_obras_pecas no Supabase.</div>'; return false; }
+  return true;
+}
+
+function renderObras(){
+  S.view="obras";
+  const lista=S.obras.map(o=>{
+    const ps=S.pecas.filter(p=>p.obra_id===o.id), semKit=ps.filter(p=>precisaKit(p)&&!p.kit_id).length, bom=ps.length&&!semKit;
+    return '<div class="row" style="grid-template-columns:14px minmax(0,1.5fr) minmax(0,1fr) 90px minmax(0,1.2fr)" data-act="abrirObra" data-id="'+o.id+'"><span class="dot '+(bom?"g":"r")+'"></span><div><b>'+esc(o.nome)+'</b><div class="small">'+(esc(o.cliente)||"sem cliente")+' · código '+esc(o.codigo)+'</div></div><div class="small">início '+dmy(o.inicio_instalacao)+'</div><div><b>'+ps.length+'</b> peça(s)</div><div class="'+(bom?"ok":"no")+'">'+(!ps.length?"Sem peças ainda":(semKit?semKit+" sem kit":"Todas com kit"))+'</div></div>';
+  }).join("");
+  $("#app").innerHTML=navArea("obras")+'<div class="bar"><div class="small">'+S.obras.length+' obra(s)</div><div style="margin-left:auto"><button class="p" data-act="novaObra">+ Nova obra</button></div></div>'+(S.obras.length?'<div class="list">'+lista+'</div>':'<div class="small">Nenhuma obra ainda. Clique em "+ Nova obra".</div>');
+}
+
+function novaObra(){ S.obra={id:null,nome:"",cliente:"",inicio_instalacao:hoje(),garantia_meses:12,observacao:""}; renderObra(); }
+function abrirObra(id){ S.obra=JSON.parse(JSON.stringify(S.obras.find(o=>o.id===id))); S.imp=[]; renderObra(); }
+function renderObra(){
+  S.view="obra"; const o=S.obra, novo=!o.id, ps=novo?[]:S.pecas.filter(p=>p.obra_id===o.id);
+  $("#app").innerHTML='<button data-act="voltaObras" style="margin-bottom:12px">‹ Obras</button>'
+   +'<div class="card"><h3 style="margin-top:0">'+(novo?"Nova obra":esc(o.nome))+'</h3><div class="grid">'
+   +'<div class="field"><label>Nome da obra *</label><input id="o_nome" value="'+esc(o.nome)+'"></div>'
+   +'<div class="field"><label>Cliente</label><input id="o_cliente" value="'+esc(o.cliente)+'"></div>'
+   +'<div class="field"><label>Início da instalação</label><input id="o_inicio" type="date" value="'+esc(o.inicio_instalacao||"")+'"></div>'
+   +'<div class="field"><label>Garantia (meses)</label><input id="o_gar" type="number" min="0" value="'+o.garantia_meses+'"></div></div>'
+   +'<div class="small" id="o_cod" style="margin-bottom:6px"></div>'
+   +(novo?"":'<div class="small" style="margin-bottom:10px">Início e garantia valem para as peças criadas daqui para frente; as que já existem mantêm a garantia delas.</div>')
+   +'<div class="field"><label>Observação da obra (só desta obra)</label><textarea id="o_obs" style="min-height:70px">'+esc(o.observacao||"")+'</textarea></div>'
+   +'<div class="bar"><button class="p" data-act="salvarObra">Salvar obra</button>'+(!novo&&!ps.length?'<button class="danger" data-act="apagarObra">Excluir obra</button>':'')+'</div></div>'
+   +(novo?'':blocoPecas(o,ps));
+  const upd=()=>{ const c=codigoObra($("#o_nome").value); $("#o_cod").innerHTML=novo?'Código do serial: <b>'+esc(c)+'</b> (fica fixo depois de salvar). Exemplo: '+esc(c)+'-NNN-001':'Código do serial: <b>'+esc(o.codigo)+'</b> · número da obra '+String(o.id).padStart(3,"0"); };
+  upd(); $("#o_nome").oninput=upd;
+}
+function blocoPecas(o,ps){
+  const linhas=ps.map(p=>{
+    const l=porId(p.luminaria_id), g=garantiaTxt(p), kits=S.kits.filter(k=>k.luminaria_id===p.luminaria_id), pk=precisaKit(p);
+    const sel=pk?'<select data-act="trocaKitPeca" data-id="'+p.id+'"><option value="">— escolher kit —</option>'+kits.map(k=>'<option value="'+k.id+'" '+(p.kit_id===k.id?"selected":"")+'>'+esc(k.nome)+'</option>').join("")+'</select>'+(!kits.length?'<div class="no">nenhum kit cadastrado para esta luminária</div>':''):'<span class="small">lâmpada integrada</span>';
+    return '<tr><td><a href="#" data-act="abrirPeca" data-id="'+p.id+'"><b>'+esc(p.serial)+'</b></a></td><td>'+esc(l?l.codigo:"?")+'</td><td>'+sel+'</td><td>'+(esc(p.local)||"—")+'</td><td class="'+g.c+'">'+g.t+'</td></tr>';
+  }).join("");
+  return '<div class="card"><div class="bar" style="margin-bottom:8px"><h3 style="margin:0">Peças da obra ('+ps.length+')</h3><div style="margin-left:auto">'+(ps.length?'<button data-act="etiquetas">Etiquetas e NFC</button>':'')+'</div></div>'
+   +(ps.length?'<table><tr><th>Serial</th><th>Luminária</th><th>Kit</th><th>Local</th><th>Garantia</th></tr>'+linhas+'</table>':'<div class="small">Nenhuma peça ainda.</div>')+'</div>'
+   +'<div class="card"><h3 style="margin-top:0">Colar lista de luminárias</h3>'
+   +'<div class="small" style="margin-bottom:8px">Uma linha por tipo: <b>código; quantidade; local</b> (o local é opcional). Exemplo: <code>CART A; 3; Hall</code>. Cada unidade vira uma peça com serial próprio. Nada é criado até você clicar em Criar peças.</div>'
+   +'<textarea id="l_txt" style="min-height:110px" placeholder="CART A; 3; Hall&#10;CART B; 2; Sala"></textarea>'
+   +'<div class="bar" style="margin-top:10px"><button class="p" data-act="conferirLista">Conferir</button><button id="l_ok" style="display:none" data-act="criarPecas">Criar peças</button></div><div id="l_res"></div></div>';
+}
+async function salvarObra(){
+  const o=S.obra, nome=$("#o_nome").value.trim();
+  if(!nome) return msg("Informe o nome da obra.",false);
+  if(S.obras.find(x=>norm(x.nome)===norm(nome)&&x.id!==o.id)) return msg('Já existe uma obra chamada "'+nome+'".',false);
+  const gar=parseInt($("#o_gar").value); if(isNaN(gar)||gar<0) return msg("Garantia em meses: use um número, 0 ou maior.",false);
+  const row={nome:nome,cliente:nv($("#o_cliente").value.trim()),inicio_instalacao:nv($("#o_inicio").value),garantia_meses:gar,observacao:nv($("#o_obs").value.trim())};
+  const r=o.id?await sb.from("v2_obras").update(row).eq("id",o.id).select().single():await sb.from("v2_obras").insert(row).select().single();
+  if(r.error) return msg(r.error.code==="23505"?"Já existe uma obra com esse nome.":"Erro ao salvar a obra: "+r.error.message,false);
+  const id=r.data.id, era=!!o.id; if(!await carregarObras()) return; abrirObra(id);
+  msg(era?"Obra salva.":'Obra "'+nome+'" criada. Agora cole a lista de luminárias.');
+}
+async function apagarObra(){
+  if(!confirm('Excluir a obra "'+S.obra.nome+'"?')) return;
+  const r=await sb.from("v2_obras").delete().eq("id",S.obra.id);
+  if(r.error) return msg("Erro ao excluir: "+r.error.message,false);
+  await carregarObras(); renderObras(); msg("Obra excluída.");
+}
+
+// ---- lista colada -> peças ----
+const chaveCod=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+function conferirLista(){
+  const linhas=$("#l_txt").value.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!linhas.length) return msg("Cole a lista primeiro.",false);
+  const lums=S.produtos.filter(p=>p.tipo==="luminaria");
+  S.imp=linhas.map((l,i)=>{
+    const c=l.split(/[;\t]/).map(x=>x.trim()), cod=c[0]||"", qtd=(c[1]===undefined||c[1]==="")?1:parseInt(c[1]), local=c[2]||"";
+    let achou=lums.filter(p=>norm(p.codigo)===norm(cod));
+    if(!achou.length) achou=lums.filter(p=>chaveCod(p.codigo)===chaveCod(cod)&&chaveCod(cod));
+    const r={n:i+1,cod:cod,qtd:qtd,local:local};
+    if(!cod) return Object.assign(r,{status:"erro",motivo:"código vazio"});
+    if(!achou.length) return Object.assign(r,{status:"erro",motivo:"luminária não encontrada no catálogo"});
+    if(achou.length>1) return Object.assign(r,{status:"erro",motivo:"mais de uma luminária com esse código"});
+    if(isNaN(qtd)||qtd<1||qtd>200) return Object.assign(r,{status:"erro",motivo:"quantidade precisa ser de 1 a 200"});
+    const lum=achou[0], kits=lum.integrada?[]:S.kits.filter(k=>k.luminaria_id===lum.id);
+    return Object.assign(r,{status:"ok",lum:lum,kit:kits.length===1?kits[0]:null,kits:kits.length,motivo:lum.integrada?"lâmpada integrada (sem kit)":(kits.length===1?"kit "+kits[0].nome+" já escolhido":(kits.length?"escolha o kit depois (há "+kits.length+")":"sem kit cadastrado"))});
+  });
+  const oks=S.imp.filter(l=>l.status==="ok"), total=oks.reduce((s,l)=>s+l.qtd,0);
+  $("#l_res").innerHTML='<div class="small" style="margin:10px 0 8px"><b>'+total+'</b> peça(s) serão criadas · <b>'+(S.imp.length-oks.length)+'</b> linha(s) com erro (ignoradas)</div><table><tr><th>Linha</th><th>Código colado</th><th>Luminária</th><th>Qtd</th><th>Local</th><th>Situação</th></tr>'
+   +S.imp.map(l=>'<tr><td>'+l.n+'</td><td>'+esc(l.cod)+'</td><td>'+(l.lum?esc(l.lum.codigo):"—")+'</td><td>'+(isNaN(l.qtd)?"?":l.qtd)+'</td><td>'+(esc(l.local)||"—")+'</td><td class="'+(l.status==="ok"?"ok":"no")+'">'+esc(l.motivo)+'</td></tr>').join("")+'</table>';
+  $("#l_ok").style.display=oks.length?"":"none";
+}
+async function criarPecas(){
+  const oks=S.imp.filter(l=>l.status==="ok"); if(!oks.length) return msg("Nenhuma linha válida.",false);
+  const rows=[]; oks.forEach(l=>{ for(let i=0;i<l.qtd;i++) rows.push({obra_id:S.obra.id,luminaria_id:l.lum.id,kit_id:l.kit?l.kit.id:null,local:nv(l.local)}); });
+  const r=await sb.from("v2_pecas").insert(rows);
+  if(r.error) return msg("Erro ao criar as peças: "+r.error.message+" — nada foi criado.",false);
+  const id=S.obra.id; if(!await carregarObras()) return; abrirObra(id); msg(rows.length+" peça(s) criada(s) com serial próprio.");
+}
+async function trocaKitPeca(d){
+  const id=Number(d.id), sel=document.querySelector('select[data-act="trocaKitPeca"][data-id="'+id+'"]');
+  if(!sel||!sel.value) return renderObra();
+  const r=await sb.rpc("v2_aplicar_kit",{p_peca:id,p_kit:Number(sel.value)});
+  if(r.error){ msg(r.error.message,false); return renderObra(); }
+  await carregarObras(); renderObra(); msg("Kit aplicado: os itens dele foram copiados para a peça.");
+}
+
+// ---- ficha da peça ----
+async function abrirPeca(id){
+  const h=await sb.from("v2_historico").select("*").eq("peca_id",id).order("data",{ascending:false}).order("id",{ascending:false});
+  if(h.error) return msg("Não consegui carregar o histórico: "+h.error.message,false);
+  S.hist=h.data; S.peca=id; S.trocando=null; renderPeca();
+}
+function renderPeca(){
+  S.view="peca";
+  const p=S.pecas.find(x=>x.id===S.peca), o=S.obras.find(x=>x.id===p.obra_id), l=porId(p.luminaria_id), g=garantiaTxt(p), kit=S.kits.find(k=>k.id===p.kit_id);
+  const itens=S.pitens.filter(i=>i.peca_id===p.id), atuais=itens.filter(i=>!i.removido_em), antigos=itens.filter(i=>i.removido_em);
+  const linhaAtual=i=>{ const c=porId(i.produto_id); return '<tr><td>'+TIPO1[c.tipo]+' <b data-act="info" data-id="'+c.id+'" style="cursor:pointer;text-decoration:underline dotted">'+esc(c.codigo)+'</b> <span class="small">'+(esc(c.fabricante)||"")+'</span></td><td>'+i.quantidade+'</td><td>'+dmy(i.instalado_em)+'</td><td><button data-act="trocar" data-id="'+i.id+'" style="padding:2px 8px">Trocar</button></td></tr>'; };
+  let formTroca="";
+  if(S.trocando){
+    const it=itens.find(i=>i.id===S.trocando), c=porId(it.produto_id);
+    const opts=S.produtos.filter(x=>x.tipo===c.tipo).sort((a,b)=>String(a.codigo).localeCompare(String(b.codigo),"pt-BR",{numeric:true}));
+    formTroca='<div class="card" style="background:var(--soft)"><h4 style="margin:0 0 10px">Trocar '+esc(c.codigo)+'</h4><div class="grid">'
+     +'<div class="field"><label>Item que entra</label><select id="t_novo">'+opts.map(x=>'<option value="'+x.id+'" '+(x.id===c.id?"selected":"")+'>'+esc(x.codigo)+(x.id===c.id?" (o mesmo)":"")+'</option>').join("")+'</select></div>'
+     +'<div class="field"><label>Motivo da troca *</label><select id="t_motivo"><option value="">— escolher —</option>'+MOTIVOS.map(m=>'<option>'+m+'</option>').join("")+'</select></div></div>'
+     +'<div class="field"><label>Observação (opcional)</label><input id="t_obs"></div><div class="bar"><button class="p" data-act="confirmaTroca">Registrar troca</button><button data-act="cancelaTroca">Cancelar</button></div></div>';
+  }
+  const url=urlPeca(p.serial);
+  $("#app").innerHTML='<button data-act="voltaObra" style="margin-bottom:12px">‹ '+esc(o.nome)+'</button>'
+   +'<div class="card"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">'+(l?(l.foto_url?'<img class="thumb" style="width:64px;height:64px" src="'+esc(l.foto_url)+'" alt="">':miniFotos(fotoAuto(l))):'')
+   +'<div style="flex:1;min-width:200px"><h3 style="margin:0">'+esc(p.serial)+'</h3><div class="small">'+esc(l?l.codigo:"?")+(kit?' · '+esc(kit.nome):'')+' · obra '+esc(o.nome)+'</div></div><div class="'+g.c+'" style="font-size:14px">'+g.t+'</div></div></div>'
+   +'<div class="card"><div class="field"><label>Local</label><input id="p_local" value="'+esc(p.local||"")+'"></div>'
+   +'<div class="field"><label>Observação desta peça (só desta peça)</label><textarea id="p_obs" style="min-height:70px">'+esc(p.observacao||"")+'</textarea></div>'
+   +'<div class="bar"><button class="p" data-act="salvarPeca">Salvar peça</button><button class="danger" data-act="apagarPeca">Excluir peça (cadastrada por engano)</button></div></div>'
+   +'<div class="card"><h3 style="margin-top:0">Itens instalados agora</h3>'+(atuais.length?'<table><tr><th>Item</th><th>Qtd</th><th>Instalado em</th><th></th></tr>'+atuais.map(linhaAtual).join("")+'</table>':'<div class="small">'+(precisaKit(p)?'Nenhum item. Escolha o kit na lista da obra.':'Lâmpada integrada: não tem itens separados.')+'</div>')+formTroca
+   +(antigos.length?'<h4 style="margin:14px 0 6px">Itens que já saíram</h4><table><tr><th>Item</th><th>Qtd</th><th>Instalado</th><th>Saiu</th><th>Motivo</th></tr>'+antigos.map(i=>{const c=porId(i.produto_id);return '<tr><td>'+esc(c.codigo)+'</td><td>'+i.quantidade+'</td><td>'+dmy(i.instalado_em)+'</td><td>'+dmy(i.removido_em)+'</td><td>'+esc(i.motivo_remocao)+'</td></tr>'}).join("")+'</table>':'')+'</div>'
+   +'<div class="card"><h3 style="margin-top:0">Histórico <span class="small">(só acrescenta, nunca se apaga)</span></h3>'+(S.hist.length?'<table>'+S.hist.map(h=>'<tr><td style="width:130px" class="small">'+dmy(h.data)+'</td><td>'+esc(h.descricao||h.tipo)+(h.motivo?' <span class="small">· '+esc(h.motivo)+'</span>':'')+'</td></tr>').join("")+'</table>':'<div class="small">Sem registros.</div>')+'</div>'
+   +'<div class="card"><h3 style="margin-top:0">Endereço da etiqueta</h3><div class="small" style="overflow-wrap:anywhere;margin-bottom:8px">'+esc(url)+'</div><div class="bar"><a href="'+esc(url)+'" target="_blank" rel="noopener"><button>Abrir página pública</button></a><button data-act="copiarUrl" data-u="'+esc(url)+'">Copiar endereço</button></div></div>';
+}
+async function salvarPeca(){
+  const p=S.pecas.find(x=>x.id===S.peca);
+  const r=await sb.from("v2_pecas").update({local:nv($("#p_local").value.trim()),observacao:nv($("#p_obs").value.trim())}).eq("id",p.id);
+  if(r.error) return msg("Erro ao salvar a peça: "+r.error.message,false);
+  await carregarObras(); renderPeca(); msg("Peça salva.");
+}
+async function apagarPeca(){
+  const p=S.pecas.find(x=>x.id===S.peca);
+  if(!confirm("Excluir a peça "+p.serial+"? Isso apaga também o histórico dela. Use só para cadastro feito por engano.")) return;
+  const r=await sb.from("v2_pecas").delete().eq("id",p.id);
+  if(r.error) return msg("Erro ao excluir: "+r.error.message,false);
+  const oid=p.obra_id; await carregarObras(); abrirObra(oid); msg("Peça "+p.serial+" excluída.");
+}
+async function confirmaTroca(){
+  const it=S.pitens.find(i=>i.id===S.trocando), motivo=$("#t_motivo").value;
+  if(!motivo) return msg("Escolha o motivo da troca.",false);
+  const r=await sb.rpc("v2_registrar_troca",{p_item:it.id,p_novo:Number($("#t_novo").value),p_motivo:motivo,p_obs:nv($("#t_obs").value.trim())});
+  if(r.error) return msg("Erro ao registrar a troca: "+r.error.message,false);
+  const id=S.peca; await carregarObras(); await abrirPeca(id); msg("Troca registrada no histórico.");
+}
+
+// ---- etiquetas (QR) e endereços para gravar no NFC ----
+function renderEtiquetas(){
+  S.view="etiq"; const o=S.obra, ps=S.pecas.filter(p=>p.obra_id===o.id), w=S.etq.w, h=S.etq.h;
+  const etq=ps.map(p=>{
+    const l=porId(p.luminaria_id); let qr="";
+    try{ const q=qrcode(0,"M"); q.addData(urlPeca(p.serial)); q.make(); qr=q.createSvgTag({cellSize:4,margin:0,scalable:true}); }catch(e){ qr=""; }
+    return '<div class="etq" style="width:'+w+'mm;height:'+h+'mm"><div class="qr" style="width:'+(h-4)+'mm;height:'+(h-4)+'mm">'+qr+'</div><div class="et"><b>'+esc(p.serial)+'</b><br>'+esc(l?l.codigo:"")+'<br><span>'+esc(o.nome)+'</span></div></div>';
+  }).join("");
+  $("#app").innerHTML='<div class="noprint"><button data-act="voltaObra" style="margin-bottom:12px">‹ '+esc(o.nome)+'</button>'
+   +'<div class="card"><h3 style="margin-top:0">Etiquetas da obra '+esc(o.nome)+'</h3><div class="small" style="margin-bottom:8px">Cada etiqueta tem o QR e o serial. Ajuste o tamanho para o da sua etiqueta e clique em Imprimir.</div>'
+   +'<div class="bar"><div><label>Largura (mm)</label><input id="e_w" type="number" min="20" max="200" value="'+w+'" style="width:100px"></div><div><label>Altura (mm)</label><input id="e_h" type="number" min="15" max="100" value="'+h+'" style="width:100px"></div><button class="p" data-act="imprimir" style="align-self:end">Imprimir</button></div></div></div>'
+   +'<div class="etqs">'+etq+'</div>'
+   +'<div class="card noprint" style="margin-top:14px"><h3 style="margin-top:0">Endereços para gravar no NFC</h3><div class="small" style="margin-bottom:8px">No celular, abra um app de gravação de NFC (por exemplo NFC Tools), escolha gravar "URL" e cole o endereço da peça. Grave a tag e cole na luminária.</div>'
+   +'<table><tr><th>Serial</th><th>Endereço</th><th></th></tr>'+ps.map(p=>{const u=urlPeca(p.serial);return '<tr><td><b>'+esc(p.serial)+'</b></td><td style="overflow-wrap:anywhere" class="small">'+esc(u)+'</td><td><button data-act="copiarUrl" data-u="'+esc(u)+'" style="padding:2px 8px">Copiar</button></td></tr>'}).join("")+'</table></div>';
+  const aj=()=>{ const w2=Math.max(20,parseInt($("#e_w").value)||60), h2=Math.max(15,parseInt($("#e_h").value)||30); S.etq={w:w2,h:h2}; document.querySelectorAll(".etq").forEach(e=>{e.style.width=w2+"mm";e.style.height=h2+"mm"}); document.querySelectorAll(".etq .qr").forEach(e=>{e.style.width=(h2-4)+"mm";e.style.height=(h2-4)+"mm"}); };
+  $("#e_w").oninput=aj; $("#e_h").oninput=aj;
+}
+async function copiarUrl(d){ try{ await navigator.clipboard.writeText(d.u); msg("Endereço copiado."); }catch(e){ msg("Não consegui copiar. Selecione o endereço e copie à mão.",false); } }
+
 // ---- cliques ----
 const ACT={
   nada:()=>{},
+  areaCat:()=>{msg("");renderLista()}, areaObras:async()=>{msg(""); if(await carregarObras()) renderObras();},
+  novaObra, abrirObra:d=>abrirObra(Number(d.id)), voltaObras:()=>{msg("");renderObras()}, salvarObra, apagarObra,
+  conferirLista, criarPecas, trocaKitPeca, abrirPeca:d=>abrirPeca(Number(d.id)),
+  voltaObra:()=>{ msg(""); const id=S.view==="peca"?S.pecas.find(x=>x.id===S.peca).obra_id:S.obra.id; abrirObra(id); },
+  salvarPeca, apagarPeca, trocar:d=>{S.trocando=Number(d.id);renderPeca()}, cancelaTroca:()=>{S.trocando=null;renderPeca()}, confirmaTroca,
+  etiquetas:renderEtiquetas, imprimir:()=>window.print(), copiarUrl,
   info:d=>abrirInfo(Number(d.id)), fechaInfo:()=>{const o=$("#ovInfo"); if(o) o.remove();},
   novoNoKit:abrirNovoNoKit, salvarNoKit:salvarNovoNoKit, cancelaNoKit:()=>{$("#k_novo").style.display="none"},
   entrar, aba:d=>{S.tab=d.t;renderLista()}, novo:()=>S.tab==="kit"?novoKit():novoItem(), importar:renderImport,

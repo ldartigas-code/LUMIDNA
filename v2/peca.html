@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LumiDNA — sua luminária</title>
+<style>
+:root{--bg:#0b0b0b;--card:#161616;--line:#2c2c2a;--ink:#f1efe8;--muted:#b4b2a9;--orange:#ff7a2f;--green:#97c459;--red:#f09595}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:560px;margin:0 auto;padding:20px 16px 40px}
+.logo{font-weight:700;font-size:20px;margin-bottom:16px}.logo span{color:var(--orange)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.foto{width:100%;max-height:260px;object-fit:contain;background:#fff;border-radius:10px;display:block}
+.fotos{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.fotos img{width:46%;max-height:150px;object-fit:contain;background:#fff;border-radius:10px}
+h1{font-size:22px;margin:12px 0 2px}h2{font-size:16px;margin:0 0 10px;color:var(--muted);font-weight:600}
+.m{color:var(--muted);font-size:14px}
+.ok{color:var(--green)}.no{color:var(--red)}
+.it{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.it:first-of-type{border-top:0}
+.it img{width:56px;height:56px;object-fit:contain;background:#fff;border-radius:8px;flex:none}
+.it .ph{width:56px;height:56px;border-radius:8px;background:#2c2c2a;flex:none}
+.tag{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:1px 10px;font-size:12px;color:var(--muted);margin-right:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="logo">Lumi<span>DNA</span></div>
+<div id="app" class="m">Carregando…</div>
+</div>
+<script src="../assets/supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb=supabase.createClient(LUMIDNA_SUPABASE_URL,LUMIDNA_SUPABASE_KEY);
+const $=s=>document.querySelector(s);
+const esc=s=>(s??"").toString().replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=v=>String(Number(v)).replace(".",",");
+const brl=v=>v==null?"":"R$ "+Number(v).toFixed(2).replace(".",",");
+const dmy=d=>{ if(!d) return "—"; const a=String(d).slice(0,10).split("-"); return a[2]+"/"+a[1]+"/"+a[0]; };
+const hoje=()=>{ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+const TIPO={led:"LED",driver:"Driver",optica:"Óptica",luminaria:"Luminária"};
+
+function spec(c){
+  const a=[];
+  if(c.potencia_w!=null) a.push(fmt(c.potencia_w)+" W");
+  if(c.cct_k) a.push(c.cct_k+" K");
+  if(c.corrente_ma!=null) a.push(fmt(c.corrente_ma)+" mA");
+  return a.join(" · ");
+}
+async function iniciar(){
+  const serial=new URLSearchParams(location.search).get("s");
+  if(!serial){ $("#app").innerHTML='<div class="card">Aponte o celular para a etiqueta da luminária, ou leia o QR.</div>'; return; }
+  const r=await sb.rpc("v2_peca_publica",{p_serial:serial});
+  if(r.error){ $("#app").innerHTML='<div class="card no">Não foi possível carregar agora. Tente de novo em instantes.</div>'; return; }
+  const p=r.data;
+  if(!p){ $("#app").innerHTML='<div class="card"><b>Luminária não encontrada.</b><div class="m">Confira o código da etiqueta: '+esc(serial)+'</div></div>'; return; }
+  const l=p.luminaria, itens=p.itens||[];
+  const gOk=p.garantia_ate&&p.garantia_ate>=hoje();
+  const fotos=itens.filter(i=>i.foto_url).map(i=>i.foto_url);
+  const foto=l.foto_url?'<img class="foto" src="'+esc(l.foto_url)+'" alt="">':(fotos.length?'<div class="fotos">'+[...new Set(fotos)].slice(0,4).map(u=>'<img src="'+esc(u)+'" alt="">').join("")+'</div>':"");
+  const potTotal=itens.filter(i=>i.tipo==="led").reduce((s,i)=>s+(i.potencia_w||0)*i.quantidade,0);
+  $("#app").innerHTML=
+   '<div class="card">'+foto+'<h1>'+esc(l.codigo)+'</h1><div class="m">'+esc(l.fabricante||"")+'</div>'
+   +'<div style="margin-top:10px"><span class="tag">'+esc(p.serial)+'</span>'+(p.local?'<span class="tag">'+esc(p.local)+'</span>':'')+(p.kit?'<span class="tag">'+esc(p.kit)+'</span>':'')+'</div>'
+   +'<div style="margin-top:10px" class="'+(p.garantia_ate?(gOk?"ok":"no"):"m")+'">'+(p.garantia_ate?(gOk?"Em garantia até "+dmy(p.garantia_ate):"Garantia vencida em "+dmy(p.garantia_ate)):"Garantia: sem data")+'</div>'
+   +(l.integrada&&l.potencia_w!=null?'<div class="m" style="margin-top:6px">Potência: '+fmt(l.potencia_w)+' W</div>':(potTotal?'<div class="m" style="margin-top:6px">Potência total: '+fmt(Math.round(potTotal*100)/100)+' W</div>':''))+'</div>'
+   +(itens.length?'<div class="card"><h2>O que está instalado nesta luminária</h2>'+itens.map(i=>'<div class="it">'+(i.foto_url?'<img src="'+esc(i.foto_url)+'" alt="">':'<div class="ph"></div>')+'<div style="min-width:0"><div><b>'+i.quantidade+'x '+esc(i.codigo)+'</b></div><div class="m">'+TIPO[i.tipo]+(i.fabricante?' · '+esc(i.fabricante):'')+(spec(i)?' · '+spec(i):'')+'</div></div></div>').join("")+'</div>':'')
+   +'<div class="card m">Em breve: pedir peças de reposição e avisar de um problema direto por aqui.</div>';
+}
+iniciar();
+</script>
+</body>
+</html>

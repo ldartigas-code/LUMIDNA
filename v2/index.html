@@ -34,6 +34,9 @@ label{font-size:13px;font-weight:600;color:var(--muted);display:block;margin-bot
 .kfoto{display:grid;gap:2px;width:44px;height:44px;border-radius:6px;overflow:hidden;background:var(--soft);border:1px solid var(--line)}
 .kfoto.n1{grid-template-columns:1fr}.kfoto.n2{grid-template-columns:1fr 1fr}.kfoto.n3,.kfoto.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
 .kfoto img{width:100%;height:100%;object-fit:contain;background:#fff;display:block}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
+.ovc{background:#fff;border-radius:12px;max-width:520px;width:100%;max-height:90vh;overflow:auto;padding:16px}
+.ovc img.big{width:100%;max-height:260px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px}
 .kfotoG{display:flex;flex-wrap:wrap;gap:10px}
 .kfotoG figure{margin:0;text-align:center;width:110px}
 .kfotoG img{width:110px;height:110px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px;display:block}
@@ -187,7 +190,7 @@ function atualizarLista(){
     html=ps.length?`<div class="list">${mostrar.map(p=>{
       const f=faltas(p);
       return `<div class="row" data-act="abrir" data-id="${p.id}"><span class="dot ${f.length?"r":"g"}"></span>
-        ${p.foto_url?`<img class="thumb" src="${esc(p.foto_url)}" alt="">`:miniFotos(fotoAuto(p))}
+        ${p.foto_url?`<img class="thumb" data-act="info" data-id="${p.id}" style="cursor:zoom-in" src="${esc(p.foto_url)}" alt="">`:miniFotos(fotoAuto(p))}
         <div style="min-width:0"><b>${esc(p.codigo)}</b><div class="small">${esc(p.fabricante)||"sem fabricante"}</div></div>
         <div class="small c4">${esc(specLinha(p))}</div><div><b>${p.preco!=null?brl(p.preco):"<span class='no'>sem preço</span>"}</b></div>
         <div class="${f.length?"no":"ok"} c6">${f.length?"Falta: "+f.join(", "):(!p.foto_url&&fotoAuto(p).length?"Completo · foto montada do kit":"Completo")}</div></div>`}).join("")}</div>${ps.length>200?`<div class="small" style="margin-top:8px">Mostrando 200 de ${ps.length}. Use a busca pra achar o resto.</div>`:""}`:`<div class="small">Nada encontrado${S.tab!=="kit"?`. Use "+ Novo item" ou "Importar lista".`:"."}</div>`;
@@ -309,6 +312,7 @@ function renderKit(){
       <div class="field"><label>Itens do kit</label><div id="k_itens"></div></div>
       <div class="field"><label>Foto do kit (montada com as fotos dos itens)</label><div id="k_foto"></div></div>
       <div class="field"><label>Adicionar item</label><div class="bar" style="margin-bottom:6px"><select id="k_tipo" style="width:140px"><option value="led">LED</option><option value="driver">Driver</option><option value="optica">Óptica</option></select><input id="k_ibusca" class="grow" placeholder="Digite parte do código ou fabricante"></div><div class="box" id="k_ires" style="display:none"></div></div>
+      <div class="bar"><button data-act="novoNoKit">+ Cadastrar novo item (se não achar na busca)</button></div><div id="k_novo" class="card" style="display:none"></div>
       <div id="k_total" class="card" style="background:var(--soft)"></div>
       <div class="bar"><button class="p" data-act="salvarKit">Salvar kit</button>${k.id?`<button class="danger" data-act="apagarKit">Excluir kit</button>`:""}</div></div>`;
   $("#k_nome").oninput=e=>{S.kit.nome=e.target.value};
@@ -318,11 +322,11 @@ function renderKit(){
 function desenhaKit(){
   const k=S.kit, lum=porId(k.luminaria_id);
   $("#k_lum").innerHTML=lum?`<span class="pills"><span><b>${esc(lum.codigo)}</b> ${esc(lum.fabricante)||""}</span></span> <button data-act="tirarLum" style="padding:2px 8px">trocar</button>`:`<span class="no">nenhuma escolhida</span>`;
-  $("#k_itens").innerHTML=k.itens.length?`<table><tr><th>Item</th><th>Potência</th><th style="width:90px">Qtd</th><th></th></tr>${k.itens.map((it,i)=>{const p=porId(it.produto_id);return `<tr><td>${TIPO1[p.tipo]} <b>${esc(p.codigo)}</b> <span class="small">${esc(p.fabricante)||""}</span></td><td>${p.tipo==="led"?(p.potencia_w!=null?fmt(p.potencia_w)+" W":"<span class='no'>falta</span>"):"—"}</td><td><input type="number" min="1" value="${it.quantidade}" data-q="${i}"></td><td><button data-act="tirarItem" data-i="${i}" style="padding:2px 8px">remover</button></td></tr>`}).join("")}</table>`:`<div class="small">Nenhum item ainda.</div>`;
+  $("#k_itens").innerHTML=k.itens.length?`<table><tr><th>Item</th><th>Potência</th><th style="width:90px">Qtd</th><th></th></tr>${k.itens.map((it,i)=>{const p=porId(it.produto_id);return `<tr><td>${TIPO1[p.tipo]} <b data-act="info" data-id="${p.id}" style="cursor:pointer;text-decoration:underline dotted">${esc(p.codigo)}</b> <span class="small">${esc(p.fabricante)||""}</span></td><td>${p.tipo==="led"?(p.potencia_w!=null?fmt(p.potencia_w)+" W":"<span class='no'>falta</span>"):"—"}</td><td><input type="number" min="1" value="${it.quantidade}" data-q="${i}"></td><td><button data-act="tirarItem" data-i="${i}" style="padding:2px 8px">remover</button></td></tr>`}).join("")}</table>`:`<div class="small">Nenhum item ainda.</div>`;
   $("#k_itens").querySelectorAll("input[data-q]").forEach(inp=>inp.onchange=()=>{ S.kit.itens[Number(inp.dataset.q)].quantidade=Math.max(1,parseInt(inp.value)||1); desenhaKit(); });
   const its=k.itens.map(i=>({...i,p:porId(i.produto_id)})), leds=its.filter(i=>i.p.tipo==="led");
   const fk=fotosDoKit(its);
-  $("#k_foto").innerHTML=fk.length?`<div class="kfotoG">${fk.map(p=>`<figure><img src="${esc(p.foto_url)}" alt="${esc(p.codigo)}"><figcaption>${esc(p.codigo)}</figcaption></figure>`).join("")}</div>`:`<div class="small">Os itens ainda não têm foto — adicione fotos nos itens do catálogo.</div>`;
+  $("#k_foto").innerHTML=fk.length?`<div class="kfotoG">${fk.map(p=>`<figure data-act="info" data-id="${p.id}" style="cursor:zoom-in"><img src="${esc(p.foto_url)}" alt="${esc(p.codigo)}"><figcaption>${esc(p.codigo)}</figcaption></figure>`).join("")}</div>`:`<div class="small">Os itens ainda não têm foto — adicione fotos nos itens do catálogo.</div>`;
   const total=leds.reduce((s,i)=>s+(i.p.potencia_w||0)*i.quantidade,0), sem=leds.filter(i=>i.p.potencia_w==null).length;
   $("#k_total").innerHTML=`<div style="display:flex;justify-content:space-between;align-items:baseline"><span class="small">Potência total calculada (soma dos LEDs × quantidade)</span><b style="font-size:18px">${leds.length?fmt(Math.round(total*100)/100)+" W":"—"}</b></div>${sem?`<div class="no" style="margin-top:4px">${sem} LED(s) sem potência cadastrada — a soma está incompleta.</div>`:""}`;
 }
@@ -336,7 +340,7 @@ function buscaItemKit(){
   const t=norm($("#k_ibusca").value), tipo=$("#k_tipo").value, box=$("#k_ires");
   if(!t){ box.style.display="none"; return; }
   const r=S.produtos.filter(p=>p.tipo===tipo&&(norm(p.codigo).includes(t)||norm(p.fabricante).includes(t))).slice(0,8);
-  box.style.display=""; box.innerHTML=r.length?r.map(p=>`<label style="cursor:pointer" data-act="pickItem" data-id="${p.id}">+ <b>${esc(p.codigo)}</b> <span class="small">${esc(p.fabricante)||""}${p.potencia_w!=null?" · "+fmt(p.potencia_w)+" W":""}</span></label>`).join(""):`<div class="small">Nada encontrado. Cadastre o item no catálogo primeiro.</div>`;
+  box.style.display=""; box.innerHTML=r.length?r.map(p=>`<label style="cursor:pointer" data-act="pickItem" data-id="${p.id}">+ <b>${esc(p.codigo)}</b> <span class="small">${esc(p.fabricante)||""}${p.potencia_w!=null?" · "+fmt(p.potencia_w)+" W":""}</span></label>`).join(""):`<div class="small">Nada encontrado. Use &quot;+ Cadastrar novo item&quot; logo abaixo.</div>`;
 }
 async function salvarKit(){
   const k=S.kit, nome=k.nome.trim();
@@ -411,8 +415,66 @@ async function cadastrarImport(){
   await carregar(); const n=novos.length; renderImport(); msg(`${n} item(ns) novo(s) cadastrado(s). O que já existia não foi mexido.`);
 }
 
+// ---- ficha do item (abre ao clicar na foto) ----
+function abrirInfo(id){
+  const p=porId(id); if(!p) return;
+  const d=p.detalhes||{}, f=faltas(p);
+  const corr=p.corrente_ma!=null?((d.corrente_min_ma?fmt(d.corrente_min_ma)+" a ":"")+fmt(p.corrente_ma)+" mA"):null;
+  const dim=d.dimmer==="sim"?"Sim"+(d.dimmer_tipo?" — "+d.dimmer_tipo:""):(d.dimmer==="nao"?"Não":null);
+  const linhas=[["Tipo",TIPO1[p.tipo]+(p.integrada?" (lâmpada integrada)":"")],["Fabricante",p.fabricante],["Preço de venda",p.preco!=null?brl(p.preco):null],["Potência",p.potencia_w!=null?fmt(p.potencia_w)+" W":null],["Temperatura de cor",p.cct_k?p.cct_k+" K":null],["Corrente",corr],["Ângulo de facho",p.facho_graus!=null?fmt(p.facho_graus)+"°":null],["IRC",d.irc],["Dimerizável",dim],["Descrição",p.descricao],["Linha",d.linha],["Fluxo",d.fluxo_lm?d.fluxo_lm+" lm":null],["IP",d.ip],["IK",d.ik],["Tensão",d.tensao],["Vida útil",d.vida_util_h?d.vida_util_h+" h":null],["Observações",d.observacoes]].filter(function(x){return x[1]});
+  const serve=p.tipo!=="luminaria"?(function(){const n=S.compat.filter(function(c){return c.componente_id===p.id}).length;return n?"Serve em "+n+" luminária(s)":"Serve em qualquer luminária";})():null;
+  const auto=fotoAuto(p);
+  const foto=p.foto_url?'<img class="big" src="'+esc(p.foto_url)+'" alt="'+esc(p.codigo)+'">':(auto.length?'<div class="kfotoG">'+auto.map(function(x){return '<figure><img src="'+esc(x.foto_url)+'" alt=""><figcaption>'+esc(x.codigo)+'</figcaption></figure>'}).join("")+'</div><div class="small">Foto montada com os itens do kit.</div>':'<div class="small">Sem foto.</div>');
+  const o=document.createElement("div"); o.id="ovInfo"; o.className="ov"; o.dataset.act="fechaInfo";
+  o.innerHTML='<div class="ovc" data-act="nada"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px"><b style="font-size:17px">'+esc(p.codigo)+'</b><span class="'+(f.length?"no":"ok")+'">'+(f.length?"Falta: "+esc(f.join(", ")):"Completo")+'</span></div>'+foto+'<table style="margin-top:10px">'+linhas.map(function(x){return '<tr><th style="width:38%">'+esc(x[0])+'</th><td>'+esc(x[1])+'</td></tr>'}).join("")+'</table>'+(serve?'<div class="small" style="margin-top:8px">'+serve+'</div>':'')+'<div class="bar" style="margin-top:12px"><button class="p" data-act="editarDoInfo" data-id="'+p.id+'">Editar este item</button><button data-act="fechaInfo">Fechar</button></div></div>';
+  document.body.appendChild(o);
+}
+
+// ---- cadastrar item novo direto de dentro do kit ----
+function abrirNovoNoKit(){
+  const t=$("#k_tipo").value, box=$("#k_novo");
+  box.style.display="";
+  box.innerHTML='<h4 style="margin:0 0 10px">Novo '+TIPO1[t]+' (entra no catálogo e já é adicionado ao kit)</h4><input type="hidden" id="nk_tipo" value="'+t+'"><div class="grid">'
+   +'<div class="field"><label>Código *</label><input id="nk_codigo" value="'+esc($("#k_ibusca").value)+'"></div>'
+   +'<div class="field"><label>Fabricante</label><input id="nk_fabricante"></div>'
+   +'<div class="field"><label>Preço de venda (R$)</label><input id="nk_preco" type="number" step="0.01"></div>'
+   +(t==="led"?'<div class="field"><label>Potência (W)</label><input id="nk_potencia" type="number" step="0.01"></div><div class="field"><label>Temperatura de cor (K)</label><input id="nk_cct" type="number"></div>':'')
+   +(t==="driver"?'<div class="field"><label>Corrente mínima (mA)</label><input id="nk_cmin" type="number" step="0.1"></div><div class="field"><label>Corrente máxima (mA)</label><input id="nk_cmax" type="number" step="0.1"></div>':'')
+   +(t==="optica"?'<div class="field"><label>Ângulo de facho (graus)</label><input id="nk_facho" type="number" step="0.1"></div>':'')
+   +'</div><div class="field"><label>Foto</label><input id="nk_foto" type="file" accept="image/*"></div><div class="small" style="margin-bottom:8px">Só o código é obrigatório agora. O que faltar deixa o item vermelho no catálogo, para você completar depois.</div><div class="bar"><button class="p" data-act="salvarNoKit">Salvar e adicionar ao kit</button><button data-act="cancelaNoKit">Cancelar</button></div>';
+  box.scrollIntoView({behavior:"smooth",block:"center"});
+}
+async function salvarNovoNoKit(){
+  const t=$("#nk_tipo").value, g=function(id){const e=$("#"+id);return e?e.value:""};
+  const codigo=g("nk_codigo").trim();
+  if(!codigo) return msg("Informe o código do item.",false);
+  const dup=S.produtos.find(function(x){return x.tipo===t&&norm(x.codigo)===norm(codigo)});
+  if(dup) return msg('Já existe '+TIPO1[t]+' "'+dup.codigo+'". Procure na busca e adicione o existente.',false);
+  const detalhes={}; const cmin=num(g("nk_cmin")); if(t==="driver"&&cmin!=null) detalhes.corrente_min_ma=cmin;
+  const cct=num(g("nk_cct"));
+  const row={tipo:t,codigo:codigo,fabricante:nv(g("nk_fabricante").trim()),preco:num(g("nk_preco")),potencia_w:t==="led"?num(g("nk_potencia")):null,
+    cct_k:t==="led"&&cct!=null?Math.round(cct):null,corrente_ma:t==="driver"?num(g("nk_cmax")):null,facho_graus:t==="optica"?num(g("nk_facho")):null,integrada:false,detalhes:detalhes};
+  const file=$("#nk_foto").files[0];
+  if(file){
+    if(!file.type.startsWith("image/")) return msg("O arquivo da foto precisa ser uma imagem.",false);
+    const path="v2/"+(t+"_"+codigo+"_"+Date.now()+"_"+file.name).replace(/[^\w.-]+/g,"_");
+    const up=await sb.storage.from("fotos").upload(path,file,{upsert:true});
+    if(up.error) return msg("Erro ao enviar a foto: "+up.error.message,false);
+    row.foto_url=sb.storage.from("fotos").getPublicUrl(path).data.publicUrl;
+  }
+  const r=await sb.from("v2_produtos").insert(row).select().single();
+  if(r.error) return msg(r.error.code==="23505"?"Esse código já existe no catálogo.":"Erro ao cadastrar: "+r.error.message,false);
+  const kitAtual=S.kit; if(!await carregar()) return; S.kit=kitAtual;
+  S.kit.itens.push({produto_id:r.data.id,quantidade:1});
+  const nome=r.data.codigo; renderKit(); msg('"'+nome+'" cadastrado no catálogo e adicionado ao kit.');
+}
+
 // ---- cliques ----
 const ACT={
+  nada:()=>{},
+  info:d=>abrirInfo(Number(d.id)), fechaInfo:()=>{const o=$("#ovInfo"); if(o) o.remove();},
+  editarDoInfo:d=>{ if(S.view==="kit"&&!confirm("Sair do kit sem salvar para editar o item?")) return; ACT.fechaInfo(); abrirItem(Number(d.id)); },
+  novoNoKit:abrirNovoNoKit, salvarNoKit:salvarNovoNoKit, cancelaNoKit:()=>{$("#k_novo").style.display="none"},
   entrar, aba:d=>{S.tab=d.t;renderLista()}, novo:()=>S.tab==="kit"?novoKit():novoItem(), importar:renderImport,
   abrir:d=>abrirItem(Number(d.id)), abrirKit:d=>abrirKit(Number(d.id)), voltar:()=>{msg("");renderLista()},
   salvarItem, apagarItem, salvarKit, apagarKit, conferir:conferirImport, cadastrarImport,

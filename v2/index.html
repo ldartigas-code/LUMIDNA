@@ -207,10 +207,11 @@ function abrirItem(id){
   S.compSel=new Set(S.compat.filter(c=>c.componente_id===id).map(c=>c.luminaria_id));
   renderItem();
 }
-const DET=[["linha","Linha"],["irc","IRC"],["fluxo_lm","Fluxo (lm)"],["ip","IP"],["ik","IK"],["tensao","Tensão"],["vida_util_h","Vida útil (h)"],["observacoes","Observações"]];
+const DET=[["linha","Linha"],["fluxo_lm","Fluxo (lm)"],["ip","IP"],["ik","IK"],["tensao","Tensão"],["vida_util_h","Vida útil (h)"]];
 function renderItem(){
   S.view="item"; const p=S.cur, t=p.tipo, novo=!p.id;
   const d=p.detalhes||{};
+  const ircOpts=["70","80","90"]; if(d.irc!=null&&d.irc!==""&&!ircOpts.includes(String(d.irc))) ircOpts.push(String(d.irc));
   const ehComp=t!=="luminaria";
   const usadoEm=!ehComp&&p.id?S.compat.filter(c=>c.luminaria_id===p.id).map(c=>porId(c.componente_id)).filter(Boolean):[];
   const kitsDe=!ehComp&&p.id?S.kits.filter(k=>k.luminaria_id===p.id):[];
@@ -230,7 +231,11 @@ function renderItem(){
       <div class="field"><label>Foto *</label>${!p.foto_url&&fotoAuto(p).length?`<div class="kfotoG" style="margin-bottom:6px">${fotoAuto(p).map(x=>`<figure><img src="${esc(x.foto_url)}" alt="${esc(x.codigo)}"><figcaption>${esc(x.codigo)}</figcaption></figure>`).join("")}</div><div class="small" style="margin-bottom:6px">Foto montada com os itens do kit. Envie uma foto da luminária pra substituir.</div>`:""}${p.foto_url?`<img id="f_prev" class="thumb" style="width:90px;height:90px" src="${esc(p.foto_url)}" alt="">`:`<img id="f_prev" class="thumb" style="width:90px;height:90px;display:none" alt="">`}<input id="f_foto" type="file" accept="image/*" style="margin-top:6px"></div>
       <details style="margin-bottom:12px"><summary style="cursor:pointer;font-weight:600;color:var(--muted)">Mais detalhes (opcionais)</summary>
         <div class="grid" style="margin-top:10px"><div class="field" style="grid-column:1/-1"><label>Descrição</label><input id="f_descricao" value="${esc(p.descricao)}"></div>
-        ${DET.map(([k,n])=>`<div class="field"><label>${n}</label><input data-det="${k}" value="${esc(d[k]??"")}"></div>`).join("")}</div></details>
+        ${DET.map(([k,n])=>`<div class="field"><label>${n}</label><input data-det="${k}" value="${esc(d[k]??"")}"></div>`).join("")}
+        <div class="field"><label>IRC</label><select data-det="irc"><option value="">—</option>${ircOpts.map(o=>`<option value="${o}" ${String(d.irc??"")===o?"selected":""}>${o}</option>`).join("")}</select></div>
+        <div class="field"><label>Dimerizável?</label><select id="f_dimmer" data-act="trocaDimmer"><option value="">—</option><option value="nao" ${d.dimmer==="nao"?"selected":""}>Não</option><option value="sim" ${d.dimmer==="sim"?"selected":""}>Sim</option></select></div>
+        <div class="field" id="dimTipos" style="${d.dimmer==="sim"?"":"display:none"}"><label>Tipo de dimmer</label><div style="display:flex;gap:14px;flex-wrap:wrap">${["DALI","1-10V","TRIAC"].map(x=>`<label style="font-weight:400;color:var(--ink);display:flex;gap:6px;align-items:center;margin:0"><input type="checkbox" data-dim="${x}" ${String(d.dimmer_tipo||"").split(",").map(s=>s.trim()).includes(x)?"checked":""}> ${x}</label>`).join("")}</div></div>
+        <div class="field" style="grid-column:1/-1"><label>Observações</label><textarea data-det="observacoes" rows="3">${esc(d.observacoes??"")}</textarea></div></div></details>
       ${ehComp?`<div class="field"><label>Serve em quais luminárias? (opcional — em branco vale pra qualquer uma)</label>
         <input id="c_busca" placeholder="Buscar luminária (ex: DIP50)"><div class="small" id="c_resumo" style="margin:6px 0"></div><div class="box" id="c_lista"></div></div>`:""}
       ${!ehComp&&p.integrada?`<div class="small">Luminária com lâmpada integrada: não tem Driver, LED nem kit separados.</div>`:""}
@@ -257,6 +262,7 @@ async function salvarItem(){
   const dup=S.produtos.find(x=>x.tipo===t&&norm(x.codigo)===norm(codigo)&&x.id!==p.id);
   if(dup) return msg(`Já existe ${TIPO1[t]} "${dup.codigo}"${dup.fabricante?" ("+dup.fabricante+")":""}. Procure na lista e edite o existente.`,false);
   const detalhes={...(p.detalhes||{})}; document.querySelectorAll("[data-det]").forEach(i=>{ const v=i.value.trim(); if(v) detalhes[i.dataset.det]=v; else delete detalhes[i.dataset.det]; });
+  { const dm=g("f_dimmer"); if(dm) detalhes.dimmer=dm; else delete detalhes.dimmer; const tp=[...document.querySelectorAll("[data-dim]")].filter(i=>i.checked).map(i=>i.dataset.dim); if(dm==="sim"&&tp.length) detalhes.dimmer_tipo=tp.join(", "); else delete detalhes.dimmer_tipo; }
   if(t==="driver"){ const mn=num(g("f_corrente_min")); if(mn!=null) detalhes.corrente_min_ma=mn; else delete detalhes.corrente_min_ma; }
   const integ=t==="luminaria"&&$("#f_integrada")&&$("#f_integrada").checked;
   const row={tipo:t,codigo,fabricante:nv(g("f_fabricante").trim()),descricao:nv(g("f_descricao").trim()),preco:num(g("f_preco")),
@@ -411,6 +417,7 @@ const ACT={
   salvarItem, apagarItem, salvarKit, apagarKit, conferir:conferirImport, cadastrarImport,
   trocaTipo:()=>{ S.cur.tipo=$("#f_tipo").value; S.compSel=new Set(); renderItem(); },
   trocaIntegrada:()=>{ S.cur.integrada=$("#f_integrada").checked; $("#blocoInteg").style.display=S.cur.integrada?"":"none"; },
+  trocaDimmer:()=>{ $("#dimTipos").style.display=$("#f_dimmer").value==="sim"?"":"none"; },
   tirarLum:()=>{S.kit.luminaria_id=null;desenhaKit()},
   pickLum:d=>{S.kit.luminaria_id=Number(d.id);$("#k_lbusca").value="";$("#k_lres").style.display="none";desenhaKit()},
   pickItem:d=>{ const id=Number(d.id); if(S.kit.itens.some(i=>i.produto_id===id)) return msg("Esse item já está no kit.",false); S.kit.itens.push({produto_id:id,quantidade:1}); $("#k_ibusca").value=""; $("#k_ires").style.display="none"; msg(""); desenhaKit(); },

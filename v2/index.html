@@ -81,7 +81,7 @@ function faltas(p){
   if(!p.codigo) f.push("código");
   if(!p.fabricante) f.push("fabricante");
   if(p.preco==null) f.push("preço");
-  if(!p.foto_url) f.push("foto");
+  if(!p.foto_url&&!fotoAuto(p).length) f.push("foto");
   if(p.tipo==="led"){ if(p.potencia_w==null) f.push("potência"); if(!p.cct_k) f.push("temp. de cor"); }
   if(p.tipo==="driver"){ if(p.corrente_ma==null) f.push("corrente"); }
   if(p.tipo==="optica"){ if(p.facho_graus==null) f.push("facho"); }
@@ -96,6 +96,13 @@ function specLinha(p){
 }
 const porId=id=>S.produtos.find(p=>p.id===id);
 
+// luminária sem foto própria: usa as fotos dos itens dos kits dela
+function fotoAuto(p){
+  if(p.tipo!=="luminaria"||p.foto_url) return [];
+  const its=[]; S.kits.filter(k=>k.luminaria_id===p.id).forEach(k=>S.itens.filter(i=>i.kit_id===k.id).forEach(i=>its.push({p:porId(i.produto_id)})));
+  return fotosDoKit(its);
+}
+function miniFotos(fs){ const f=fs.slice(0,4); return f.length?'<div class="kfoto n'+f.length+'">'+f.map(p=>'<img src="'+esc(p.foto_url)+'" alt="'+esc(p.codigo)+'">').join("")+'</div>':'<div class="thumb"></div>'; }
 // foto do kit = fotos dos itens juntas (cada uma mantém a proporção, sem esticar)
 function fotosDoKit(its){ const vistos=new Set(), out=[]; its.forEach(i=>{ if(i.p&&i.p.foto_url&&!vistos.has(i.p.id)){ vistos.add(i.p.id); out.push(i.p); } }); return out; }
 function kitFotoMini(its){ const f=fotosDoKit(its).slice(0,4); return f.length?`<div class="kfoto n${f.length}">${f.map(p=>`<img src="${esc(p.foto_url)}" alt="${esc(p.codigo)}">`).join("")}</div>`:`<div class="thumb"></div>`; }
@@ -180,10 +187,10 @@ function atualizarLista(){
     html=ps.length?`<div class="list">${mostrar.map(p=>{
       const f=faltas(p);
       return `<div class="row" data-act="abrir" data-id="${p.id}"><span class="dot ${f.length?"r":"g"}"></span>
-        ${p.foto_url?`<img class="thumb" src="${esc(p.foto_url)}" alt="">`:`<div class="thumb"></div>`}
+        ${p.foto_url?`<img class="thumb" src="${esc(p.foto_url)}" alt="">`:miniFotos(fotoAuto(p))}
         <div style="min-width:0"><b>${esc(p.codigo)}</b><div class="small">${esc(p.fabricante)||"sem fabricante"}</div></div>
         <div class="small c4">${esc(specLinha(p))}</div><div><b>${p.preco!=null?brl(p.preco):"<span class='no'>sem preço</span>"}</b></div>
-        <div class="${f.length?"no":"ok"} c6">${f.length?"Falta: "+f.join(", "):"Completo"}</div></div>`}).join("")}</div>${ps.length>200?`<div class="small" style="margin-top:8px">Mostrando 200 de ${ps.length}. Use a busca pra achar o resto.</div>`:""}`:`<div class="small">Nada encontrado${S.tab!=="kit"?`. Use "+ Novo item" ou "Importar lista".`:"."}</div>`;
+        <div class="${f.length?"no":"ok"} c6">${f.length?"Falta: "+f.join(", "):(!p.foto_url&&fotoAuto(p).length?"Completo · foto montada do kit":"Completo")}</div></div>`}).join("")}</div>${ps.length>200?`<div class="small" style="margin-top:8px">Mostrando 200 de ${ps.length}. Use a busca pra achar o resto.</div>`:""}`:`<div class="small">Nada encontrado${S.tab!=="kit"?`. Use "+ Novo item" ou "Importar lista".`:"."}</div>`;
     const tot=S.produtos.filter(p=>p.tipo===S.tab), verm=tot.filter(p=>faltas(p).length).length;
     html=`<div class="small" style="margin-bottom:8px">${tot.length} item(ns) · <span class="ok">${tot.length-verm} completo(s)</span> · <span class="no">${verm} com falta</span></div>`+html;
   }
@@ -220,7 +227,7 @@ function renderItem(){
       </div>
       ${t==="luminaria"?`<label style="display:flex;gap:8px;align-items:center;font-weight:400;color:var(--ink);margin:4px 0 12px"><input type="checkbox" id="f_integrada" data-act="trocaIntegrada" ${p.integrada?"checked":""}> Lâmpada integrada (vende só a peça completa, sem acessórios separados)</label>
         <div id="blocoInteg" class="grid" style="${p.integrada?"":"display:none"}"><div class="field"><label>Potência da luminária (W) *</label><input id="f_potencia" type="number" step="0.01" value="${p.potencia_w??""}"></div><div class="field"><label>Temperatura de cor (K)</label><input id="f_cct" type="number" value="${p.cct_k??""}"></div></div>`:""}
-      <div class="field"><label>Foto *</label>${p.foto_url?`<img id="f_prev" class="thumb" style="width:90px;height:90px" src="${esc(p.foto_url)}" alt="">`:`<img id="f_prev" class="thumb" style="width:90px;height:90px;display:none" alt="">`}<input id="f_foto" type="file" accept="image/*" style="margin-top:6px"></div>
+      <div class="field"><label>Foto *</label>${!p.foto_url&&fotoAuto(p).length?`<div class="kfotoG" style="margin-bottom:6px">${fotoAuto(p).map(x=>`<figure><img src="${esc(x.foto_url)}" alt="${esc(x.codigo)}"><figcaption>${esc(x.codigo)}</figcaption></figure>`).join("")}</div><div class="small" style="margin-bottom:6px">Foto montada com os itens do kit. Envie uma foto da luminária pra substituir.</div>`:""}${p.foto_url?`<img id="f_prev" class="thumb" style="width:90px;height:90px" src="${esc(p.foto_url)}" alt="">`:`<img id="f_prev" class="thumb" style="width:90px;height:90px;display:none" alt="">`}<input id="f_foto" type="file" accept="image/*" style="margin-top:6px"></div>
       <details style="margin-bottom:12px"><summary style="cursor:pointer;font-weight:600;color:var(--muted)">Mais detalhes (opcionais)</summary>
         <div class="grid" style="margin-top:10px"><div class="field" style="grid-column:1/-1"><label>Descrição</label><input id="f_descricao" value="${esc(p.descricao)}"></div>
         ${DET.map(([k,n])=>`<div class="field"><label>${n}</label><input data-det="${k}" value="${esc(d[k]??"")}"></div>`).join("")}</div></details>

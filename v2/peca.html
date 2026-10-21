@@ -21,11 +21,28 @@ h1{font-size:22px;margin:12px 0 2px}h2{font-size:16px;margin:0 0 10px;color:var(
 .it img{width:56px;height:56px;object-fit:contain;background:#fff;border-radius:8px;flex:none}
 .it .ph{width:56px;height:56px;border-radius:8px;background:#2c2c2a;flex:none}
 .tag{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:1px 10px;font-size:12px;color:var(--muted);margin-right:4px}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid #4a4a46;background:#1f1f1d;color:var(--ink);padding:12px 14px}
+button.p{background:var(--orange);border-color:var(--orange);color:#1a0d04;font-weight:700}
+button:disabled{opacity:.5;cursor:default}
+label.f{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:#0f0f0e;border:1px solid #4a4a46;border-radius:10px;padding:10px 12px}
+textarea{min-height:70px}
+.op{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--line)}
+.op:first-of-type{border-top:0}
+.op input[type=checkbox]{width:22px;height:22px;margin-top:2px;flex:none;accent-color:var(--orange)}
+.op .t{flex:1;min-width:0}.op .pr{text-align:right;white-space:nowrap;font-weight:600}
+.op select{width:auto;padding:4px 8px;margin-top:6px}
+.tot{display:flex;justify-content:space-between;font-size:18px;font-weight:700;margin-top:12px}
+.st{display:inline-block;border-radius:999px;padding:1px 10px;font-size:12px;border:1px solid var(--line)}
+.msg{border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px}
+.msg.e{background:#3a1a1a;color:var(--red)}.msg.s{background:#1d2a14;color:var(--green)}
 </style>
 </head>
 <body>
 <div class="wrap">
 <div class="logo">Lumi<span>DNA</span></div>
+<div id="msg"></div>
 <div id="app" class="m">Carregando…</div>
 </div>
 <script src="../assets/supabase-config.js"></script>
@@ -35,11 +52,17 @@ const sb=supabase.createClient(LUMIDNA_SUPABASE_URL,LUMIDNA_SUPABASE_KEY);
 const $=s=>document.querySelector(s);
 const esc=s=>(s??"").toString().replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=v=>String(Number(v)).replace(".",",");
-const brl=v=>v==null?"":"R$ "+Number(v).toFixed(2).replace(".",",");
+const brl=v=>v==null?"sob consulta":"R$ "+Number(v).toFixed(2).replace(".",",");
 const dmy=d=>{ if(!d) return "—"; const a=String(d).slice(0,10).split("-"); return a[2]+"/"+a[1]+"/"+a[0]; };
 const hoje=()=>{ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
 const TIPO={led:"LED",driver:"Driver",optica:"Óptica",luminaria:"Luminária"};
+const MOTIVOS=["parou de funcionar","piscando","perdeu brilho","troca preventiva","outro"];
+const STATUS={novo:"Recebido",em_atendimento:"Em atendimento",entregue:"Entregue",instalado:"Instalado",resolvido:"Resolvido",cancelado:"Cancelado"};
+let SERIAL="", P=null, PED=[], VIEW="menu", LAST=null;
 
+function guardado(){ try{ return JSON.parse(localStorage.getItem("lumidna_contato")||"{}"); }catch(e){ return {}; } }
+function guardar(n,f){ try{ localStorage.setItem("lumidna_contato",JSON.stringify({nome:n,fone:f})); }catch(e){} }
+function msg(t,ok){ $("#msg").innerHTML=t?'<div class="msg '+(ok?"s":"e")+'">'+esc(t)+'</div>':""; if(t) window.scrollTo({top:0,behavior:"smooth"}); }
 function spec(c){
   const a=[];
   if(c.potencia_w!=null) a.push(fmt(c.potencia_w)+" W");
@@ -47,25 +70,130 @@ function spec(c){
   if(c.corrente_ma!=null) a.push(fmt(c.corrente_ma)+" mA");
   return a.join(" · ");
 }
-async function iniciar(){
-  const serial=new URLSearchParams(location.search).get("s");
-  if(!serial){ $("#app").innerHTML='<div class="card">Aponte o celular para a etiqueta da luminária, ou leia o QR.</div>'; return; }
-  const r=await sb.rpc("v2_peca_publica",{p_serial:serial});
-  if(r.error){ $("#app").innerHTML='<div class="card no">Não foi possível carregar agora. Tente de novo em instantes.</div>'; return; }
-  const p=r.data;
-  if(!p){ $("#app").innerHTML='<div class="card"><b>Luminária não encontrada.</b><div class="m">Confira o código da etiqueta: '+esc(serial)+'</div></div>'; return; }
-  const l=p.luminaria, itens=p.itens||[];
-  const gOk=p.garantia_ate&&p.garantia_ate>=hoje();
+async function carregar(){
+  const r=await sb.rpc("v2_peca_publica",{p_serial:SERIAL});
+  if(r.error){ $("#app").innerHTML='<div class="card no">Não foi possível carregar agora. Tente de novo em instantes.</div>'; return false; }
+  P=r.data; if(!P){ $("#app").innerHTML='<div class="card"><b>Luminária não encontrada.</b><div class="m">Confira o código da etiqueta: '+esc(SERIAL)+'</div></div>'; return false; }
+  const p=await sb.rpc("v2_pedidos_peca",{p_serial:SERIAL}); PED=(p.error||!p.data)?[]:p.data;
+  return true;
+}
+function topo(){
+  const l=P.luminaria, itens=P.itens||[];
+  const gOk=P.garantia_ate&&P.garantia_ate>=hoje();
   const fotos=itens.filter(i=>i.foto_url).map(i=>i.foto_url);
   const foto=l.foto_url?'<img class="foto" src="'+esc(l.foto_url)+'" alt="">':(fotos.length?'<div class="fotos">'+[...new Set(fotos)].slice(0,4).map(u=>'<img src="'+esc(u)+'" alt="">').join("")+'</div>':"");
   const potTotal=itens.filter(i=>i.tipo==="led").reduce((s,i)=>s+(i.potencia_w||0)*i.quantidade,0);
-  $("#app").innerHTML=
-   '<div class="card">'+foto+'<h1>'+esc(l.codigo)+'</h1><div class="m">'+esc(l.fabricante||"")+'</div>'
-   +'<div style="margin-top:10px"><span class="tag">'+esc(p.serial)+'</span>'+(p.local?'<span class="tag">'+esc(p.local)+'</span>':'')+(p.kit?'<span class="tag">'+esc(p.kit)+'</span>':'')+'</div>'
-   +'<div style="margin-top:10px" class="'+(p.garantia_ate?(gOk?"ok":"no"):"m")+'">'+(p.garantia_ate?(gOk?"Em garantia até "+dmy(p.garantia_ate):"Garantia vencida em "+dmy(p.garantia_ate)):"Garantia: sem data")+'</div>'
-   +(l.integrada&&l.potencia_w!=null?'<div class="m" style="margin-top:6px">Potência: '+fmt(l.potencia_w)+' W</div>':(potTotal?'<div class="m" style="margin-top:6px">Potência total: '+fmt(Math.round(potTotal*100)/100)+' W</div>':''))+'</div>'
-   +(itens.length?'<div class="card"><h2>O que está instalado nesta luminária</h2>'+itens.map(i=>'<div class="it">'+(i.foto_url?'<img src="'+esc(i.foto_url)+'" alt="">':'<div class="ph"></div>')+'<div style="min-width:0"><div><b>'+i.quantidade+'x '+esc(i.codigo)+'</b></div><div class="m">'+TIPO[i.tipo]+(i.fabricante?' · '+esc(i.fabricante):'')+(spec(i)?' · '+spec(i):'')+'</div></div></div>').join("")+'</div>':'')
-   +'<div class="card m">Em breve: pedir peças de reposição e avisar de um problema direto por aqui.</div>';
+  return '<div class="card">'+foto+'<h1>'+esc(l.codigo)+'</h1><div class="m">'+esc(l.fabricante||"")+'</div>'
+   +'<div style="margin-top:10px"><span class="tag">'+esc(P.serial)+'</span>'+(P.local?'<span class="tag">'+esc(P.local)+'</span>':'')+(P.kit?'<span class="tag">'+esc(P.kit)+'</span>':'')+'</div>'
+   +'<div style="margin-top:10px" class="'+(P.garantia_ate?(gOk?"ok":"no"):"m")+'">'+(P.garantia_ate?(gOk?"Em garantia até "+dmy(P.garantia_ate):"Garantia vencida em "+dmy(P.garantia_ate)):"Garantia: sem data")+'</div>'
+   +(l.integrada&&l.potencia_w!=null?'<div class="m" style="margin-top:6px">Potência: '+fmt(l.potencia_w)+' W</div>':(potTotal?'<div class="m" style="margin-top:6px">Potência total: '+fmt(Math.round(potTotal*100)/100)+' W</div>':''))+'</div>';
+}
+function listaItens(){
+  const itens=P.itens||[];
+  return itens.length?'<div class="card"><h2>O que está instalado nesta luminária</h2>'+itens.map(i=>'<div class="it">'+(i.foto_url?'<img src="'+esc(i.foto_url)+'" alt="">':'<div class="ph"></div>')+'<div style="min-width:0"><div><b>'+i.quantidade+'x '+esc(i.codigo)+'</b></div><div class="m">'+TIPO[i.tipo]+(i.fabricante?' · '+esc(i.fabricante):'')+(spec(i)?' · '+spec(i):'')+'</div></div></div>').join("")+'</div>':'';
+}
+function listaPedidos(){
+  if(!PED.length) return "";
+  return '<div class="card"><h2>Seus pedidos nesta luminária</h2>'+PED.map(p=>{
+    const t=p.total, sem=(p.linhas||[]).some(l=>l.preco_unit==null);
+    return '<div class="it" style="align-items:flex-start"><div style="flex:1;min-width:0"><div><b>#'+p.id+' · '+(p.tipo==="problema"?"Aviso de problema":"Pedido de peças")+'</b> <span class="st">'+esc(STATUS[p.status]||p.status)+'</span></div>'
+     +'<div class="m">'+dmy(p.criado_em)+(p.motivo?' · '+esc(p.motivo):'')+'</div>'
+     +(p.linhas&&p.linhas.length?'<div class="m">'+p.linhas.map(l=>l.quantidade+'x '+esc(l.descricao)).join(" · ")+'</div><div class="m">Total: '+(sem?"a combinar":brl(t))+'</div>':'')
+     +(p.tipo==="compra"&&p.status==="entregue"?'<button class="p" style="margin-top:8px" data-ac="instalei" data-id="'+p.id+'">Já instalei</button>':'')
+     +'</div></div>';
+  }).join("")+'</div>';
+}
+function menu(){
+  VIEW="menu";
+  $("#app").innerHTML=topo()+'<div class="btns"><button data-ac="problema">Avisar de um problema</button><button class="p" data-ac="compra">Pedir peças</button></div>'+listaPedidos()+listaItens();
+}
+
+// ---- compra ----
+function compra(){
+  VIEW="compra"; const c=guardado(), integ=P.luminaria.integrada, itens=P.itens||[];
+  let ops="";
+  if(!integ&&P.kit) ops+='<div class="op"><input type="checkbox" id="o_kit"><label for="o_kit" class="t"><b>Kit completo</b><div class="m">'+esc(P.kit)+' · todos os itens abaixo</div></label><div class="pr">'+brl(P.kit_preco)+'</div></div>';
+  if(!integ) ops+=itens.map((i,n)=>'<div class="op"><input type="checkbox" id="o_i'+n+'"><label for="o_i'+n+'" class="t"><b>Só '+esc(TIPO[i.tipo]==="LED"?"a barra de LED":(TIPO[i.tipo]||"o item").toLowerCase())+'</b> · '+esc(i.codigo)+'<div class="m">'+(spec(i)||"")+(i.quantidade>1?' · tem '+i.quantidade+' instalada(s)':'')+'</div>'
+      +(i.quantidade>1?'<select id="q_i'+n+'">'+Array.from({length:i.quantidade},(_,k)=>'<option value="'+(k+1)+'">'+(k+1)+' unidade(s)</option>').join("")+'</select>':'')+'</label><div class="pr" id="p_i'+n+'">'+brl(i.preco)+'</div></div>').join("");
+  ops+='<div class="op"><input type="checkbox" id="o_lum"><label for="o_lum" class="t"><b>Luminária inteira</b><div class="m">'+esc(P.luminaria.codigo)+'</div></label><div class="pr">'+brl(P.luminaria.preco)+'</div></div>';
+  $("#app").innerHTML=topo()+'<div class="card"><h2>Pedir peças de reposição</h2><div class="m" style="margin-bottom:6px">Marque o que você precisa. Você recebe um orçamento e a entrega é combinada com a LDArti; nada é cobrado agora.</div>'+ops
+   +'<div class="tot"><span>Total</span><span id="tot">—</span></div><div class="m" id="totn"></div></div>'
+   +'<div class="card"><h2>Seus dados</h2><label class="f">Nome *</label><input id="c_nome" value="'+esc(c.nome||"")+'" autocomplete="name"><label class="f">Telefone / WhatsApp *</label><input id="c_fone" value="'+esc(c.fone||"")+'" type="tel" autocomplete="tel">'
+   +'<label class="f">Por que está trocando? (opcional)</label><select id="c_motivo"><option value="">—</option>'+MOTIVOS.map(m=>'<option>'+m+'</option>').join("")+'</select>'
+   +'<label class="f">Observação (opcional)</label><textarea id="c_obs"></textarea><div style="display:flex;gap:10px;margin-top:14px"><button data-ac="menu">Voltar</button><button class="p" style="flex:1" id="enviar" data-ac="enviarCompra">Enviar pedido</button></div></div>';
+  document.querySelectorAll('.op input,.op select').forEach(e=>e.onchange=recalc); recalc();
+}
+function linhasCompra(){
+  const out=[], itens=P.itens||[];
+  if($("#o_kit")&&$("#o_kit").checked) out.push({escopo:"kit",quantidade:1,txt:"Kit completo "+P.kit,preco:P.kit_preco,q:1});
+  itens.forEach((i,n)=>{ const e=$("#o_i"+n); if(e&&e.checked){ const q=$("#q_i"+n)?Number($("#q_i"+n).value):1; out.push({escopo:"item",peca_item_id:i.peca_item_id,quantidade:q,txt:q+"x "+i.codigo,preco:i.preco,q:q}); } });
+  if($("#o_lum")&&$("#o_lum").checked) out.push({escopo:"luminaria",quantidade:1,txt:"Luminária inteira",preco:P.luminaria.preco,q:1});
+  return out;
+}
+function recalc(){
+  const ls=linhasCompra(), sem=ls.filter(l=>l.preco==null).length, tot=ls.reduce((s,l)=>s+(l.preco||0)*l.q,0);
+  (P.itens||[]).forEach((i,n)=>{ const el=$("#p_i"+n); if(el){ const q=$("#q_i"+n)?Number($("#q_i"+n).value):1; el.textContent=i.preco==null?"sob consulta":brl(i.preco*q); } });
+  $("#tot").textContent=ls.length?(sem?(tot?brl(tot)+" + a combinar":"a combinar"):brl(tot)):"—";
+  $("#totn").textContent=ls.length&&sem?"Itens sem preço fechado serão cotados pela LDArti.":"";
+}
+async function enviarCompra(){
+  const ls=linhasCompra(), nome=$("#c_nome").value.trim(), fone=$("#c_fone").value.trim();
+  if(!ls.length) return msg("Marque pelo menos um item.",false);
+  if(!nome||!fone) return msg("Informe seu nome e telefone para contato.",false);
+  $("#enviar").disabled=true;
+  const r=await sb.rpc("v2_criar_pedido",{p_serial:SERIAL,p_tipo:"compra",p_nome:nome,p_fone:fone,p_motivo:$("#c_motivo").value||null,p_obs:$("#c_obs").value.trim()||null,p_item_afetado:null,
+    p_linhas:ls.map(l=>({escopo:l.escopo,peca_item_id:l.peca_item_id||null,quantidade:l.quantidade}))});
+  if(r.error){ $("#enviar").disabled=false; return msg(r.error.message||"Não consegui enviar. Tente de novo.",false); }
+  guardar(nome,fone); LAST={tipo:"compra",id:r.data.id,total:r.data.total,sem:r.data.itens_sem_preco>0}; await concluido();
+}
+
+// ---- problema ----
+function problema(){
+  VIEW="problema"; const c=guardado(), itens=P.itens||[];
+  $("#app").innerHTML=topo()+'<div class="card"><h2>Avisar de um problema</h2><div class="m">Conte o que está acontecendo. A equipe da LDArti recebe o aviso e entra em contato.</div>'
+   +'<label class="f">Qual parte está com problema?</label><select id="p_item"><option value="">Não sei / a luminária toda</option>'+itens.map(i=>'<option value="'+i.peca_item_id+'">'+esc(TIPO[i.tipo])+' · '+esc(i.codigo)+'</option>').join("")+'</select>'
+   +'<label class="f">O que acontece? *</label><select id="p_motivo"><option value="">— escolher —</option>'+MOTIVOS.filter(m=>m!=="troca preventiva").map(m=>'<option>'+m+'</option>').join("")+'</select>'
+   +'<label class="f">Detalhes (opcional)</label><textarea id="p_obs"></textarea>'
+   +'<label class="f">Nome *</label><input id="p_nome" value="'+esc(c.nome||"")+'" autocomplete="name"><label class="f">Telefone / WhatsApp *</label><input id="p_fone" value="'+esc(c.fone||"")+'" type="tel" autocomplete="tel">'
+   +'<div style="display:flex;gap:10px;margin-top:14px"><button data-ac="menu">Voltar</button><button class="p" style="flex:1" id="enviar" data-ac="enviarProblema">Enviar aviso</button></div></div>';
+}
+async function enviarProblema(){
+  const motivo=$("#p_motivo").value, nome=$("#p_nome").value.trim(), fone=$("#p_fone").value.trim();
+  if(!motivo) return msg("Escolha o que está acontecendo.",false);
+  if(!nome||!fone) return msg("Informe seu nome e telefone para contato.",false);
+  $("#enviar").disabled=true;
+  const r=await sb.rpc("v2_criar_pedido",{p_serial:SERIAL,p_tipo:"problema",p_nome:nome,p_fone:fone,p_motivo:motivo,p_obs:$("#p_obs").value.trim()||null,p_item_afetado:$("#p_item").value?Number($("#p_item").value):null,p_linhas:[]});
+  if(r.error){ $("#enviar").disabled=false; return msg(r.error.message||"Não consegui enviar. Tente de novo.",false); }
+  guardar(nome,fone); LAST={tipo:"problema",id:r.data.id}; await concluido();
+}
+async function concluido(){
+  msg("");
+  await carregar();
+  const garantia=P.garantia_ate&&P.garantia_ate>=hoje();
+  $("#app").innerHTML=topo()+'<div class="card"><h2>'+(LAST.tipo==="compra"?"Pedido recebido":"Aviso recebido")+' · #'+LAST.id+'</h2>'
+   +'<div>'+(LAST.tipo==="compra"?'Recebemos seu pedido'+(LAST.total?' (total '+(LAST.sem?'a combinar':brl(LAST.total))+')':'')+'. A LDArti entra em contato para confirmar valores e entrega.':'Recebemos seu aviso. A LDArti entra em contato para resolver.')+'</div>'
+   +'<div class="m" style="margin-top:8px">'+(garantia?'Sua luminária está em garantia; vamos avaliar o caso.':'')+'</div>'
+   +'<div style="display:flex;gap:10px;margin-top:14px">'+(LAST.tipo==="problema"?'<button class="p" data-ac="compra">Já quero pedir a peça</button>':'')+'<button data-ac="menu">Voltar</button></div></div>'+listaPedidos();
+  window.scrollTo({top:0});
+}
+async function instalei(id){
+  if(!confirm("Confirma que as peças deste pedido já foram instaladas?")) return;
+  const r=await sb.rpc("v2_confirmar_instalado",{p_serial:SERIAL,p_pedido:id});
+  if(r.error) return msg(r.error.message||"Não consegui registrar agora.",false);
+  await carregar(); menu(); msg("Obrigado! A instalação foi registrada no histórico da sua luminária.",true);
+}
+
+document.addEventListener("click",e=>{
+  const el=e.target.closest("[data-ac]"); if(!el||!P) return;
+  msg(""); const a=el.dataset.ac;
+  if(a==="menu") menu(); else if(a==="compra") compra(); else if(a==="problema") problema();
+  else if(a==="enviarCompra") enviarCompra(); else if(a==="enviarProblema") enviarProblema(); else if(a==="instalei") instalei(Number(el.dataset.id));
+  if(a==="menu"||a==="compra"||a==="problema") window.scrollTo({top:0});
+});
+async function iniciar(){
+  SERIAL=new URLSearchParams(location.search).get("s")||"";
+  if(!SERIAL){ $("#app").innerHTML='<div class="card">Aponte o celular para a etiqueta da luminária, ou leia o QR.</div>'; return; }
+  if(await carregar()) menu();
 }
 iniciar();
 </script>

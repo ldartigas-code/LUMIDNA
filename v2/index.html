@@ -483,7 +483,7 @@ const garantiaTxt=p=>!p.garantia_ate?{t:"sem data",c:"small"}:(p.garantia_ate>=h
 const precisaKit=p=>{ const l=porId(p.luminaria_id); return !!l&&!l.integrada; };
 const urlPeca=s=>new URL("peca.html?s="+encodeURIComponent(s),location.href).href;
 function codigoObra(nome){ const s=String(nome||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase(); const c=s.replace(/[^BCDFGHJKLMNPQRSTVWXYZ]/g,""), l=s.replace(/[^A-Z]/g,""); if(c.length>=3) return c.slice(0,3); return (c+l).slice(0,3).padEnd(3,"X"); }
-const navArea=a=>'<div class="tabs noprint" style="border-bottom:1px solid var(--line);padding-bottom:10px"><button class="tab '+(a==="cat"?"on":"")+'" data-act="areaCat">Catálogo</button><button class="tab '+(a==="obras"?"on":"")+'" data-act="areaObras">Obras</button></div>';
+const navArea=a=>'<div class="tabs noprint" style="border-bottom:1px solid var(--line);padding-bottom:10px"><button class="tab '+(a==="cat"?"on":"")+'" data-act="areaCat">Catálogo</button><button class="tab '+(a==="obras"?"on":"")+'" data-act="areaObras">Obras</button><button class="tab '+(a==="ped"?"on":"")+'" data-act="areaPedidos">Pedidos</button></div>';
 
 async function carregarObras(){
   try{
@@ -727,10 +727,87 @@ async function addItemPeca(){
   await recarregaPeca(); msg("Item adicionado.");
 }
 
+// ---- pedidos (problemas e compras) ----
+Object.assign(S,{pedidos:[],ped_itens:[],ped:null,pedFiltro:"abertos"});
+const ST={novo:"Novo",em_atendimento:"Em atendimento",entregue:"Entregue",instalado:"Instalado",resolvido:"Resolvido",cancelado:"Cancelado"};
+const ABERTOS=["novo","em_atendimento","entregue"];
+async function carregarPedidos(){
+  try{
+    [S.pedidos,S.ped_itens]=await Promise.all([
+      pagina(()=>sb.from("v2_pedidos").select("*").order("id",{ascending:false})),
+      pagina(()=>sb.from("v2_pedido_itens").select("*").order("id"))
+    ]);
+  }catch(e){ $("#app").innerHTML='<div class="msg e">Não consegui carregar os pedidos: '+esc(e.message||e)+'<br>Se for "relation does not exist", falta rodar o SQL v2_03_pedidos no Supabase.</div>'; return false; }
+  return true;
+}
+const totalPed=id=>{ const l=S.ped_itens.filter(i=>i.pedido_id===id); return {total:l.reduce((s,i)=>s+(i.preco_unit||0)*i.quantidade,0),sem:l.some(i=>i.preco_unit==null),n:l.length}; };
+const dataHora=d=>{ if(!d) return "—"; const x=new Date(d); return x.toLocaleDateString("pt-BR")+" "+x.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); };
+
+function renderPedidos(){
+  S.view="pedidos";
+  const lista=S.pedidos.filter(p=>S.pedFiltro==="todos"||(S.pedFiltro==="abertos"?ABERTOS.includes(p.status):!ABERTOS.includes(p.status)));
+  const abertos=S.pedidos.filter(p=>ABERTOS.includes(p.status)).length, novos=S.pedidos.filter(p=>p.status==="novo").length;
+  const rows=lista.map(p=>{
+    const pc=S.pecas.find(x=>x.id===p.peca_id), t=totalPed(p.id), aberto=ABERTOS.includes(p.status);
+    return '<div class="row" style="grid-template-columns:14px minmax(0,1.3fr) minmax(0,1.2fr) 110px 120px" data-act="abrirPedido" data-id="'+p.id+'"><span class="dot '+(p.status==="novo"?"r":(aberto?"":"g"))+'" '+(p.status!=="novo"&&aberto?'style="background:#ba7517"':'')+'></span>'
+     +'<div><b>#'+p.id+' · '+(p.tipo==="problema"?"Problema":"Compra")+'</b><div class="small">'+esc(pc?pc.serial:"?")+' · '+dataHora(p.criado_em)+'</div></div>'
+     +'<div><b>'+esc(p.contato_nome)+'</b><div class="small">'+(p.em_garantia?'<span class="ok">em garantia</span>':'fora da garantia')+'</div></div>'
+     +'<div><b>'+(t.n?(t.sem?"a combinar":brl(t.total)):"—")+'</b></div><div class="'+(p.status==="novo"?"no":"small")+'">'+ST[p.status]+'</div></div>';
+  }).join("");
+  $("#app").innerHTML=navArea("ped")+'<div class="bar"><div class="tabs" style="margin:0">'+[["abertos","Abertos ("+abertos+")"],["encerrados","Encerrados"],["todos","Todos"]].map(x=>'<button class="tab '+(S.pedFiltro===x[0]?"on":"")+'" data-act="filtroPed" data-f="'+x[0]+'">'+x[1]+'</button>').join("")+'</div><div class="small" style="margin-left:auto">'+(novos?'<span class="no"><b>'+novos+'</b> novo(s) sem atendimento</span>':'Nenhum pedido novo')+'</div></div>'
+   +(lista.length?'<div class="list">'+rows+'</div>':'<div class="small">Nenhum pedido nesta lista.</div>');
+}
+function abrirPedido(id){ S.ped=id; renderPedido(); }
+function renderPedido(){
+  S.view="pedido";
+  const pd=S.pedidos.find(x=>x.id===S.ped), pc=S.pecas.find(x=>x.id===pd.peca_id), o=pc&&S.obras.find(x=>x.id===pc.obra_id), l=pc&&porId(pc.luminaria_id);
+  const ls=S.ped_itens.filter(i=>i.pedido_id===pd.id), t=totalPed(pd.id), afet=S.pitens.find(i=>i.id===pd.item_afetado_id);
+  const g=pc?garantiaTxt(pc):{t:"—",c:"small"};
+  const dig=String(pd.contato_fone||"").replace(/\D/g,""), wa=dig.length>=10?"https://wa.me/"+(dig.length<=11?"55":"")+dig:null;
+  const bt=(s,rot,cls)=>'<button '+(cls?'class="'+cls+'" ':'')+'data-act="mudaStatus" data-s="'+s+'">'+rot+'</button>';
+  let botoes="";
+  if(pd.tipo==="compra"){
+    if(pd.status==="novo") botoes=bt("em_atendimento","Em atendimento","p")+bt("entregue","Marcar entregue")+bt("cancelado","Cancelar","danger");
+    else if(pd.status==="em_atendimento") botoes=bt("entregue","Marcar entregue","p")+bt("cancelado","Cancelar","danger");
+    else if(pd.status==="entregue") botoes=bt("instalado","Registrar instalação (cliente não confirmou)","p");
+  }else{
+    if(pd.status==="novo") botoes=bt("em_atendimento","Em atendimento","p")+bt("resolvido","Resolvido")+bt("cancelado","Cancelar","danger");
+    else if(pd.status==="em_atendimento") botoes=bt("resolvido","Resolvido","p")+bt("cancelado","Cancelar","danger");
+  }
+  $("#app").innerHTML='<button data-act="voltaPedidos" style="margin-bottom:12px">‹ Pedidos</button>'
+   +'<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0">Pedido #'+pd.id+' · '+(pd.tipo==="problema"?"Aviso de problema":"Compra de peças")+'</h3><b class="'+(pd.status==="novo"?"no":"")+'">'+ST[pd.status]+'</b></div>'
+   +'<div class="small" style="margin:4px 0 10px">Recebido em '+dataHora(pd.criado_em)+(pd.entregue_em?' · entregue em '+dataHora(pd.entregue_em):'')+(pd.instalado_em?' · instalado em '+dataHora(pd.instalado_em):'')+'</div>'
+   +'<table><tr><th style="width:32%">Peça</th><td>'+(pc?'<a href="#" data-act="abrirPeca" data-id="'+pc.id+'"><b>'+esc(pc.serial)+'</b></a> · '+esc(l?l.codigo:"?")+' · obra '+esc(o?o.nome:"?")+(pc.local?' · '+esc(pc.local):''):'?')+'</td></tr>'
+   +'<tr><th>Garantia</th><td><span class="'+g.c+'">'+g.t+'</span> <span class="small">(na hora do pedido: '+(pd.em_garantia?"em garantia":"fora da garantia")+')</span></td></tr>'
+   +'<tr><th>Cliente</th><td><b>'+esc(pd.contato_nome)+'</b> · '+esc(pd.contato_fone)+(wa?' · <a href="'+wa+'" target="_blank" rel="noopener">chamar no WhatsApp</a>':'')+'</td></tr>'
+   +(pd.motivo?'<tr><th>Motivo</th><td>'+esc(pd.motivo)+'</td></tr>':'')
+   +(afet?'<tr><th>Item com problema</th><td>'+esc(porId(afet.produto_id).codigo)+'</td></tr>':'')
+   +(pd.observacao?'<tr><th>Observação do cliente</th><td>'+esc(pd.observacao)+'</td></tr>':'')+'</table></div>'
+   +(ls.length?'<div class="card"><h3 style="margin-top:0">Itens pedidos</h3><table><tr><th>Item</th><th>Qtd</th><th>Preço</th><th>Subtotal</th></tr>'+ls.map(i=>'<tr><td>'+esc(i.descricao)+'</td><td>'+i.quantidade+'</td><td>'+(i.preco_unit!=null?brl(i.preco_unit):'<span class="no">sem preço</span>')+'</td><td>'+(i.preco_unit!=null?brl(i.preco_unit*i.quantidade):'—')+'</td></tr>').join("")+'</table><div style="text-align:right;margin-top:8px"><b>Total: '+(t.sem?'a combinar ('+brl(t.total)+' + itens sem preço)':brl(t.total))+'</b></div></div>':'')
+   +'<div class="card"><div class="field"><label>Anotação interna (o cliente não vê)</label><textarea id="pd_obs" style="min-height:70px">'+esc(pd.obs_interna||"")+'</textarea></div><div class="bar">'+botoes+'<button data-act="salvarObsPedido">Salvar anotação</button></div>'
+   +(pd.tipo==="compra"?'<div class="small">Entregue: o cliente passa a ver o botão "Já instalei" na página da peça. Quando ele confirma (ou você registra a instalação), os itens da peça são trocados e entram no histórico.</div>':'')+'</div>';
+}
+async function mudaStatus(d){
+  const pd=S.pedidos.find(x=>x.id===S.ped), s=d.s;
+  if(s==="cancelado"&&!confirm("Cancelar o pedido #"+pd.id+"?")) return;
+  if(s==="instalado"&&!confirm("Registrar a instalação troca os itens da peça e grava no histórico. Confirma?")) return;
+  const r=await sb.rpc("v2_mudar_status_pedido",{p_pedido:pd.id,p_status:s,p_obs:nv(($("#pd_obs").value||"").trim())});
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  await Promise.all([carregarPedidos(),carregarObras()]); renderPedido(); msg("Pedido #"+pd.id+": "+ST[s]+".");
+}
+async function salvarObsPedido(){
+  const pd=S.pedidos.find(x=>x.id===S.ped);
+  const r=await sb.rpc("v2_mudar_status_pedido",{p_pedido:pd.id,p_status:pd.status,p_obs:nv(($("#pd_obs").value||"").trim())});
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  await carregarPedidos(); renderPedido(); msg("Anotação salva.");
+}
+
 // ---- cliques ----
 const ACT={
   nada:()=>{},
   areaCat:()=>{msg("");renderLista()}, areaObras:async()=>{msg(""); if(await carregarObras()) renderObras();},
+  areaPedidos:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderPedidos();},
+  filtroPed:d=>{S.pedFiltro=d.f;renderPedidos()}, abrirPedido:d=>abrirPedido(Number(d.id)), voltaPedidos:()=>{msg("");renderPedidos()}, mudaStatus, salvarObsPedido,
   novaObra, abrirObra:d=>abrirObra(Number(d.id)), voltaObras:()=>{msg("");renderObras()}, salvarObra, apagarObra,
   conferirLista, criarPecas, trocaKitPeca, abrirPeca:d=>abrirPeca(Number(d.id)),
   voltaObra:()=>{ msg(""); const id=S.view==="peca"?S.pecas.find(x=>x.id===S.peca).obra_id:S.obra.id; abrirObra(id); },

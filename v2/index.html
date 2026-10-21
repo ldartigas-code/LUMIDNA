@@ -529,11 +529,11 @@ function blocoPecas(o,ps){
     const sel=pk?'<select data-act="trocaKitPeca" data-id="'+p.id+'"><option value="">— escolher kit —</option>'+kits.map(k=>'<option value="'+k.id+'" '+(p.kit_id===k.id?"selected":"")+'>'+esc(k.nome)+'</option>').join("")+'</select>'+(!kits.length?'<div class="no">nenhum kit cadastrado para esta luminária</div>':''):'<span class="small">lâmpada integrada</span>';
     return '<tr><td><a href="#" data-act="abrirPeca" data-id="'+p.id+'"><b>'+esc(p.serial)+'</b></a></td><td>'+esc(l?l.codigo:"?")+'</td><td>'+sel+'</td><td>'+(esc(p.local)||"—")+'</td><td class="'+g.c+'">'+g.t+'</td></tr>';
   }).join("");
-  const grupos=[...new Set(ps.map(p=>p.luminaria_id))].map(id=>{ const l=porId(id), n=ps.filter(p=>p.luminaria_id===id).length; return '<tr><td><b>'+esc(l?l.codigo:"?")+'</b></td><td>'+n+' peça(s)</td><td><button data-act="maisPeca" data-id="'+id+'" style="padding:2px 10px">+ 1</button> <button data-act="menosPeca" data-id="'+id+'" style="padding:2px 10px">− 1</button></td></tr>'; }).join("");
+  const grupos=[...new Set(ps.map(p=>p.luminaria_id))].map(id=>{ const l=porId(id), n=ps.filter(p=>p.luminaria_id===id).length; return '<tr><td><b>'+esc(l?l.codigo:"?")+'</b></td><td>'+n+' peça(s)</td><td style="white-space:nowrap"><input type="number" min="1" max="200" value="1" id="qn_'+id+'" style="width:76px"> <button data-act="maisPeca" data-id="'+id+'" style="padding:6px 12px">Adicionar</button> <button data-act="menosPeca" data-id="'+id+'" style="padding:6px 12px">Remover</button></td></tr>'; }).join("");
   const addRapido='<div class="card"><h3 style="margin-top:0">Adicionar peça nova</h3><div class="grid"><div class="field"><label>Luminária *</label><input id="a_lum" list="dl_lum" placeholder="Digite o código"></div><div class="field"><label>Quantidade</label><input id="a_qtd" type="number" min="1" value="1"></div><div class="field"><label>Local</label><input id="a_loc"></div></div><datalist id="dl_lum">'+S.produtos.filter(p=>p.tipo==="luminaria").map(p=>'<option value="'+esc(p.codigo)+'">').join("")+'</datalist><button class="p" data-act="adicionarPeca">Adicionar</button></div>';
   return '<div class="card"><div class="bar" style="margin-bottom:8px"><h3 style="margin:0">Peças da obra ('+ps.length+')</h3><div style="margin-left:auto">'+(ps.length?'<button data-act="etiquetas">Etiquetas e NFC</button>':'')+'</div></div>'
    +(ps.length?'<table><tr><th>Serial</th><th>Luminária</th><th>Kit</th><th>Local</th><th>Garantia</th></tr>'+linhas+'</table>':'<div class="small">Nenhuma peça ainda.</div>')+'</div>'
-   +(ps.length?'<div class="card"><h3 style="margin-top:0">Quantidade por luminária</h3><div class="small" style="margin-bottom:8px">+ 1 cria mais uma peça igual (mesmo kit e local, serial novo). − 1 exclui a última peça dessa luminária, só se ela não tiver troca no histórico.</div><table>'+grupos+'</table></div>':'')
+   +(ps.length?'<div class="card"><h3 style="margin-top:0">Quantidade por luminária</h3><div class="small" style="margin-bottom:8px">Digite quantas peças e clique em Adicionar (cria peças iguais à última, com mesmo kit e local e serial novo) ou em Remover (exclui as últimas dessa luminária, só se nenhuma tiver troca ou outro registro no histórico).</div><table>'+grupos+'</table></div>':'')
    +addRapido
    +'<div class="card"><h3 style="margin-top:0">Adicionar várias de uma vez (colar lista)</h3>'
    +'<div class="small" style="margin-bottom:8px">Uma linha por tipo: <b>código; quantidade; local</b> (o local é opcional). Exemplo: <code>CART A; 3; Hall</code>. Cada unidade vira uma peça com serial próprio. Nada é criado até você clicar em Criar peças.</div>'
@@ -681,22 +681,27 @@ async function adicionarPeca(){
   if(S.imp[0].status!=="ok"){ const m=S.imp[0].motivo; return msg(m.charAt(0).toUpperCase()+m.slice(1)+".",false); }
   await criarPecas();
 }
+function qtdDigitada(id){ const n=parseInt(($("#qn_"+id)||{}).value); return (isNaN(n)||n<1||n>200)?null:n; }
 async function maisPeca(d){
-  const id=Number(d.id), ps=S.pecas.filter(p=>p.obra_id===S.obra.id&&p.luminaria_id===id), ult=ps[ps.length-1];
-  const r=await sb.from("v2_pecas").insert({obra_id:S.obra.id,luminaria_id:id,kit_id:ult?ult.kit_id:null,local:ult?ult.local:null});
-  if(r.error) return msg("Erro ao criar a peça: "+r.error.message,false);
-  const oid=S.obra.id; await carregarObras(); abrirObra(oid); msg("Peça criada com serial novo.");
+  const id=Number(d.id), n=qtdDigitada(id), ps=S.pecas.filter(p=>p.obra_id===S.obra.id&&p.luminaria_id===id), ult=ps[ps.length-1];
+  if(!n) return msg("Digite uma quantidade de 1 a 200.",false);
+  const rows=Array.from({length:n},()=>({obra_id:S.obra.id,luminaria_id:id,kit_id:ult?ult.kit_id:null,local:ult?ult.local:null}));
+  const r=await sb.from("v2_pecas").insert(rows);
+  if(r.error) return msg("Erro ao criar as peças: "+r.error.message+" — nada foi criado.",false);
+  const oid=S.obra.id; await carregarObras(); abrirObra(oid); msg(n+" peça(s) criada(s) com serial novo.");
 }
 async function menosPeca(d){
-  const id=Number(d.id), ps=S.pecas.filter(p=>p.obra_id===S.obra.id&&p.luminaria_id===id), ult=ps[ps.length-1];
-  if(!ult) return;
-  const h=await sb.from("v2_historico").select("id").eq("peca_id",ult.id).not("tipo","in","(instalada,kit)").limit(1);
+  const id=Number(d.id), n=qtdDigitada(id), ps=S.pecas.filter(p=>p.obra_id===S.obra.id&&p.luminaria_id===id);
+  if(!n) return msg("Digite uma quantidade de 1 a 200.",false);
+  if(n>ps.length) return msg("Esta obra só tem "+ps.length+" peça(s) dessa luminária.",false);
+  const alvo=ps.slice(-n), ids=alvo.map(p=>p.id);
+  const h=await sb.from("v2_historico").select("peca_id").in("peca_id",ids).not("tipo","in","(instalada,kit)");
   if(h.error) return msg("Erro ao conferir o histórico: "+h.error.message,false);
-  if(h.data.length) return msg("A peça "+ult.serial+" já tem troca ou outro registro no histórico. Abra a peça e use Excluir se tiver certeza.",false);
-  if(!confirm("Excluir a peça "+ult.serial+"?")) return;
-  const r=await sb.from("v2_pecas").delete().eq("id",ult.id);
+  if(h.data.length){ const com=[...new Set(h.data.map(x=>x.peca_id))].map(pid=>alvo.find(p=>p.id===pid).serial); return msg("Estas peças já têm troca ou outro registro no histórico: "+com.join(", ")+". Nada foi excluído. Abra a peça e use Excluir se tiver certeza.",false); }
+  if(!confirm("Excluir as "+n+" últimas peças ("+alvo.map(p=>p.serial).join(", ")+")?")) return;
+  const r=await sb.from("v2_pecas").delete().in("id",ids);
   if(r.error) return msg("Erro ao excluir: "+r.error.message,false);
-  const oid=S.obra.id; await carregarObras(); abrirObra(oid); msg("Peça "+ult.serial+" excluída.");
+  const oid=S.obra.id; await carregarObras(); abrirObra(oid); msg(n+" peça(s) excluída(s).");
 }
 async function recarregaPeca(){ const id=S.peca; await carregarObras(); await abrirPeca(id); }
 async function registraHist(peca,produto,descricao){ const h=await sb.from("v2_historico").insert({peca_id:peca,tipo:"observacao",produto_id:produto,descricao:descricao}); if(h.error) msg("Alteração feita, mas não consegui registrar no histórico: "+h.error.message,false); }

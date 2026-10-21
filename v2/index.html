@@ -135,11 +135,12 @@ async function pagina(consulta){
 }
 async function carregar(){
   try{
-    [S.produtos,S.compat,S.kits,S.itens]=await Promise.all([
+    [S.produtos,S.compat,S.kits,S.itens,S.similares]=await Promise.all([
       pagina(()=>sb.from("v2_produtos").select("*").order("id")),
       pagina(()=>sb.from("v2_compatibilidade").select("*").order("componente_id")),
       pagina(()=>sb.from("v2_kits").select("*").order("id")),
-      pagina(()=>sb.from("v2_kit_itens").select("*").order("kit_id"))
+      pagina(()=>sb.from("v2_kit_itens").select("*").order("kit_id")),
+      pagina(()=>sb.from("v2_similares").select("*").order("original_id"))
     ]);
   }catch(e){ $("#app").innerHTML=`<div class="msg e">Não consegui carregar o catálogo: ${esc(e.message||e)}<br>Se for "relation does not exist", falta rodar o SQL v2_01_catalogo no Supabase.</div>`; return false; }
   return true;
@@ -247,12 +248,14 @@ function renderItem(){
         ${DET.map(([k,n])=>`<div class="field"><label>${n}</label><input data-det="${k}" value="${esc(d[k]??"")}"></div>`).join("")}</div></details>
       ${ehComp?`<div class="field"><label>Serve em quais luminárias? (opcional — em branco vale pra qualquer uma)</label>
         <input id="c_busca" placeholder="Buscar luminária (ex: DIP50)"><div class="small" id="c_resumo" style="margin:6px 0"></div><div class="box" id="c_lista"></div></div>`:""}
+      ${ehComp&&p.id?`<div id="sim_box"></div>`:""}
+      ${ehComp&&!p.id?`<div class="small" style="margin-bottom:10px">Depois de salvar, aqui você cadastra os similares homologados deste item.</div>`:""}
       ${!ehComp&&p.integrada?`<div class="small">Luminária com lâmpada integrada: não tem Driver, LED nem kit separados.</div>`:""}
       ${!ehComp&&!p.integrada&&p.id?`<div class="field"><label>Componentes que servem nesta luminária</label><div class="pills">${usadoEm.length?usadoEm.map(c=>`<span>${TIPO1[c.tipo]} ${esc(c.codigo)}</span>`).join(""):'<span class="small">nenhum ligado ainda — marque no cadastro de cada componente</span>'}</div></div>
         <div class="field"><label>Kits desta luminária</label><div class="pills">${kitsDe.length?kitsDe.map(k=>`<span>${esc(k.nome)}</span>`).join(""):'<span class="small">nenhum kit ainda</span>'}</div></div>`:""}
       <div class="bar" style="margin-top:8px"><button class="p" data-act="salvarItem">Salvar</button>${novo?"":`<button class="danger" data-act="apagarItem">Excluir</button>`}</div>
     </div>`;
-  if(ehComp){ $("#c_busca").oninput=listaCompat; listaCompat(); }
+  if(ehComp){ $("#c_busca").oninput=listaCompat; listaCompat(); desenhaSimilares(); }
   $("#f_foto").onchange=e=>{ const f=e.target.files[0]; if(f){ const im=$("#f_prev"); im.src=URL.createObjectURL(f); im.style.display=""; } };
 }
 function listaCompat(){
@@ -626,6 +629,7 @@ function renderPeca(){
    +'<div class="card"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">'+(l?(l.foto_url?'<img class="thumb" style="width:64px;height:64px" src="'+esc(l.foto_url)+'" alt="">':miniFotos(fotoAuto(l))):'')
    +'<div style="flex:1;min-width:200px"><h3 style="margin:0">'+esc(p.serial)+'</h3><div class="small">'+esc(l?l.codigo:"?")+(kit?' · '+esc(kit.nome):'')+' · obra '+esc(o.nome)+'</div></div><div class="'+g.c+'" style="font-size:14px">'+g.t+'</div></div></div>'
    +'<div class="card"><div class="field"><label>Local</label><input id="p_local" value="'+esc(p.local||"")+'"></div>'
+   +'<div class="field"><label>Garantia até (a empresa pode ajustar)</label><input id="p_gar" type="date" value="'+esc(p.garantia_ate||"")+'"></div>'
    +'<div class="field"><label>Observação desta peça (só desta peça)</label><textarea id="p_obs" style="min-height:70px">'+esc(p.observacao||"")+'</textarea></div>'
    +'<div class="bar"><button class="p" data-act="salvarPeca">Salvar peça</button><button class="danger" data-act="apagarPeca">Excluir peça (cadastrada por engano)</button></div></div>'
    +'<div class="card"><h3 style="margin-top:0">Itens instalados agora</h3>'+(atuais.length?'<table><tr><th>Item</th><th>Qtd</th><th>Instalado em</th><th></th></tr>'+atuais.map(linhaAtual).join("")+'</table>':'<div class="small">'+(precisaKit(p)?'Nenhum item. Escolha o kit na lista da obra.':'Lâmpada integrada: não tem itens separados.')+'</div>')+formTroca
@@ -635,9 +639,10 @@ function renderPeca(){
 }
 async function salvarPeca(){
   const p=S.pecas.find(x=>x.id===S.peca);
-  const r=await sb.from("v2_pecas").update({local:nv($("#p_local").value.trim()),observacao:nv($("#p_obs").value.trim())}).eq("id",p.id);
+  const gar=nv($("#p_gar").value), r=await sb.from("v2_pecas").update({local:nv($("#p_local").value.trim()),observacao:nv($("#p_obs").value.trim()),garantia_ate:gar}).eq("id",p.id);
   if(r.error) return msg("Erro ao salvar a peça: "+r.error.message,false);
-  await carregarObras(); renderPeca(); msg("Peça salva.");
+  if((p.garantia_ate||null)!==gar) await registraHist(p.id,null,"Garantia alterada de "+dmy(p.garantia_ate)+" para "+dmy(gar));
+  await carregarObras(); await abrirPeca(p.id); msg("Peça salva.");
 }
 async function apagarPeca(){
   const p=S.pecas.find(x=>x.id===S.peca);
@@ -734,8 +739,10 @@ async function addItemPeca(){
 
 // ---- pedidos (problemas e compras) ----
 Object.assign(S,{pedidos:[],ped_itens:[],ped:null,pedFiltro:"abertos"});
-const ST={novo:"Novo",em_atendimento:"Em atendimento",entregue:"Entregue",instalado:"Instalado",resolvido:"Resolvido",cancelado:"Cancelado"};
-const ABERTOS=["novo","em_atendimento","entregue"];
+const ST={novo:"Novo",em_atendimento:"Em atendimento",entregue:"Entregue",instalado:"Instalado",resolvido:"Resolvido",cancelado:"Cancelado",aguardando_aprovacao:"Aguardando aprovação",aprovada:"Aprovada",reprovada:"Reprovada"};
+const urgente=p=>p.status==="novo"||p.status==="aguardando_aprovacao";
+const TIPO_PED={problema:"Problema",compra:"Compra",manutencao:"Manutenção"};
+const ABERTOS=["novo","em_atendimento","entregue","aguardando_aprovacao"];
 async function carregarPedidos(){
   try{
     [S.pedidos,S.ped_itens]=await Promise.all([
@@ -751,13 +758,13 @@ const dataHora=d=>{ if(!d) return "—"; const x=new Date(d); return x.toLocaleD
 function renderPedidos(){
   S.view="pedidos";
   const lista=S.pedidos.filter(p=>S.pedFiltro==="todos"||(S.pedFiltro==="abertos"?ABERTOS.includes(p.status):!ABERTOS.includes(p.status)));
-  const abertos=S.pedidos.filter(p=>ABERTOS.includes(p.status)).length, novos=S.pedidos.filter(p=>p.status==="novo").length;
+  const abertos=S.pedidos.filter(p=>ABERTOS.includes(p.status)).length, novos=S.pedidos.filter(urgente).length;
   const rows=lista.map(p=>{
     const pc=S.pecas.find(x=>x.id===p.peca_id), t=totalPed(p.id), aberto=ABERTOS.includes(p.status);
-    return '<div class="row" style="grid-template-columns:14px minmax(0,1.3fr) minmax(0,1.2fr) 110px 120px" data-act="abrirPedido" data-id="'+p.id+'"><span class="dot '+(p.status==="novo"?"r":(aberto?"":"g"))+'" '+(p.status!=="novo"&&aberto?'style="background:#ba7517"':'')+'></span>'
-     +'<div><b>#'+p.id+' · '+(p.tipo==="problema"?"Problema":"Compra")+'</b><div class="small">'+esc(pc?pc.serial:"?")+' · '+dataHora(p.criado_em)+'</div></div>'
+    return '<div class="row" style="grid-template-columns:14px minmax(0,1.3fr) minmax(0,1.2fr) 110px 120px" data-act="abrirPedido" data-id="'+p.id+'"><span class="dot '+(urgente(p)?"r":(aberto?"":"g"))+'" '+(!urgente(p)&&aberto?'style="background:#ba7517"':'')+'></span>'
+     +'<div><b>#'+p.id+' · '+TIPO_PED[p.tipo]+'</b><div class="small">'+esc(pc?pc.serial:"?")+' · '+dataHora(p.criado_em)+'</div></div>'
      +'<div><b>'+esc(p.contato_nome)+'</b><div class="small">'+(p.em_garantia?'<span class="ok">em garantia</span>':'fora da garantia')+'</div></div>'
-     +'<div><b>'+(t.n?(t.sem?"a combinar":brl(t.total)):"—")+'</b></div><div class="'+(p.status==="novo"?"no":"small")+'">'+ST[p.status]+'</div></div>';
+     +'<div><b>'+(t.n?(t.sem?"a combinar":brl(t.total)):"—")+'</b></div><div class="'+(urgente(p)?"no":"small")+'">'+ST[p.status]+'</div></div>';
   }).join("");
   $("#app").innerHTML=navArea("ped")+'<div class="bar"><div class="tabs" style="margin:0">'+[["abertos","Abertos ("+abertos+")"],["encerrados","Encerrados"],["todos","Todos"]].map(x=>'<button class="tab '+(S.pedFiltro===x[0]?"on":"")+'" data-act="filtroPed" data-f="'+x[0]+'">'+x[1]+'</button>').join("")+'</div><div class="small" style="margin-left:auto">'+(novos?'<span class="no"><b>'+novos+'</b> novo(s) sem atendimento</span>':'Nenhum pedido novo')+'</div></div>'
    +(lista.length?'<div class="list">'+rows+'</div>':'<div class="small">Nenhum pedido nesta lista.</div>');
@@ -780,7 +787,7 @@ function renderPedido(){
     else if(pd.status==="em_atendimento") botoes=bt("resolvido","Resolvido","p")+bt("cancelado","Cancelar","danger");
   }
   $("#app").innerHTML='<button data-act="voltaPedidos" style="margin-bottom:12px">‹ Pedidos</button>'
-   +'<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0">Pedido #'+pd.id+' · '+(pd.tipo==="problema"?"Aviso de problema":"Compra de peças")+'</h3><b class="'+(pd.status==="novo"?"no":"")+'">'+ST[pd.status]+'</b></div>'
+   +'<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0">Pedido #'+pd.id+' · '+(pd.tipo==="problema"?"Aviso de problema":(pd.tipo==="manutencao"?"Manutenção informada":"Compra de peças"))+'</h3><b class="'+(pd.status==="novo"?"no":"")+'">'+ST[pd.status]+'</b></div>'
    +'<div class="small" style="margin:4px 0 10px">Recebido em '+dataHora(pd.criado_em)+(pd.entregue_em?' · entregue em '+dataHora(pd.entregue_em):'')+(pd.instalado_em?' · instalado em '+dataHora(pd.instalado_em):'')+'</div>'
    +'<table><tr><th style="width:32%">Peça</th><td>'+(pc?'<a href="#" data-act="abrirPeca" data-id="'+pc.id+'"><b>'+esc(pc.serial)+'</b></a> · '+esc(l?l.codigo:"?")+' · obra '+esc(o?o.nome:"?")+(pc.local?' · '+esc(pc.local):''):'?')+'</td></tr>'
    +'<tr><th>Garantia</th><td><span class="'+g.c+'">'+g.t+'</span> <span class="small">(na hora do pedido: '+(pd.em_garantia?"em garantia":"fora da garantia")+')</span></td></tr>'
@@ -788,9 +795,11 @@ function renderPedido(){
    +(pd.motivo?'<tr><th>Motivo</th><td>'+esc(pd.motivo)+'</td></tr>':'')
    +(afet?'<tr><th>Item com problema</th><td>'+esc(porId(afet.produto_id).codigo)+'</td></tr>':'')
    +(pd.observacao?'<tr><th>Observação do cliente</th><td>'+esc(pd.observacao)+'</td></tr>':'')+'</table></div>'
+   +(pd.tipo==="manutencao"?painelMan(pd):"")
    +(ls.length?'<div class="card"><h3 style="margin-top:0">Itens pedidos</h3><table><tr><th>Item</th><th>Qtd</th><th>Preço</th><th>Subtotal</th></tr>'+ls.map(i=>'<tr><td>'+esc(i.descricao)+'</td><td>'+i.quantidade+'</td><td>'+(i.preco_unit!=null?brl(i.preco_unit):'<span class="no">sem preço</span>')+'</td><td>'+(i.preco_unit!=null?brl(i.preco_unit*i.quantidade):'—')+'</td></tr>').join("")+'</table><div style="text-align:right;margin-top:8px"><b>Total: '+(t.sem?'a combinar ('+brl(t.total)+' + itens sem preço)':brl(t.total))+'</b></div></div>':'')
    +'<div class="card"><div class="field"><label>Anotação interna (o cliente não vê)</label><textarea id="pd_obs" style="min-height:70px">'+esc(pd.obs_interna||"")+'</textarea></div><div class="bar">'+botoes+'<button data-act="salvarObsPedido">Salvar anotação</button></div>'
    +(pd.tipo==="compra"?'<div class="small">Entregue: o cliente passa a ver o botão "Já instalei" na página da peça. Quando ele confirma (ou você registra a instalação), os itens da peça são trocados e entram no histórico.</div>':'')+'</div>';
+  posPedido(pd);
 }
 async function mudaStatus(d){
   const pd=S.pedidos.find(x=>x.id===S.ped), s=d.s;
@@ -831,7 +840,7 @@ function eventosManut(){
   });
   S.pedidos.filter(pd=>!noPeriodo(pd.criado_em)).forEach(pd=>{
     const p=pm.get(pd.peca_id); if(!p) return;
-    ev.push({obra:p.obra_id,peca:p.id,data:diaDe(pd.criado_em),serial:p.serial,tipo:pd.tipo==="problema"?"Problema":"Pedido de peças",desc:"Pedido #"+pd.id+" · "+ST[pd.status],motivo:pd.motivo||"",un:0});
+    ev.push({obra:p.obra_id,peca:p.id,data:diaDe(pd.criado_em),serial:p.serial,tipo:pd.tipo==="problema"?"Problema":(pd.tipo==="manutencao"?"Manutenção informada":"Pedido de peças"),desc:"Pedido #"+pd.id+" · "+ST[pd.status],motivo:pd.motivo||"",un:0});
   });
   return ev;
 }
@@ -847,7 +856,7 @@ function relManut(){
   }
   const linhas=S.obras.map(o=>{
     const ps=S.pecas.filter(p=>p.obra_id===o.id), e=ev.filter(x=>x.obra===o.id);
-    return {o:o,ps:ps.length,prob:e.filter(x=>x.tipo==="Problema").length,trocas:e.filter(x=>x.tipo==="Troca").reduce((s,x)=>s+x.un,0),ped:e.filter(x=>x.tipo==="Pedido de peças").length,comOc:new Set(e.filter(x=>x.tipo!=="Pedido de peças").map(x=>x.peca)).size};
+    return {o:o,ps:ps.length,prob:e.filter(x=>x.tipo==="Problema").length,trocas:e.filter(x=>x.tipo==="Troca").reduce((s,x)=>s+x.un,0),ped:e.filter(x=>x.tipo==="Pedido de peças").length,comOc:new Set(e.filter(x=>x.tipo==="Problema"||x.tipo==="Troca").map(x=>x.peca)).size};
   }).sort((a,b)=>b.comOc-a.comOc||b.trocas-a.trocas);
   S.relExp={nome:"manutencao-por-obra.csv",cab:["Obra","Peças","Peças com ocorrência","% com ocorrência","Avisos de problema","Unidades trocadas","Pedidos de peças"],rows:linhas.map(l=>[l.o.nome,l.ps,l.comOc,pct(l.comOc,l.ps),l.prob,l.trocas,l.ped])};
   const tot=linhas.reduce((a,l)=>({ps:a.ps+l.ps,oc:a.oc+l.comOc,pr:a.pr+l.prob,tr:a.tr+l.trocas}),{ps:0,oc:0,pr:0,tr:0});
@@ -906,6 +915,96 @@ function renderRel(){
    +'<div class="card">'+corpo+'</div>';
 }
 
+// ---- similares homologados (cadastro no item) ----
+Object.assign(S,{similares:[],apSel:null});
+function desenhaSimilares(){
+  const box=$("#sim_box"); if(!box||!S.cur||!S.cur.id) return;
+  const p=S.cur;
+  const sims=S.similares.filter(s=>s.original_id===p.id).map(s=>porId(s.similar_id)).filter(Boolean);
+  const deQuem=S.similares.filter(s=>s.similar_id===p.id).map(s=>porId(s.original_id)).filter(Boolean);
+  box.innerHTML='<div class="field"><label>Similares homologados (podem substituir este item)</label><div class="pills">'
+   +(sims.length?sims.map(c=>'<span>'+esc(c.codigo)+' <a href="#" data-act="tirarSimilar" data-id="'+c.id+'" title="Remover">✕</a></span>').join(""):'<span class="small">nenhum ainda</span>')+'</div>'
+   +'<input id="sm_busca" placeholder="Buscar no catálogo o item que você homologa como similar" style="margin-top:6px"><div class="box" id="sm_res" style="display:none;margin-top:6px"></div>'
+   +'<div class="small" style="margin-top:4px">O similar precisa estar cadastrado no catálogo, do mesmo tipo (LED com LED, driver com driver). Quando o cliente comprar ou informar um similar daqui, a empresa já sabe que é homologado.</div>'
+   +(deQuem.length?'<div class="small" style="margin-top:6px">Este item é similar homologado de: '+deQuem.map(c=>esc(c.codigo)).join(", ")+'</div>':'')+'</div>';
+  $("#sm_busca").oninput=()=>{
+    const t=norm($("#sm_busca").value), res=$("#sm_res");
+    if(!t){ res.style.display="none"; return; }
+    const ja=new Set(sims.map(x=>x.id));
+    const r=S.produtos.filter(x=>x.tipo===p.tipo&&x.id!==p.id&&!ja.has(x.id)&&(norm(x.codigo).includes(t)||norm(x.fabricante).includes(t))).slice(0,8);
+    res.style.display=""; res.innerHTML=r.length?r.map(x=>'<label style="cursor:pointer" data-act="addSimilar" data-id="'+x.id+'">+ <b>'+esc(x.codigo)+'</b> <span class="small">'+(esc(x.fabricante)||"")+(x.preco!=null?' · '+brl(x.preco):'')+'</span></label>').join(""):'<div class="small">Nada encontrado. Cadastre o item no catálogo primeiro.</div>';
+  };
+}
+async function recarregaSimilares(){ const r=await sb.from("v2_similares").select("*"); if(!r.error) S.similares=r.data; return !r.error; }
+async function addSimilar(d){
+  const r=await sb.from("v2_similares").insert({original_id:S.cur.id,similar_id:Number(d.id)});
+  if(r.error) return msg(r.error.code==="23505"?"Esse similar já está cadastrado.":"Erro ao homologar: "+r.error.message,false);
+  await recarregaSimilares(); msg(""); desenhaSimilares();
+}
+async function tirarSimilar(d){
+  const r=await sb.from("v2_similares").delete().eq("original_id",S.cur.id).eq("similar_id",Number(d.id));
+  if(r.error) return msg("Erro ao remover: "+r.error.message,false);
+  await recarregaSimilares(); desenhaSimilares();
+}
+
+// ---- aprovação de manutenção informada pelo cliente ----
+function painelMan(pd){
+  const it=S.pitens.find(i=>i.id===pd.item_afetado_id), c=it&&porId(it.produto_id), sim=pd.similar_id&&porId(pd.similar_id), aberta=pd.status==="aguardando_aprovacao";
+  let oque;
+  if(pd.man_origem==="original") oque='O mesmo item original ('+esc(c?c.codigo:"?")+') <span class="ok">homologado</span>';
+  else if(pd.man_origem==="similar") oque='Similar <b>'+esc(sim?sim.codigo:"?")+'</b> <span class="ok">homologado</span>';
+  else oque='<span class="no">Não homologado</span>: modelo <b>'+esc(pd.modelo_informado||"?")+'</b>'+(pd.fabricante_informado?' · '+esc(pd.fabricante_informado):'');
+  let decisao="";
+  if(aberta){
+    let escolha="";
+    if(pd.man_origem==="outro") escolha='<div class="field"><label>Qual item do catálogo ficou instalado? *</label><input id="ap_busca" placeholder="Buscar no catálogo (mesmo tipo)"><div class="box" id="ap_res" style="display:none;margin-top:6px"></div><div style="margin-top:6px">Escolhido: <b id="ap_sel">nenhum</b></div>'
+      +'<button data-act="cadNovoMan" style="margin-top:6px">Não existe: cadastrar "'+esc(pd.modelo_informado||"")+'" como item novo</button>'
+      +'<label style="display:flex;gap:8px;align-items:center;font-weight:400;color:var(--ink);margin-top:10px"><input type="checkbox" id="ap_hom"> Homologar como similar de '+esc(c?c.codigo:"?")+' (os próximos clientes já veem como homologado)</label></div>';
+    decisao='<div class="card" style="background:var(--soft);margin-top:10px">'+escolha+'<div class="field"><label>Mensagem para o cliente (obrigatória se reprovar)</label><input id="ap_msg"></div>'
+      +'<div class="bar"><button class="p" data-act="decidirMan" data-v="1">Aprovar e atualizar a peça</button><button class="danger" data-act="decidirMan" data-v="0">Reprovar</button></div>'
+      +'<div class="small">Ao aprovar, o item da peça é trocado e o histórico registra a manutenção. Se a garantia deve mudar, ajuste na ficha da peça.</div></div>';
+  }else decisao='<div class="small" style="margin-top:8px"><b>'+ST[pd.status]+'</b> em '+dataHora(pd.decidido_em)+(pd.decisao_msg?' · mensagem ao cliente: '+esc(pd.decisao_msg):'')+'</div>';
+  return '<div class="card"><h3 style="margin-top:0">Manutenção informada pelo cliente</h3><table><tr><th style="width:32%">Item trocado</th><td>'+esc(c?c.codigo:"?")+(pd.quantidade_man?' · '+pd.quantidade_man+' unidade(s)':'')+'</td></tr><tr><th>Foi instalado</th><td>'+oque+'</td></tr></table><div id="man_foto" style="margin-top:10px"></div>'+decisao+'</div>';
+}
+async function posPedido(pd){
+  if(pd.tipo!=="manutencao") return;
+  if(pd.man_origem==="outro"){
+    const r=await sb.from("v2_pedido_fotos").select("dados").eq("pedido_id",pd.id).limit(1), el=$("#man_foto");
+    if(el&&r.data&&r.data[0]) el.innerHTML='<div class="small">Foto enviada pelo cliente:</div><img src="'+esc(r.data[0].dados)+'" alt="Foto enviada pelo cliente" style="max-width:100%;max-height:360px;border:1px solid var(--line);border-radius:8px">';
+    else if(el) el.innerHTML='<div class="no">Sem foto anexada.</div>';
+  }
+  const b=$("#ap_busca"); if(!b) return;
+  const it=S.pitens.find(i=>i.id===pd.item_afetado_id), orig=it&&porId(it.produto_id);
+  b.oninput=()=>{
+    const t=norm(b.value), box=$("#ap_res");
+    if(!t){ box.style.display="none"; return; }
+    const r=S.produtos.filter(p=>orig&&p.tipo===orig.tipo&&p.id!==orig.id&&(norm(p.codigo).includes(t)||norm(p.fabricante).includes(t))).slice(0,8);
+    box.style.display=""; box.innerHTML=r.length?r.map(p=>'<label style="cursor:pointer" data-act="pickAp" data-id="'+p.id+'">+ <b>'+esc(p.codigo)+'</b> <span class="small">'+(esc(p.fabricante)||"")+'</span></label>').join(""):'<div class="small">Nada encontrado.</div>';
+  };
+}
+function pickAp(d){ S.apSel=Number(d.id); $("#ap_sel").textContent=porId(S.apSel).codigo; $("#ap_res").style.display="none"; $("#ap_busca").value=""; }
+async function cadNovoMan(){
+  const pd=S.pedidos.find(x=>x.id===S.ped), it=S.pitens.find(i=>i.id===pd.item_afetado_id), orig=it&&porId(it.produto_id);
+  if(!orig||!pd.modelo_informado) return msg("Faltam dados para cadastrar o item.",false);
+  const ja=S.produtos.find(p=>p.tipo===orig.tipo&&norm(p.codigo)===norm(pd.modelo_informado));
+  if(ja){ S.apSel=ja.id; $("#ap_sel").textContent=ja.codigo; return msg("Esse modelo já existe no catálogo; selecionei ele.",true); }
+  const r=await sb.from("v2_produtos").insert({tipo:orig.tipo,codigo:pd.modelo_informado,fabricante:nv(pd.fabricante_informado),integrada:false,detalhes:{}}).select().single();
+  if(r.error) return msg("Erro ao cadastrar: "+r.error.message,false);
+  await carregar(); S.apSel=r.data.id; $("#ap_sel").textContent=r.data.codigo;
+  msg('"'+r.data.codigo+'" foi cadastrado no catálogo (incompleto: falta preço, foto e dados). Complete depois na aba Catálogo.',true);
+}
+async function decidirMan(d){
+  const pd=S.pedidos.find(x=>x.id===S.ped), aprovar=d.v==="1", texto=($("#ap_msg").value||"").trim();
+  let prod=null;
+  if(aprovar){ if(pd.man_origem==="outro"){ prod=S.apSel; if(!prod) return msg("Escolha o item do catálogo que ficou instalado (ou cadastre o novo) antes de aprovar.",false); } }
+  else if(!texto) return msg("Escreva o motivo da reprovação para o cliente.",false);
+  if(!confirm(aprovar?"Aprovar e trocar o item na peça?":"Reprovar esta manutenção?")) return;
+  const hom=!!($("#ap_hom")&&$("#ap_hom").checked);
+  const r=await sb.rpc("v2_decidir_manutencao",{p_pedido:pd.id,p_aprovar:aprovar,p_produto:prod,p_homologar:hom,p_msg:nv(texto)});
+  if(r.error) return msg("Erro: "+r.error.message,false);
+  S.apSel=null; await Promise.all([carregarPedidos(),carregarObras(),recarregaSimilares()]); renderPedido(); msg(aprovar?"Manutenção aprovada e peça atualizada.":"Manutenção reprovada.");
+}
+
 // ---- cliques ----
 const ACT={
   nada:()=>{},
@@ -917,6 +1016,7 @@ const ACT={
   relFiltra:()=>{ const de=$("#r_de").value, ate=$("#r_ate").value; if(de&&ate&&de>ate) return msg("A data inicial é depois da final.",false); msg(""); S.relDe=de; S.relAte=ate; renderRel(); },
   relLimpa:()=>{S.relDe="";S.relAte="";renderRel()},
   relCsv:()=>{ if(S.relExp) baixarCsv(S.relExp.nome,S.relExp.cab,S.relExp.rows); },
+  addSimilar, tirarSimilar, pickAp, cadNovoMan, decidirMan,
   novaObra, abrirObra:d=>abrirObra(Number(d.id)), voltaObras:()=>{msg("");renderObras()}, salvarObra, apagarObra,
   conferirLista, criarPecas, trocaKitPeca, abrirPeca:d=>abrirPeca(Number(d.id)),
   voltaObra:()=>{ msg(""); const id=S.view==="peca"?S.pecas.find(x=>x.id===S.peca).obra_id:S.obra.id; abrirObra(id); },

@@ -426,7 +426,7 @@ function abrirInfo(id){
   const auto=fotoAuto(p);
   const foto=p.foto_url?'<img class="big" src="'+esc(p.foto_url)+'" alt="'+esc(p.codigo)+'">':(auto.length?'<div class="kfotoG">'+auto.map(function(x){return '<figure><img src="'+esc(x.foto_url)+'" alt=""><figcaption>'+esc(x.codigo)+'</figcaption></figure>'}).join("")+'</div><div class="small">Foto montada com os itens do kit.</div>':'<div class="small">Sem foto.</div>');
   const o=document.createElement("div"); o.id="ovInfo"; o.className="ov"; o.dataset.act="fechaInfo";
-  o.innerHTML='<div class="ovc" data-act="nada"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px"><b style="font-size:17px">'+esc(p.codigo)+'</b><span class="'+(f.length?"no":"ok")+'">'+(f.length?"Falta: "+esc(f.join(", ")):"Completo")+'</span></div>'+foto+'<table style="margin-top:10px">'+linhas.map(function(x){return '<tr><th style="width:38%">'+esc(x[0])+'</th><td>'+esc(x[1])+'</td></tr>'}).join("")+'</table>'+(serve?'<div class="small" style="margin-top:8px">'+serve+'</div>':'')+'<div class="bar" style="margin-top:12px"><button class="p" data-act="editarDoInfo" data-id="'+p.id+'">Editar este item</button><button data-act="fechaInfo">Fechar</button></div></div>';
+  o.innerHTML='<div class="ovc" data-act="nada"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px"><b style="font-size:17px">'+esc(p.codigo)+'</b><span class="'+(f.length?"no":"ok")+'">'+(f.length?"Falta: "+esc(f.join(", ")):"Completo")+'</span></div>'+foto+'<table style="margin-top:10px">'+linhas.map(function(x){return '<tr><th style="width:38%">'+esc(x[0])+'</th><td>'+esc(x[1])+'</td></tr>'}).join("")+'</table>'+(serve?'<div class="small" style="margin-top:8px">'+serve+'</div>':'')+'<div class="bar" style="margin-top:12px"><button class="p" data-act="fechaInfo">Fechar</button></div></div>';
   document.body.appendChild(o);
 }
 
@@ -473,7 +473,6 @@ async function salvarNovoNoKit(){
 const ACT={
   nada:()=>{},
   info:d=>abrirInfo(Number(d.id)), fechaInfo:()=>{const o=$("#ovInfo"); if(o) o.remove();},
-  editarDoInfo:d=>{ if(S.view==="kit"&&!confirm("Sair do kit sem salvar para editar o item?")) return; ACT.fechaInfo(); abrirItem(Number(d.id)); },
   novoNoKit:abrirNovoNoKit, salvarNoKit:salvarNovoNoKit, cancelaNoKit:()=>{$("#k_novo").style.display="none"},
   entrar, aba:d=>{S.tab=d.t;renderLista()}, novo:()=>S.tab==="kit"?novoKit():novoItem(), importar:renderImport,
   abrir:d=>abrirItem(Number(d.id)), abrirKit:d=>abrirKit(Number(d.id)), voltar:()=>{msg("");renderLista()},

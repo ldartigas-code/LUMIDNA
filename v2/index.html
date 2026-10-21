@@ -31,6 +31,13 @@ label{font-size:13px;font-weight:600;color:var(--muted);display:block;margin-bot
 .row:last-child{border-bottom:0}.row:hover{background:var(--soft)}
 .dot{width:12px;height:12px;border-radius:50%;display:inline-block}
 .g{background:var(--green)}.r{background:var(--red)}
+.kfoto{display:grid;gap:2px;width:44px;height:44px;border-radius:6px;overflow:hidden;background:var(--soft);border:1px solid var(--line)}
+.kfoto.n1{grid-template-columns:1fr}.kfoto.n2{grid-template-columns:1fr 1fr}.kfoto.n3,.kfoto.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.kfoto img{width:100%;height:100%;object-fit:contain;background:#fff;display:block}
+.kfotoG{display:flex;flex-wrap:wrap;gap:10px}
+.kfotoG figure{margin:0;text-align:center;width:110px}
+.kfotoG img{width:110px;height:110px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px;display:block}
+.kfotoG figcaption{font-size:11px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
 .thumb{width:40px;height:40px;border-radius:6px;background:var(--soft);object-fit:contain;border:1px solid var(--line)}
 .ok{color:var(--greent);font-size:12px}.no{color:var(--redt);font-size:12px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
@@ -89,6 +96,9 @@ function specLinha(p){
 }
 const porId=id=>S.produtos.find(p=>p.id===id);
 
+// foto do kit = fotos dos itens juntas (cada uma mantém a proporção, sem esticar)
+function fotosDoKit(its){ const vistos=new Set(), out=[]; its.forEach(i=>{ if(i.p&&i.p.foto_url&&!vistos.has(i.p.id)){ vistos.add(i.p.id); out.push(i.p); } }); return out; }
+function kitFotoMini(its){ const f=fotosDoKit(its).slice(0,4); return f.length?`<div class="kfoto n${f.length}">${f.map(p=>`<img src="${esc(p.foto_url)}" alt="${esc(p.codigo)}">`).join("")}</div>`:`<div class="thumb"></div>`; }
 // ---- kits ----
 function kitInfo(k){
   const its=S.itens.filter(i=>i.kit_id===k.id).map(i=>({...i,p:porId(i.produto_id)})).filter(i=>i.p);
@@ -157,7 +167,7 @@ function atualizarLista(){
     if(S.vermelhos) ks=ks.filter(k=>info(k).faltas.length);
     html=ks.length?`<div class="list">${ks.map(k=>{
       const i=info(k), lum=porId(k.luminaria_id);
-      return `<div class="row" data-act="abrirKit" data-id="${k.id}"><span class="dot ${i.faltas.length?"r":"g"}"></span><div></div>
+      return `<div class="row" data-act="abrirKit" data-id="${k.id}"><span class="dot ${i.faltas.length?"r":"g"}"></span>${kitFotoMini(i.its)}
         <div style="min-width:0"><b>${esc(k.nome)}</b><div class="small">${lum?"serve em "+esc(lum.codigo):"sem luminária"}</div></div>
         <div class="small c4">${i.its.map(x=>x.quantidade+"x "+esc(x.p.codigo)).join(" · ")||"sem itens"}</div>
         <div><b>${i.leds?fmt(Math.round(i.total*100)/100)+" W":"—"}</b></div>
@@ -282,6 +292,7 @@ function renderKit(){
       <div class="field"><label>Nome do kit *</label><input id="k_nome" value="${esc(k.nome)}"></div>
       <div class="field"><label>Luminária onde o kit serve *</label><div id="k_lum"></div><input id="k_lbusca" placeholder="Buscar luminária por código ou fabricante" style="margin-top:6px"><div class="box" id="k_lres" style="display:none;margin-top:6px"></div></div>
       <div class="field"><label>Itens do kit</label><div id="k_itens"></div></div>
+      <div class="field"><label>Foto do kit (montada com as fotos dos itens)</label><div id="k_foto"></div></div>
       <div class="field"><label>Adicionar item</label><div class="bar" style="margin-bottom:6px"><select id="k_tipo" style="width:140px"><option value="led">LED</option><option value="driver">Driver</option><option value="optica">Óptica</option></select><input id="k_ibusca" class="grow" placeholder="Digite parte do código ou fabricante"></div><div class="box" id="k_ires" style="display:none"></div></div>
       <div id="k_total" class="card" style="background:var(--soft)"></div>
       <div class="bar"><button class="p" data-act="salvarKit">Salvar kit</button>${k.id?`<button class="danger" data-act="apagarKit">Excluir kit</button>`:""}</div></div>`;
@@ -295,6 +306,8 @@ function desenhaKit(){
   $("#k_itens").innerHTML=k.itens.length?`<table><tr><th>Item</th><th>Potência</th><th style="width:90px">Qtd</th><th></th></tr>${k.itens.map((it,i)=>{const p=porId(it.produto_id);return `<tr><td>${TIPO1[p.tipo]} <b>${esc(p.codigo)}</b> <span class="small">${esc(p.fabricante)||""}</span></td><td>${p.tipo==="led"?(p.potencia_w!=null?fmt(p.potencia_w)+" W":"<span class='no'>falta</span>"):"—"}</td><td><input type="number" min="1" value="${it.quantidade}" data-q="${i}"></td><td><button data-act="tirarItem" data-i="${i}" style="padding:2px 8px">remover</button></td></tr>`}).join("")}</table>`:`<div class="small">Nenhum item ainda.</div>`;
   $("#k_itens").querySelectorAll("input[data-q]").forEach(inp=>inp.onchange=()=>{ S.kit.itens[Number(inp.dataset.q)].quantidade=Math.max(1,parseInt(inp.value)||1); desenhaKit(); });
   const its=k.itens.map(i=>({...i,p:porId(i.produto_id)})), leds=its.filter(i=>i.p.tipo==="led");
+  const fk=fotosDoKit(its);
+  $("#k_foto").innerHTML=fk.length?`<div class="kfotoG">${fk.map(p=>`<figure><img src="${esc(p.foto_url)}" alt="${esc(p.codigo)}"><figcaption>${esc(p.codigo)}</figcaption></figure>`).join("")}</div>`:`<div class="small">Os itens ainda não têm foto — adicione fotos nos itens do catálogo.</div>`;
   const total=leds.reduce((s,i)=>s+(i.p.potencia_w||0)*i.quantidade,0), sem=leds.filter(i=>i.p.potencia_w==null).length;
   $("#k_total").innerHTML=`<div style="display:flex;justify-content:space-between;align-items:baseline"><span class="small">Potência total calculada (soma dos LEDs × quantidade)</span><b style="font-size:18px">${leds.length?fmt(Math.round(total*100)/100)+" W":"—"}</b></div>${sem?`<div class="no" style="margin-top:4px">${sem} LED(s) sem potência cadastrada — a soma está incompleta.</div>`:""}`;
 }

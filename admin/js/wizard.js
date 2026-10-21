@@ -399,7 +399,7 @@ function renderWizCarrinho(){
     <div class="card" style="padding:12px 14px">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         ${item.modelo.imagem_url?`<img src="${esc(item.modelo.imagem_url)}" alt="" style="width:36px;height:36px;object-fit:contain;border:1px solid #eee;border-radius:4px">`:""}
-        <div style="flex:1;min-width:160px">
+        <div style="flex:1;min-width:160px;cursor:pointer" title="Clique pra abrir/fechar a edição (ambiente, kit, Driver/LED/Óptica)" onclick="wizToggleEditarItem(${idx})">
           <b>${esc(item.modelo.fabricante)||""} — ${esc(item.modelo.codigo)}</b>${item.modelo.tipo_montagem==="Retrofit"?` <span class="pill" style="background:#edf3ff;color:#355fa8">Retrofit</span>`:""}
           <div class="small" id="wizItemResumo${idx}">${wizLinhaResumoTexto(item)}</div>
         </div>

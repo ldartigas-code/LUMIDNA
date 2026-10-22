@@ -123,7 +123,7 @@ const NOME={led:"Barra de LED",driver:"Driver",optica:"Óptica",luminaria:"Lumin
 const MOTIVOS=["parou de funcionar","piscando","perdeu brilho","troca preventiva","outro"];
 const STATUS={novo:"Recebido",em_atendimento:"Em atendimento",entregue:"Entregue",instalado:"Instalado",resolvido:"Resolvido",cancelado:"Cancelado",aguardando_aprovacao:"Aguardando aprovação",aprovada:"Aprovada",reprovada:"Não aprovada"};
 const TIT={problema:"Aviso de problema",compra:"Pedido de peças",manutencao:"Manutenção informada"};
-let SERIAL="", P=null, PED=[], CART=[], QTD={}, VAR={}, SHEET=null, FOTO=null;
+let SERIAL="", P=null, PED=[], CART=[], QTD={}, VAR={}, SHEET=null, FOTO=null, TERMOS=null;
 
 function guardado(){ try{ return JSON.parse(localStorage.getItem("lumidna_contato")||"{}"); }catch(e){ return {}; } }
 function guardar(n,f){ try{ localStorage.setItem("lumidna_contato",JSON.stringify({nome:n,fone:f})); }catch(e){} }
@@ -143,6 +143,7 @@ async function carregar(){
   if(r.error){ $("#content").innerHTML='<div class="card" style="color:var(--red)">Não foi possível carregar agora. Tente de novo em instantes.</div>'; return false; }
   P=r.data; if(!P){ $("#content").innerHTML='<div class="card"><b>Luminária não encontrada.</b><div class="small" style="margin-top:4px">Confira o código da etiqueta: '+esc(SERIAL)+'</div></div>'; return false; }
   const p=await sb.rpc("v2_pedidos_peca",{p_serial:SERIAL}); PED=(p.error||!p.data)?[]:p.data;
+  const tg=await sb.rpc("v2_termos_garantia",{p_serial:SERIAL}); TERMOS=(tg.error||!tg.data)?null:tg.data;
   return true;
 }
 
@@ -196,7 +197,7 @@ function render(){
    '<div class="hero">'+compFotos()
    +'<div class="row"><div><div class="id">'+esc(l.codigo)+'</div><div class="model">'+esc(l.fabricante||"")+'</div></div>'
    +'<span class="status '+(g?(gOk?"st-ok":"st-bad"):"st-off")+'"><span class="dot"></span>'+(g?(gOk?"Em garantia":"Garantia vencida"):"Sem garantia informada")+'</span></div>'
-   +'<div class="tags"><span class="tag">'+esc(P.serial)+'</span>'+(P.local?'<span class="tag">'+esc(P.local)+'</span>':'')+(P.kit?'<span class="tag">'+esc(P.kit)+'</span>':'')+'</div></div>'
+   +'<div class="tags"><span class="tag">'+esc(P.serial)+'</span>'+(P.local?'<span class="tag">'+esc(P.local)+'</span>':'')+(P.kit?'<span class="tag">'+esc(P.kit)+'</span>':'')+'</div>'+(TERMOS?'<button type="button" class="btn" data-ac="termos" style="margin-top:12px;padding:10px 14px;font-size:14px">Termos de garantia</button>':'')+(g?'<div class="small" style="margin-top:8px">Verificar condições direto com fabricante</div>':'')+'</div>'
    +'<div class="tiles">'
    +'<div class="tile"><small>Potência</small><div class="v">'+(pot?fmt(Math.round(pot*100)/100)+'<i>W</i>':'—')+'</div></div>'
    +'<div class="tile"><small>Temperatura de cor</small><div class="v">'+(cct?cct+'<i>K</i>':'—')+'</div></div>'
@@ -242,6 +243,20 @@ function renderRegs(){
   }).join("")+'</div>';
 }
 
+// ---- termos de garantia (texto da empresa da luminária, ou o padrão) ----
+function fmtTermos(t){
+  return String(t||"").split(/\r?\n/).map(l=>{
+    l=l.trim(); if(!l) return '<div style="height:8px"></div>';
+    if(l.charAt(0)==="•") return '<div style="display:flex;gap:8px;margin:4px 0"><span style="color:var(--orange)">•</span><span>'+esc(l.replace(/^•\s*/,""))+'</span></div>';
+    if(l.slice(-1)===":"&&l.length<90) return '<div style="font-weight:700;margin-top:12px">'+esc(l)+'</div>';
+    return '<p style="margin:6px 0">'+esc(l)+'</p>';
+  }).join("");
+}
+function termos(){
+  if(!TERMOS) return;
+  abreSheet('<h3>'+esc(TERMOS.titulo)+'</h3><div class="small" style="margin-bottom:10px">'+(TERMOS.padrao?'Termos padrão de garantia':'Termos de garantia · '+esc(TERMOS.fabricante))+'</div><div style="font-size:14px;line-height:1.55">'+fmtTermos(TERMOS.texto)+'</div><div class="acoes" style="margin-top:16px"><button type="button" class="btn p" data-ac="fechar">Fechar</button></div>',"termos");
+  $("#sheet").scrollTop=0;
+}
 // ---- janela deslizante (carrinho e formulários) ----
 function abreSheet(html,nome){ SHEET=nome; $("#sheet").innerHTML=html+'<div id="smsg"></div>'; $("#ov").classList.remove("hidden"); document.body.style.overflow="hidden"; }
 function fechaSheet(){ SHEET=null; $("#ov").classList.add("hidden"); $("#sheet").innerHTML=""; document.body.style.overflow=""; }
@@ -375,7 +390,7 @@ document.addEventListener("click",e=>{
   const a=el.dataset.ac;
   if(a==="fundo"){ if(e.target===el) fechaSheet(); return; }
   if(e.target.tagName==="SELECT"||e.target.tagName==="INPUT") return;
-  if(a==="problema") problema(); else if(a==="manutencao") manutencao(); else if(a==="carrinho") carrinho();
+  if(a==="problema") problema(); else if(a==="manutencao") manutencao(); else if(a==="carrinho") carrinho(); else if(a==="termos") termos();
   else if(a==="camera") $("#m_foto_cam").click(); else if(a==="galeria") $("#m_foto").click();
   else if(a==="fechar") fechaSheet(); else if(a==="checkout") checkout();
   else if(a==="enviarPedido") enviarPedido(); else if(a==="enviarProblema") enviarProblema(); else if(a==="enviarManutencao") enviarManutencao();

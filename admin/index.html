@@ -487,7 +487,7 @@ const garantiaTxt=p=>!p.garantia_ate?{t:"sem data",c:"small"}:(p.garantia_ate>=h
 const precisaKit=p=>{ const l=porId(p.luminaria_id); return !!l&&!l.integrada; };
 const urlPeca=s=>new URL("../ativo/?c="+encodeURIComponent(s),location.href).href;
 function codigoObra(nome){ const s=String(nome||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase(); const c=s.replace(/[^BCDFGHJKLMNPQRSTVWXYZ]/g,""), l=s.replace(/[^A-Z]/g,""); if(c.length>=3) return c.slice(0,3); return (c+l).slice(0,3).padEnd(3,"X"); }
-const navArea=a=>'<div class="tabs noprint" style="border-bottom:1px solid var(--line);padding-bottom:10px"><button class="tab '+(a==="cat"?"on":"")+'" data-act="areaCat">Catálogo</button><button class="tab '+(a==="obras"?"on":"")+'" data-act="areaObras">Obras</button><button class="tab '+(a==="ped"?"on":"")+'" data-act="areaPedidos">Pedidos</button><button class="tab '+(a==="rel"?"on":"")+'" data-act="areaRel">Relatórios</button></div>';
+const navArea=a=>'<div class="tabs noprint" style="border-bottom:1px solid var(--line);padding-bottom:10px"><button class="tab '+(a==="cat"?"on":"")+'" data-act="areaCat">Catálogo</button><button class="tab '+(a==="pend"?"on":"")+'" data-act="areaPend">Pendências '+badgePend()+'</button><button class="tab '+(a==="obras"?"on":"")+'" data-act="areaObras">Obras</button><button class="tab '+(a==="ped"?"on":"")+'" data-act="areaPedidos">Pedidos</button><button class="tab '+(a==="rel"?"on":"")+'" data-act="areaRel">Relatórios</button></div>';
 
 async function carregarObras(){
   try{
@@ -810,7 +810,7 @@ async function carregarPedidos(){
       pagina(()=>sb.from("v2_pedido_itens").select("*").order("id"))
     ]);
   }catch(e){ $("#app").innerHTML='<div class="msg e">Não consegui carregar os pedidos: '+esc(e.message||e)+'<br>Se for "relation does not exist", falta rodar o SQL v2_03_pedidos no Supabase.</div>'; return false; }
-  return true;
+  atualizaContPend(); return true;
 }
 const totalPed=id=>{ const l=S.ped_itens.filter(i=>i.pedido_id===id); return {total:l.reduce((s,i)=>s+(i.preco_unit||0)*i.quantidade,0),sem:l.some(i=>i.preco_unit==null),n:l.length}; };
 const dataHora=d=>{ if(!d) return "—"; const x=new Date(d); return x.toLocaleDateString("pt-BR")+" "+x.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); };
@@ -846,7 +846,7 @@ function renderPedido(){
     if(pd.status==="novo") botoes=bt("em_atendimento","Em atendimento","p")+bt("resolvido","Resolvido")+bt("cancelado","Cancelar","danger");
     else if(pd.status==="em_atendimento") botoes=bt("resolvido","Resolvido","p")+bt("cancelado","Cancelar","danger");
   }
-  $("#app").innerHTML='<button data-act="voltaPedidos" style="margin-bottom:12px">‹ Pedidos</button>'
+  $("#app").innerHTML='<button data-act="voltaPedidos" style="margin-bottom:12px">‹ '+(S.voltaPara==="pend"?"Pendências":"Pedidos")+'</button>'
    +'<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0">Pedido #'+pd.id+' · '+(pd.tipo==="problema"?"Aviso de problema":(pd.tipo==="manutencao"?"Manutenção informada":"Compra de peças"))+'</h3><b class="'+(pd.status==="novo"?"no":"")+'">'+ST[pd.status]+'</b></div>'
    +'<div class="small" style="margin:4px 0 10px">Recebido em '+dataHora(pd.criado_em)+(pd.entregue_em?' · entregue em '+dataHora(pd.entregue_em):'')+(pd.instalado_em?' · instalado em '+dataHora(pd.instalado_em):'')+'</div>'
    +'<table><tr><th style="width:32%">Peça</th><td>'+(pc?'<a href="#" data-act="abrirPeca" data-id="'+pc.id+'"><b>'+esc(pc.serial)+'</b></a> · '+esc(l?l.codigo:"?")+' · obra '+esc(o?o.nome:"?")+(pc.local?' · '+esc(pc.local):''):'?')+'</td></tr>'
@@ -1087,12 +1087,39 @@ async function notaSalvar(){
   await abrirPeca(S.peca); msg("Situação registrada no histórico da peça.");
 }
 
+// ---- pendências (botão do menu com contador) ----
+Object.assign(S,{contPend:{prob:0,man:0,apr:0},voltaPara:null});
+const badgePend=()=>{ const n=S.contPend.prob+S.contPend.man; return '<span class="badgePend" style="background:var(--red);color:#fff;border-radius:999px;padding:0 7px;font-size:12px;margin-left:4px;'+(n?"":"display:none")+'">'+n+'</span>'; };
+async function atualizaContPend(){
+  const r=await sb.from("v2_pedidos").select("tipo,status").in("status",["novo","em_atendimento","aguardando_aprovacao","aprovada"]);
+  if(r.error) return;
+  S.contPend={prob:r.data.filter(p=>p.tipo==="problema"&&(p.status==="novo"||p.status==="em_atendimento")).length,
+              man:r.data.filter(p=>p.tipo==="manutencao"&&p.status==="aguardando_aprovacao").length,
+              apr:r.data.filter(p=>p.tipo==="manutencao"&&p.status==="aprovada").length};
+  const n=S.contPend.prob+S.contPend.man;
+  document.querySelectorAll(".badgePend").forEach(b=>{ b.textContent=n; b.style.display=n?"":"none"; });
+}
+function renderPend(){
+  S.view="pend";
+  const pc=pcMap(), serial=p=>{ const x=pc.get(p.peca_id); return x?x.serial:"?"; };
+  const prob=S.pedidos.filter(p=>p.tipo==="problema"&&(p.status==="novo"||p.status==="em_atendimento"));
+  const man=S.pedidos.filter(p=>p.tipo==="manutencao"&&p.status==="aguardando_aprovacao");
+  const apr=S.pedidos.filter(p=>p.tipo==="manutencao"&&p.status==="aprovada");
+  const linha=p=>'<div class="row" style="grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) 110px" data-act="abrirPendente" data-id="'+p.id+'"><div><b>'+esc(serial(p))+'</b><div class="small">'+dataHora(p.criado_em)+'</div></div><div class="small">'+esc(p.contato_nome)+(p.motivo?' · '+esc(p.motivo):'')+'</div><div class="'+(urgente(p)?"no":"small")+'">'+ST[p.status]+'</div></div>';
+  const bloco=(tit,n,lista,vazio,extra)=>'<div class="card"><div style="display:flex;align-items:center;gap:14px"><div style="font-size:36px;font-weight:700;line-height:1;color:'+(n?"var(--redt)":"var(--ink)")+'">'+n+'</div><div><b>'+tit+'</b>'+(extra||"")+'</div></div>'
+    +(lista.length?'<div class="list" style="margin-top:12px">'+lista.map(linha).join("")+'</div>':'<div class="small" style="margin-top:8px">'+vazio+'</div>')+'</div>';
+  $("#app").innerHTML=navArea("pend")
+   +bloco("Problemas em aberto",prob.length,prob,"Nenhum problema em aberto.","")
+   +bloco("Manutenções aguardando aprovação",man.length,man,"Nenhuma manutenção aguardando aprovação.",'<div class="small">'+apr.length+' manutenção(ões) já aprovada(s)</div>');
+}
+
 // ---- cliques ----
 const ACT={
   nada:()=>{},
   areaCat:()=>{msg("");renderLista()}, areaObras:async()=>{msg(""); if(await carregarObras()) renderObras();},
   areaPedidos:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderPedidos();},
-  filtroPed:d=>{S.pedFiltro=d.f;renderPedidos()}, abrirPedido:d=>abrirPedido(Number(d.id)), voltaPedidos:()=>{msg("");renderPedidos()}, mudaStatus, salvarObsPedido,
+  filtroPed:d=>{S.pedFiltro=d.f;renderPedidos()}, abrirPedido:d=>{S.voltaPara=null;abrirPedido(Number(d.id))}, abrirPendente:d=>{S.voltaPara="pend";abrirPedido(Number(d.id))}, voltaPedidos:()=>{msg(""); if(S.voltaPara==="pend") renderPend(); else renderPedidos();},
+  areaPend:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderPend();}, mudaStatus, salvarObsPedido,
   areaRel:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderRel();},
   relAba:d=>{S.relTab=d.t;S.relObra=null;renderRel()}, relAbrirObra:d=>{S.relObra=Number(d.id);renderRel()}, relVoltaObra:()=>{S.relObra=null;renderRel()},
   relFiltra:()=>{ const de=$("#r_de").value, ate=$("#r_ate").value; if(de&&ate&&de>ate) return msg("A data inicial é depois da final.",false); msg(""); S.relDe=de; S.relAte=ate; renderRel(); },
@@ -1134,7 +1161,7 @@ async function iniciar(){
   if(!s.data.session) return telaLogin();
   $("#quem").innerHTML=`${esc(s.data.session.user.email)} · <a href="#" id="sair">Sair</a>`;
   $("#sair").onclick=async e=>{e.preventDefault();await sb.auth.signOut();telaLogin()};
-  if(await carregar()) renderLista();
+  if(await carregar()){ await atualizaContPend(); renderLista(); if(!window._ptim) window._ptim=setInterval(atualizaContPend,60000); }
 }
 iniciar();
 </script>

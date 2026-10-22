@@ -594,6 +594,7 @@ async function kitGrupo(d){
   const lid=Number(d.id), sel=document.querySelector('select[data-act="kitGrupo"][data-id="'+lid+'"]');
   if(!sel||!sel.value) return renderObra();
   const kit=Number(sel.value), alvo=S.pecas.filter(p=>p.obra_id===S.obra.id&&p.luminaria_id===lid&&p.kit_id!==kit);
+  if(!alvo.length){ S.verGrupo.add(lid); renderObra(); return msg("Todas as peças desse modelo já estão com esse kit.",true); }
   let ok=0; const falhas=[];
   for(const p of alvo){ const r=await sb.rpc("v2_aplicar_kit",{p_peca:p.id,p_kit:kit}); if(r.error) falhas.push(p.serial); else ok++; }
   S.verGrupo.add(lid); await carregarObras(); renderObra();

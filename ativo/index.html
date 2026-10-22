@@ -143,7 +143,7 @@ async function carregar(){
   if(r.error){ $("#content").innerHTML='<div class="card" style="color:var(--red)">Não foi possível carregar agora. Tente de novo em instantes.</div>'; return false; }
   P=r.data; if(!P){ $("#content").innerHTML='<div class="card"><b>Luminária não encontrada.</b><div class="small" style="margin-top:4px">Confira o código da etiqueta: '+esc(SERIAL)+'</div></div>'; return false; }
   const p=await sb.rpc("v2_pedidos_peca",{p_serial:SERIAL}); PED=(p.error||!p.data)?[]:p.data;
-  const tg=await sb.rpc("v2_termos_garantia",{p_serial:SERIAL}); TERMOS=(tg.error||!tg.data)?null:tg.data;
+  TERMOS=termoDaPeca(P.luminaria.fabricante);
   return true;
 }
 
@@ -197,7 +197,7 @@ function render(){
    '<div class="hero">'+compFotos()
    +'<div class="row"><div><div class="id">'+esc(l.codigo)+'</div><div class="model">'+esc(l.fabricante||"")+'</div></div>'
    +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:none;max-width:52%;text-align:right"><span class="status '+(g?(gOk?"st-ok":"st-bad"):"st-off")+'"><span class="dot"></span>'+(g?(gOk?"Em garantia":"Garantia vencida"):"Sem garantia informada")+'</span>'
-   +(TERMOS?'<button type="button" class="btn" data-ac="termos" style="padding:8px 14px;font-size:13px;width:auto">Termos de garantia</button>':'')
+   +(TERMOS&&g?'<button type="button" class="btn" data-ac="termos" style="padding:8px 14px;font-size:13px;width:auto">Termos de garantia</button>':'')
    +(g?'<div class="small">Verificar condições direto com fabricante</div>':'')+'</div></div>'
    +'<div class="tags"><span class="tag">'+esc(P.serial)+'</span>'+(P.local?'<span class="tag">'+esc(P.local)+'</span>':'')+(P.kit?'<span class="tag">'+esc(P.kit)+'</span>':'')+'</div></div>'
    +'<div class="tiles">'
@@ -245,7 +245,47 @@ function renderRegs(){
   }).join("")+'</div>';
 }
 
-// ---- termos de garantia (texto da empresa da luminária, ou o padrão) ----
+// ---- termos de garantia: texto padrão e, se precisar, um texto próprio por fabricante ----
+const TERMOS_PADRAO={titulo:"Termos de garantia",padrao:true,fabricante:null,texto:`Luminação Ltda. fornece garantia para defeitos de fabricação de seus produtos, desde que estes tenham sido instalados de acordo com as instruções de montagem Lumini, respeitando as condições de uso recomendadas no catálogo técnico, no site, ou informadas pela equipe comercial.
+
+A garantia é válida a partir da data de emissão da nota fiscal de venda emitida pela Lumini, de acordo com os prazos abaixo informados, os quais já englobam a garantia de 90 (noventa) dias prevista em lei, sendo:
+
+• Luminárias para áreas internas e externas com tecnologia LED: prazo de 02 (dois) anos.
+• Objetos decorativos: prazo de 02 (dois) anos.
+• Lamp LED: prazo de 06 (seis) meses.
+
+Observações importantes:
+• Durante o período estipulado, a garantia abrangerá a mão de obra e peças utilizadas para reparos de defeitos devidamente constatados como sendo de fabricação.
+• Somente técnicos autorizados pela Lumini estão habilitados a reparar defeitos cobertos pela garantia.
+• Produtos em materiais naturais, como madeira ou mármore, estão sujeitos a variações de tonalidade, textura e intensidade de veios.
+• A substituição de peças e/ou componentes defeituosos e os reparos executados dentro do período de garantia do produto não dá direito à prorrogação do prazo de garantia inicialmente concedido.
+
+A garantia não cobre:
+• Transporte, vistoria e remoção de equipamentos para assistência técnica ou manutenção.
+• Reforma e reparos como repintura, troca de componentes, substituição de parte da peça.
+• Defeitos de acabamentos oriundos da condição atmosférica onde a peça foi instalada, como locais sujeitos a maresia, poluição ou calor extremos. As condições de uso do produto devem respeitar seus respectivos índices de proteção (IP), indicados no site e catálogos Lumini.
+• Pagamento ou outra forma de compensação, a qualquer título, de despesas ou danos, diretos ou indiretos, às pessoas ou bens, em decorrência de defeito do componente ou do produto.
+
+A garantia cessará em caso de:
+• A instalação ou utilização do produto estiver em desacordo com as recomendadas nas instruções de montagem, catálogo técnico, site, ou informada pela equipe de vendas Lumini.
+• O equipamento sofrer qualquer dano provocado por acidente, queda, agentes da natureza, ou ainda, alterações ou consertos realizados por pessoas não autorizadas pelo fabricante.
+• O corpo ou qualquer outra parte do produto estiver adulterado ou danificado, impedindo a sua identificação.
+• Defeitos causados por oscilação ou corte de energia na rede elétrica.
+• O problema for provocado por negligência, imprudência ou imperícia do usuário.
+• Fim do prazo de validade.
+
+A garantia somente será válida mediante a apresentação de nota fiscal do produto. Em caso de dúvidas durante a instalação, consulte sempre o fabricante.
+
+Produtos outlet:
+As condições de garantia acima aplicam-se aos produtos da linha regular Lumini. Produtos adquiridos na modalidade outlet, mostruário, saldo, peça única, produto descontinuado, produto sem embalagem original ou em condição comercial diferenciada possuem regras próprias de comercialização e garantia, informadas no momento da venda e formalizadas em termo específico.
+
+Marcas, avarias, sinais de exposição ou demais condições informadas ao cliente no momento da venda integram as condições comerciais do produto e não autorizam troca, devolução ou reparo em garantia. A garantia de produtos outlet ficará limitada às condições e ao prazo previstos no termo específico da venda.`};
+// Para dar a um fabricante o termo dele: "NOME DO FABRICANTE":{titulo:"Termos de garantia",texto:"..."}
+const TERMOS_POR_FABRICANTE={};
+function termoDaPeca(fab){
+  const k=Object.keys(TERMOS_POR_FABRICANTE).find(x=>x.trim().toLowerCase()===String(fab||"").trim().toLowerCase());
+  return k?Object.assign({padrao:false,fabricante:k},TERMOS_POR_FABRICANTE[k]):TERMOS_PADRAO;
+}
 function fmtTermos(t){
   return String(t||"").split(/\r?\n/).map(l=>{
     l=l.trim(); if(!l) return '<div style="height:8px"></div>';

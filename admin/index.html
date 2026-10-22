@@ -51,6 +51,7 @@ label{font-size:13px;font-weight:600;color:var(--muted);display:block;margin-bot
 .box{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px}
 .box label{font-weight:400;color:var(--ink);font-size:14px;margin:0;padding:3px 4px;display:flex;gap:8px;align-items:center;cursor:pointer}
 table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+.grp{padding:14px}.prow{border-top:1px solid var(--line);padding:10px 0}.prow:first-child{border-top:0}
 .etqs{display:flex;flex-wrap:wrap;gap:8px}
 .etq{display:flex;gap:2mm;align-items:center;border:1px dashed #b4b2a9;padding:2mm;overflow:hidden;font-size:9pt;line-height:1.25;background:#fff;break-inside:avoid}
 .etq .qr svg{width:100%;height:100%;display:block}.etq .qr{flex:none}.etq .et{min-width:0;overflow-wrap:anywhere}.etq .et b{font-size:11pt}
@@ -510,10 +511,13 @@ function renderObras(){
 
 function novaObra(){ S.obra={id:null,nome:"",cliente:"",inicio_instalacao:hoje(),garantia_meses:12,observacao:""}; renderObra(); }
 function abrirObra(id){ S.obra=JSON.parse(JSON.stringify(S.obras.find(o=>o.id===id))); S.imp=[]; renderObra(); }
+Object.assign(S,{verGrupo:new Set(),addOpen:false,editObra:false,addTab:"um"});
 function renderObra(){
   S.view="obra"; const o=S.obra, novo=!o.id, ps=novo?[]:S.pecas.filter(p=>p.obra_id===o.id);
-  $("#app").innerHTML='<button data-act="voltaObras" style="margin-bottom:12px">‹ Obras</button>'
-   +'<div class="card"><h3 style="margin-top:0">'+(novo?"Nova obra":esc(o.nome))+'</h3><div class="grid">'
+  const aberto=novo||S.editObra;
+  const resumo=novo?"":'<div class="small" style="margin-top:2px">'+(esc(o.cliente)||"sem cliente")+' · início '+dmy(o.inicio_instalacao)+' · garantia '+o.garantia_meses+' meses · código <b>'+esc(o.codigo)+'-'+String(o.id).padStart(3,"0")+'</b></div>'
+    +(o.observacao?'<div class="small" style="margin-top:6px"><b>Observação da obra:</b> '+esc(o.observacao)+'</div>':'');
+  const form=aberto?'<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px"><div class="grid">'
    +'<div class="field"><label>Nome da obra *</label><input id="o_nome" value="'+esc(o.nome)+'"></div>'
    +'<div class="field"><label>Cliente</label><input id="o_cliente" value="'+esc(o.cliente)+'"></div>'
    +'<div class="field"><label>Início da instalação</label><input id="o_inicio" type="date" value="'+esc(o.inicio_instalacao||"")+'"></div>'
@@ -521,27 +525,79 @@ function renderObra(){
    +'<div class="small" id="o_cod" style="margin-bottom:6px"></div>'
    +(novo?"":'<div class="small" style="margin-bottom:10px">Início e garantia valem para as peças criadas daqui para frente; as que já existem mantêm a garantia delas.</div>')
    +'<div class="field"><label>Observação da obra (só desta obra)</label><textarea id="o_obs" style="min-height:70px">'+esc(o.observacao||"")+'</textarea></div>'
-   +'<div class="bar"><button class="p" data-act="salvarObra">Salvar obra</button>'+(!novo&&!ps.length?'<button class="danger" data-act="apagarObra">Excluir obra</button>':'')+'</div></div>'
-   +(novo?'':blocoPecas(o,ps));
-  const upd=()=>{ const c=codigoObra($("#o_nome").value); $("#o_cod").innerHTML=novo?'Código do serial: <b>'+esc(c)+'</b> (fica fixo depois de salvar). Exemplo: '+esc(c)+'-NNN-001':'Código do serial: <b>'+esc(o.codigo)+'</b> · número da obra '+String(o.id).padStart(3,"0"); };
-  upd(); $("#o_nome").oninput=upd;
+   +'<div class="bar"><button class="p" data-act="salvarObra">Salvar obra</button>'+(!novo&&!ps.length?'<button class="danger" data-act="apagarObra">Excluir obra</button>':'')+'</div></div>':'';
+  $("#app").innerHTML='<button data-act="voltaObras" style="margin-bottom:12px">‹ Obras</button>'
+   +'<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h3 style="margin:0">'+(novo?"Nova obra":esc(o.nome))+'</h3>'+resumo+'</div>'
+   +(novo?'':'<div class="bar" style="margin:0"><button data-act="editObra">'+(S.editObra?"Fechar edição":"Editar dados da obra")+'</button>'+(ps.length?'<button data-act="etiquetas">Etiquetas e NFC</button>':'')+'</div>')+'</div>'+form+'</div>'
+   +(novo?'<div class="small">Salve a obra para começar a adicionar as luminárias.</div>':blocoLuminarias(o,ps));
+  if($("#o_nome")){ const upd=()=>{ const c=codigoObra($("#o_nome").value); $("#o_cod").innerHTML=novo?'Código do serial: <b>'+esc(c)+'</b> (fica fixo depois de salvar). Exemplo: '+esc(c)+'-NNN-001':'Código do serial: <b>'+esc(o.codigo)+'</b> · número da obra '+String(o.id).padStart(3,"0"); }; upd(); $("#o_nome").oninput=upd; }
+  if($("#a_lum")){ $("#a_lum").oninput=atualizaKitAdd; atualizaKitAdd(); }
+  document.querySelectorAll("input[data-loc]").forEach(i=>i.onchange=async()=>{
+    const id=Number(i.dataset.loc), v=nv(i.value.trim());
+    const r=await sb.from("v2_pecas").update({local:v}).eq("id",id);
+    if(r.error){ i.style.borderColor="var(--red)"; return msg("Erro ao salvar o local: "+r.error.message,false); }
+    const p=S.pecas.find(x=>x.id===id); if(p) p.local=v;
+    i.style.borderColor="var(--green)"; setTimeout(()=>{ i.style.borderColor=""; },1200);
+  });
 }
-function blocoPecas(o,ps){
-  const linhas=ps.map(p=>{
-    const l=porId(p.luminaria_id), g=garantiaTxt(p), kits=S.kits.filter(k=>k.luminaria_id===p.luminaria_id), pk=precisaKit(p);
-    const sel=pk?'<select data-act="trocaKitPeca" data-id="'+p.id+'"><option value="">— escolher kit —</option>'+kits.map(k=>'<option value="'+k.id+'" '+(p.kit_id===k.id?"selected":"")+'>'+esc(k.nome)+'</option>').join("")+'</select>'+(!kits.length?'<div class="no">nenhum kit cadastrado para esta luminária</div>':''):'<span class="small">lâmpada integrada</span>';
-    return '<tr><td><a href="#" data-act="abrirPeca" data-id="'+p.id+'"><b>'+esc(p.serial)+'</b></a></td><td>'+esc(l?l.codigo:"?")+'</td><td>'+sel+'</td><td>'+(esc(p.local)||"—")+'</td><td class="'+g.c+'">'+g.t+'</td></tr>';
-  }).join("");
-  const grupos=[...new Set(ps.map(p=>p.luminaria_id))].map(id=>{ const l=porId(id), n=ps.filter(p=>p.luminaria_id===id).length; return '<tr><td><b>'+esc(l?l.codigo:"?")+'</b></td><td>'+n+' peça(s)</td><td style="white-space:nowrap"><input type="number" min="1" max="200" value="1" id="qn_'+id+'" style="width:76px"> <button data-act="maisPeca" data-id="'+id+'" style="padding:6px 12px">Adicionar</button> <button data-act="menosPeca" data-id="'+id+'" style="padding:6px 12px">Remover</button></td></tr>'; }).join("");
-  const addRapido='<div class="card"><h3 style="margin-top:0">Adicionar peça nova</h3><div class="grid"><div class="field"><label>Luminária *</label><input id="a_lum" list="dl_lum" placeholder="Digite o código"></div><div class="field"><label>Quantidade</label><input id="a_qtd" type="number" min="1" value="1"></div><div class="field"><label>Local</label><input id="a_loc"></div></div><datalist id="dl_lum">'+S.produtos.filter(p=>p.tipo==="luminaria").map(p=>'<option value="'+esc(p.codigo)+'">').join("")+'</datalist><button class="p" data-act="adicionarPeca">Adicionar</button></div>';
-  return '<div class="card"><div class="bar" style="margin-bottom:8px"><h3 style="margin:0">Peças da obra ('+ps.length+')</h3><div style="margin-left:auto">'+(ps.length?'<button data-act="etiquetas">Etiquetas e NFC</button>':'')+'</div></div>'
-   +(ps.length?'<table><tr><th>Serial</th><th>Luminária</th><th>Kit</th><th>Local</th><th>Garantia</th></tr>'+linhas+'</table>':'<div class="small">Nenhuma peça ainda.</div>')+'</div>'
-   +(ps.length?'<div class="card"><h3 style="margin-top:0">Quantidade por luminária</h3><div class="small" style="margin-bottom:8px">Digite quantas peças e clique em Adicionar (cria peças iguais à última, com mesmo kit e local e serial novo) ou em Remover (exclui as últimas dessa luminária, só se nenhuma tiver troca ou outro registro no histórico).</div><table>'+grupos+'</table></div>':'')
-   +addRapido
-   +'<div class="card"><h3 style="margin-top:0">Adicionar várias de uma vez (colar lista)</h3>'
-   +'<div class="small" style="margin-bottom:8px">Uma linha por tipo: <b>código; quantidade; local</b> (o local é opcional). Exemplo: <code>CART A; 3; Hall</code>. Cada unidade vira uma peça com serial próprio. Nada é criado até você clicar em Criar peças.</div>'
+
+function painelAdd(){
+  const t=S.addTab||"um";
+  return '<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px"><div class="tabs"><button class="tab '+(t==="um"?"on":"")+'" data-act="abaAdd" data-t="um">Um modelo, várias unidades</button><button class="tab '+(t==="lista"?"on":"")+'" data-act="abaAdd" data-t="lista">Colar lista de vários modelos</button></div>'
+   +'<div id="add_um" style="'+(t==="um"?"":"display:none")+'"><div class="grid">'
+   +'<div class="field"><label>Luminária *</label><input id="a_lum" list="dl_lum" placeholder="Digite o código (ex: CART A)" autocomplete="off"></div>'
+   +'<div class="field"><label>Quantidade</label><input id="a_qtd" type="number" min="1" max="200" value="1"></div>'
+   +'<div class="field"><label>Local (opcional)</label><input id="a_loc" placeholder="ex: Hall"></div>'
+   +'<div class="field"><label>Kit</label><select id="a_kit"></select></div></div>'
+   +'<datalist id="dl_lum">'+S.produtos.filter(p=>p.tipo==="luminaria").map(p=>'<option value="'+esc(p.codigo)+'">').join("")+'</datalist>'
+   +'<button class="p" data-act="adicionarPeca">Adicionar à obra</button></div>'
+   +'<div id="add_lista" style="'+(t==="lista"?"":"display:none")+'"><div class="small" style="margin-bottom:8px">Uma linha por modelo: <b>código; quantidade; local</b> (o local é opcional). Exemplo: <code>CART A; 3; Hall</code>. Cada unidade vira uma peça com serial próprio. Nada é criado até você clicar em Criar peças.</div>'
    +'<textarea id="l_txt" style="min-height:110px" placeholder="CART A; 3; Hall&#10;CART B; 2; Sala"></textarea>'
-   +'<div class="bar" style="margin-top:10px"><button class="p" data-act="conferirLista">Conferir</button><button id="l_ok" style="display:none" data-act="criarPecas">Criar peças</button></div><div id="l_res"></div></div>';
+   +'<div class="bar" style="margin-top:10px"><button class="p" data-act="conferirLista">Conferir</button><button id="l_ok" style="display:none" data-act="criarPecas">Criar peças</button></div><div id="l_res"></div></div></div>';
+}
+function atualizaKitAdd(){
+  const sel=$("#a_kit"); if(!sel) return;
+  const l=S.produtos.find(p=>p.tipo==="luminaria"&&norm(p.codigo)===norm($("#a_lum").value));
+  if(!l){ sel.innerHTML='<option value="">— escolha a luminária primeiro —</option>'; return; }
+  if(l.integrada){ sel.innerHTML='<option value="">Lâmpada integrada (sem kit)</option>'; return; }
+  const kits=S.kits.filter(k=>k.luminaria_id===l.id);
+  if(!kits.length){ sel.innerHTML='<option value="">sem kit cadastrado para esta luminária</option>'; return; }
+  sel.innerHTML=(kits.length===1?'':'<option value="">— escolher depois —</option>')+kits.map(k=>'<option value="'+k.id+'">'+esc(k.nome)+'</option>').join("");
+}
+function blocoLuminarias(o,ps){
+  const ids=[...new Set(ps.map(p=>p.luminaria_id))].sort((a,b)=>String((porId(a)||{}).codigo).localeCompare(String((porId(b)||{}).codigo),"pt-BR",{numeric:true}));
+  const abrir=S.addOpen||!ps.length;
+  return '<div class="card"><div class="bar" style="margin-bottom:0"><div><h3 style="margin:0">Luminárias desta obra</h3><div class="small">'+ps.length+' peça(s) · '+ids.length+' modelo(s)</div></div>'
+   +(ps.length?'<div style="margin-left:auto"><button class="p" data-act="addAbrir">'+(abrir?"Fechar":"+ Adicionar luminárias")+'</button></div>':'')+'</div>'
+   +(abrir?painelAdd():'')+'</div>'
+   +ids.map(id=>cardGrupo(id,ps.filter(p=>p.luminaria_id===id))).join("");
+}
+function cardGrupo(id,pcs){
+  const l=porId(id), kits=S.kits.filter(k=>k.luminaria_id===id), pk=!!l&&!l.integrada;
+  const semKit=pcs.filter(p=>pk&&!p.kit_id).length, kitIds=[...new Set(pcs.map(p=>p.kit_id))], comum=kitIds.length===1?kitIds[0]:null;
+  const aberto=S.verGrupo.has(id);
+  const foto=l&&l.foto_url?'<img class="thumb" style="width:56px;height:56px" src="'+esc(l.foto_url)+'" alt="">':(l?miniFotos(fotoAuto(l)):'<div class="thumb"></div>');
+  const status=pk?(semKit?'<span class="no">'+semKit+' sem kit</span>':'<span class="ok">kit definido</span>'):'<span class="small">lâmpada integrada</span>';
+  const kitSel=pk?'<div class="field" style="flex:1;min-width:210px;margin:0"><label>Kit (vale para as '+pcs.length+' peças)</label><select data-act="kitGrupo" data-id="'+id+'"><option value="">'+(kitIds.length>1?"— vários / escolher —":"— escolher kit —")+'</option>'+kits.map(k=>'<option value="'+k.id+'" '+(comum===k.id?"selected":"")+'>'+esc(k.nome)+'</option>').join("")+'</select>'+(!kits.length?'<div class="no">nenhum kit cadastrado para esta luminária</div>':'')+'</div>':'';
+  const qtd='<div class="field" style="margin:0"><label>Quantidade</label><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input type="number" min="1" max="200" value="1" id="qn_'+id+'" style="width:76px"><button data-act="maisPeca" data-id="'+id+'">+ Adicionar</button><button data-act="menosPeca" data-id="'+id+'">− Remover</button></div></div>';
+  const linhas=aberto?'<div style="margin-top:10px">'+pcs.map(p=>{
+    const g=garantiaTxt(p), k=S.kits.find(x=>x.id===p.kit_id);
+    return '<div class="prow"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><a href="#" data-act="abrirPeca" data-id="'+p.id+'"><b>'+esc(p.serial)+'</b></a><span class="'+g.c+'">'+g.t+'</span></div>'
+     +'<div style="display:flex;gap:8px;align-items:center;margin-top:4px"><input data-loc="'+p.id+'" value="'+esc(p.local||"")+'" placeholder="Local (ex: Hall)" style="flex:1;min-width:0"><button data-act="abrirPeca" data-id="'+p.id+'" style="padding:6px 10px">Abrir</button></div>'
+     +(pk?'<div class="small" style="margin-top:2px">'+(k?esc(k.nome):'<span class="no">sem kit</span>')+'</div>':'')+'</div>';
+  }).join("")+'</div>':'';
+  return '<div class="card grp"><div style="display:flex;gap:12px;align-items:center"><div style="flex:none">'+foto+'</div><div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700">'+esc(l?l.codigo:"?")+'</div><div class="small">'+pcs.length+' peça(s) · '+status+'</div></div></div>'
+   +'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;align-items:flex-end">'+kitSel+qtd+'</div>'
+   +'<div style="margin-top:10px"><button data-act="verGrupo" data-id="'+id+'" style="padding:6px 12px">'+(aberto?"Esconder as peças ▴":"Ver as "+pcs.length+" peças ▾")+'</button></div>'+linhas+'</div>';
+}
+async function kitGrupo(d){
+  const lid=Number(d.id), sel=document.querySelector('select[data-act="kitGrupo"][data-id="'+lid+'"]');
+  if(!sel||!sel.value) return renderObra();
+  const kit=Number(sel.value), alvo=S.pecas.filter(p=>p.obra_id===S.obra.id&&p.luminaria_id===lid&&p.kit_id!==kit);
+  let ok=0; const falhas=[];
+  for(const p of alvo){ const r=await sb.rpc("v2_aplicar_kit",{p_peca:p.id,p_kit:kit}); if(r.error) falhas.push(p.serial); else ok++; }
+  S.verGrupo.add(lid); await carregarObras(); renderObra();
+  msg(ok+" peça(s) com o kit aplicado."+(falhas.length?" Não mudaram (já têm troca ou outro registro no histórico): "+falhas.join(", ")+".":""),!falhas.length);
 }
 async function salvarObra(){
   const o=S.obra, nome=$("#o_nome").value.trim();
@@ -551,7 +607,7 @@ async function salvarObra(){
   const row={nome:nome,cliente:nv($("#o_cliente").value.trim()),inicio_instalacao:nv($("#o_inicio").value),garantia_meses:gar,observacao:nv($("#o_obs").value.trim())};
   const r=o.id?await sb.from("v2_obras").update(row).eq("id",o.id).select().single():await sb.from("v2_obras").insert(row).select().single();
   if(r.error) return msg(r.error.code==="23505"?"Já existe uma obra com esse nome.":"Erro ao salvar a obra: "+r.error.message,false);
-  const id=r.data.id, era=!!o.id; if(!await carregarObras()) return; abrirObra(id);
+  const id=r.data.id, era=!!o.id; S.editObra=false; if(!await carregarObras()) return; abrirObra(id);
   msg(era?"Obra salva.":'Obra "'+nome+'" criada. Agora cole a lista de luminárias.');
 }
 async function apagarObra(){
@@ -592,14 +648,14 @@ async function criarPecas(){
   const rows=[]; oks.forEach(l=>{ for(let i=0;i<l.qtd;i++) rows.push({obra_id:S.obra.id,luminaria_id:l.lum.id,kit_id:l.kit?l.kit.id:null,local:nv(l.local)}); });
   const r=await sb.from("v2_pecas").insert(rows);
   if(r.error) return msg("Erro ao criar as peças: "+r.error.message+" — nada foi criado.",false);
-  const id=S.obra.id; if(!await carregarObras()) return; abrirObra(id); msg(rows.length+" peça(s) criada(s) com serial próprio.");
+  oks.forEach(l=>S.verGrupo.add(l.lum.id)); S.addOpen=false; const id=S.obra.id; if(!await carregarObras()) return; abrirObra(id); msg(rows.length+" peça(s) criada(s) com serial próprio.");
 }
 async function trocaKitPeca(d){
-  const id=Number(d.id), sel=document.querySelector('select[data-act="trocaKitPeca"][data-id="'+id+'"]');
-  if(!sel||!sel.value) return renderObra();
+  const id=Number(d.id), sel=document.querySelector('select[data-act="trocaKitPeca"][data-id="'+id+'"]'), naFicha=S.view==="peca";
+  if(!sel||!sel.value) return naFicha?renderPeca():renderObra();
   const r=await sb.rpc("v2_aplicar_kit",{p_peca:id,p_kit:Number(sel.value)});
-  if(r.error){ msg(r.error.message,false); return renderObra(); }
-  await carregarObras(); renderObra(); msg("Kit aplicado: os itens dele foram copiados para a peça.");
+  if(r.error){ msg(r.error.message,false); return naFicha?renderPeca():renderObra(); }
+  await carregarObras(); if(naFicha) await recarregaPeca(); else renderObra(); msg("Kit aplicado: os itens dele foram copiados para a peça.");
 }
 
 // ---- ficha da peça ----
@@ -629,6 +685,7 @@ function renderPeca(){
    +'<div class="card"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">'+(l?(l.foto_url?'<img class="thumb" style="width:64px;height:64px" src="'+esc(l.foto_url)+'" alt="">':miniFotos(fotoAuto(l))):'')
    +'<div style="flex:1;min-width:200px"><h3 style="margin:0">'+esc(p.serial)+'</h3><div class="small">'+esc(l?l.codigo:"?")+(kit?' · '+esc(kit.nome):'')+' · obra '+esc(o.nome)+'</div></div><div class="'+g.c+'" style="font-size:14px">'+g.t+'</div></div></div>'
    +'<div class="card"><div class="field"><label>Local</label><input id="p_local" value="'+esc(p.local||"")+'"></div>'
+   +(precisaKit(p)?'<div class="field"><label>Kit desta peça</label><select data-act="trocaKitPeca" data-id="'+p.id+'"><option value="">— escolher kit —</option>'+S.kits.filter(k=>k.luminaria_id===p.luminaria_id).map(k=>'<option value="'+k.id+'" '+(p.kit_id===k.id?"selected":"")+'>'+esc(k.nome)+'</option>').join("")+'</select></div>':'')
    +'<div class="field"><label>Garantia até (a empresa pode ajustar)</label><input id="p_gar" type="date" value="'+esc(p.garantia_ate||"")+'"></div>'
    +'<div class="field"><label>Observação desta peça (só desta peça)</label><textarea id="p_obs" style="min-height:70px">'+esc(p.observacao||"")+'</textarea></div>'
    +'<div class="bar"><button class="p" data-act="salvarPeca">Salvar peça</button><button class="danger" data-act="apagarPeca">Excluir peça (cadastrada por engano)</button></div></div>'
@@ -684,6 +741,7 @@ async function adicionarPeca(){
   if(!cod) return msg("Digite o código da luminária.",false);
   S.imp=classificarLinhas([cod+";"+q+";"+loc]);
   if(S.imp[0].status!=="ok"){ const m=S.imp[0].motivo; return msg(m.charAt(0).toUpperCase()+m.slice(1)+".",false); }
+  const kitSel=$("#a_kit")?$("#a_kit").value:""; if(kitSel) S.imp[0].kit=S.kits.find(k=>k.id===Number(kitSel))||S.imp[0].kit;
   await criarPecas();
 }
 function qtdDigitada(id){ const n=parseInt(($("#qn_"+id)||{}).value); return (isNaN(n)||n<1||n>200)?null:n; }
@@ -693,7 +751,7 @@ async function maisPeca(d){
   const rows=Array.from({length:n},()=>({obra_id:S.obra.id,luminaria_id:id,kit_id:ult?ult.kit_id:null,local:ult?ult.local:null}));
   const r=await sb.from("v2_pecas").insert(rows);
   if(r.error) return msg("Erro ao criar as peças: "+r.error.message+" — nada foi criado.",false);
-  const oid=S.obra.id; await carregarObras(); abrirObra(oid); msg(n+" peça(s) criada(s) com serial novo.");
+  S.verGrupo.add(id); const oid=S.obra.id; await carregarObras(); abrirObra(oid); msg(n+" peça(s) criada(s) com serial novo.");
 }
 async function menosPeca(d){
   const id=Number(d.id), n=qtdDigitada(id), ps=S.pecas.filter(p=>p.obra_id===S.obra.id&&p.luminaria_id===id);
@@ -1022,7 +1080,12 @@ const ACT={
   relLimpa:()=>{S.relDe="";S.relAte="";renderRel()},
   relCsv:()=>{ if(S.relExp) baixarCsv(S.relExp.nome,S.relExp.cab,S.relExp.rows); },
   addSimilar, tirarSimilar, pickAp, cadNovoMan, decidirMan,
-  novaObra, abrirObra:d=>abrirObra(Number(d.id)), voltaObras:()=>{msg("");renderObras()}, salvarObra, apagarObra,
+  novaObra:()=>{S.editObra=false;S.addOpen=false;novaObra()},
+  abrirObra:d=>{S.verGrupo=new Set();S.addOpen=false;S.editObra=false;abrirObra(Number(d.id))},
+  addAbrir:()=>{S.addOpen=!S.addOpen;renderObra()}, editObra:()=>{S.editObra=!S.editObra;renderObra()},
+  abaAdd:d=>{ S.addTab=d.t; document.querySelectorAll('[data-act="abaAdd"]').forEach(b=>b.classList.toggle("on",b.dataset.t===S.addTab)); $("#add_um").style.display=S.addTab==="um"?"":"none"; $("#add_lista").style.display=S.addTab==="lista"?"":"none"; },
+  verGrupo:d=>{ const id=Number(d.id); if(S.verGrupo.has(id)) S.verGrupo.delete(id); else S.verGrupo.add(id); renderObra(); },
+  kitGrupo, voltaObras:()=>{msg("");renderObras()}, salvarObra, apagarObra,
   conferirLista, criarPecas, trocaKitPeca, abrirPeca:d=>abrirPeca(Number(d.id)),
   voltaObra:()=>{ msg(""); const id=S.view==="peca"?S.pecas.find(x=>x.id===S.peca).obra_id:S.obra.id; abrirObra(id); },
   salvarPeca, apagarPeca, trocar:d=>{S.trocando=Number(d.id);renderPeca()}, cancelaTroca:()=>{S.trocando=null;renderPeca()}, confirmaTroca,

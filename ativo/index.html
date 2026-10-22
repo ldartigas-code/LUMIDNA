@@ -196,8 +196,10 @@ function render(){
   $("#content").innerHTML=
    '<div class="hero">'+compFotos()
    +'<div class="row"><div><div class="id">'+esc(l.codigo)+'</div><div class="model">'+esc(l.fabricante||"")+'</div></div>'
-   +'<span class="status '+(g?(gOk?"st-ok":"st-bad"):"st-off")+'"><span class="dot"></span>'+(g?(gOk?"Em garantia":"Garantia vencida"):"Sem garantia informada")+'</span></div>'
-   +'<div class="tags"><span class="tag">'+esc(P.serial)+'</span>'+(P.local?'<span class="tag">'+esc(P.local)+'</span>':'')+(P.kit?'<span class="tag">'+esc(P.kit)+'</span>':'')+'</div>'+(TERMOS?'<button type="button" class="btn" data-ac="termos" style="margin-top:12px;padding:10px 14px;font-size:14px">Termos de garantia</button>':'')+(g?'<div class="small" style="margin-top:8px">Verificar condições direto com fabricante</div>':'')+'</div>'
+   +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:none;max-width:52%;text-align:right"><span class="status '+(g?(gOk?"st-ok":"st-bad"):"st-off")+'"><span class="dot"></span>'+(g?(gOk?"Em garantia":"Garantia vencida"):"Sem garantia informada")+'</span>'
+   +(TERMOS?'<button type="button" class="btn" data-ac="termos" style="padding:8px 14px;font-size:13px;width:auto">Termos de garantia</button>':'')
+   +(g?'<div class="small">Verificar condições direto com fabricante</div>':'')+'</div></div>'
+   +'<div class="tags"><span class="tag">'+esc(P.serial)+'</span>'+(P.local?'<span class="tag">'+esc(P.local)+'</span>':'')+(P.kit?'<span class="tag">'+esc(P.kit)+'</span>':'')+'</div></div>'
    +'<div class="tiles">'
    +'<div class="tile"><small>Potência</small><div class="v">'+(pot?fmt(Math.round(pot*100)/100)+'<i>W</i>':'—')+'</div></div>'
    +'<div class="tile"><small>Temperatura de cor</small><div class="v">'+(cct?cct+'<i>K</i>':'—')+'</div></div>'

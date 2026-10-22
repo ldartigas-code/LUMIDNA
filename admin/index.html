@@ -487,7 +487,7 @@ const garantiaTxt=p=>!p.garantia_ate?{t:"sem data",c:"small"}:(p.garantia_ate>=h
 const precisaKit=p=>{ const l=porId(p.luminaria_id); return !!l&&!l.integrada; };
 const urlPeca=s=>new URL("../ativo/?c="+encodeURIComponent(s),location.href).href;
 function codigoObra(nome){ const s=String(nome||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase(); const c=s.replace(/[^BCDFGHJKLMNPQRSTVWXYZ]/g,""), l=s.replace(/[^A-Z]/g,""); if(c.length>=3) return c.slice(0,3); return (c+l).slice(0,3).padEnd(3,"X"); }
-const navArea=a=>'<div class="tabs noprint" style="border-bottom:1px solid var(--line);padding-bottom:10px"><button class="tab '+(a==="cat"?"on":"")+'" data-act="areaCat">Catálogo</button><button class="tab '+(a==="obras"?"on":"")+'" data-act="areaObras">Obras</button><button class="tab '+(a==="ped"?"on":"")+'" data-act="areaPedidos">Pedidos</button><button class="tab '+(a==="rel"?"on":"")+'" data-act="areaRel">Relatórios</button><button class="tab '+(a==="gar"?"on":"")+'" data-act="areaGarantia">Garantia</button></div>';
+const navArea=a=>'<div class="tabs noprint" style="border-bottom:1px solid var(--line);padding-bottom:10px"><button class="tab '+(a==="cat"?"on":"")+'" data-act="areaCat">Catálogo</button><button class="tab '+(a==="obras"?"on":"")+'" data-act="areaObras">Obras</button><button class="tab '+(a==="ped"?"on":"")+'" data-act="areaPedidos">Pedidos</button><button class="tab '+(a==="rel"?"on":"")+'" data-act="areaRel">Relatórios</button></div>';
 
 async function carregarObras(){
   try{
@@ -1070,52 +1070,6 @@ async function decidirMan(d){
   S.apSel=null; await Promise.all([carregarPedidos(),carregarObras(),recarregaSimilares()]); renderPedido(); msg(aprovar?"Manutenção aprovada e peça atualizada.":"Manutenção reprovada.");
 }
 
-// ---- termos de garantia ----
-Object.assign(S,{termos:[],termoAberto:null});
-async function carregarTermos(){
-  const r=await sb.from("v2_garantia_termos").select("*").order("padrao",{ascending:false}).order("fabricante");
-  if(r.error){ $("#app").innerHTML='<div class="msg e">Não consegui carregar os termos: '+esc(r.error.message)+'<br>Se for "relation does not exist", falta rodar o SQL v2_07_termos_garantia no Supabase.</div>'; return false; }
-  S.termos=r.data; return true;
-}
-function renderGarantia(){
-  S.view="garantia";
-  const fabs=[...new Set(S.produtos.filter(p=>p.tipo==="luminaria"&&p.fabricante).map(p=>p.fabricante.trim()))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
-  const padrao=S.termos.find(t=>t.padrao);
-  const cards=S.termos.map(t=>'<details class="card" '+(S.termoAberto===t.id?"open":"")+'><summary style="cursor:pointer;font-weight:600">'+(t.padrao?'Termo padrão <span class="small">(vale para quem não tem termo próprio)</span>':'Termo de '+esc(t.fabricante))+'</summary><div style="margin-top:10px">'
-    +'<div class="field"><label>Título</label><input id="g_tit_'+t.id+'" value="'+esc(t.titulo)+'"></div>'
-    +(t.padrao?'':'<div class="field"><label>Empresa / fabricante *</label><input id="g_fab_'+t.id+'" list="dl_fab" value="'+esc(t.fabricante)+'"></div>')
-    +'<div class="field"><label>Texto dos termos</label><textarea id="g_txt_'+t.id+'" style="min-height:260px">'+esc(t.texto)+'</textarea></div>'
-    +'<div class="bar"><button class="p" data-act="salvarTermo" data-id="'+t.id+'">Salvar</button>'+(t.padrao?'':'<button class="danger" data-act="apagarTermo" data-id="'+t.id+'">Excluir</button>')+'</div></div></details>').join("");
-  $("#app").innerHTML=navArea("gar")+'<div class="small" style="margin-bottom:10px">Estes textos aparecem para o cliente quando ele toca em "Termos de garantia" na página da luminária. A luminária usa o termo da empresa dela (o fabricante cadastrado); se a empresa não tiver termo próprio, vale o padrão.</div>'
-   +cards
-   +'<datalist id="dl_fab">'+fabs.map(f=>'<option value="'+esc(f)+'">').join("")+'</datalist>'
-   +'<div class="card"><h3 style="margin-top:0">+ Termo de uma empresa</h3><div class="field"><label>Empresa / fabricante *</label><input id="gn_fab" list="dl_fab" placeholder="Digite ou escolha (ex: LDARTI)"></div><div class="field"><label>Título</label><input id="gn_tit" value="Termos de garantia"></div>'
-   +'<div class="field"><label>Texto</label><textarea id="gn_txt" style="min-height:160px">'+esc(padrao?padrao.texto:"")+'</textarea></div><div class="small" style="margin-bottom:8px">O texto começa igual ao padrão; troque pelo termo da empresa.</div><button class="p" data-act="criarTermo">Criar termo</button></div>';
-}
-async function salvarTermo(d){
-  const id=Number(d.id), t=S.termos.find(x=>x.id===id), tit=$("#g_tit_"+id).value.trim(), txt=$("#g_txt_"+id).value.trim(), fab=t.padrao?null:$("#g_fab_"+id).value.trim();
-  if(!tit||!txt) return msg("Título e texto não podem ficar vazios.",false);
-  if(!t.padrao&&!fab) return msg("Informe a empresa.",false);
-  const r=await sb.from("v2_garantia_termos").update({titulo:tit,texto:txt,fabricante:fab,atualizado_em:new Date().toISOString()}).eq("id",id);
-  if(r.error) return msg(r.error.code==="23505"?"Já existe um termo para essa empresa.":"Erro ao salvar: "+r.error.message,false);
-  S.termoAberto=id; await carregarTermos(); renderGarantia(); msg("Termo salvo.");
-}
-async function criarTermo(){
-  const fab=$("#gn_fab").value.trim(), tit=$("#gn_tit").value.trim(), txt=$("#gn_txt").value.trim();
-  if(!fab) return msg("Informe a empresa / fabricante.",false);
-  if(!tit||!txt) return msg("Título e texto não podem ficar vazios.",false);
-  const r=await sb.from("v2_garantia_termos").insert({fabricante:fab,titulo:tit,texto:txt,padrao:false}).select().single();
-  if(r.error) return msg(r.error.code==="23505"?"Já existe um termo para essa empresa. Abra o dela e edite.":"Erro ao criar: "+r.error.message,false);
-  S.termoAberto=r.data.id; await carregarTermos(); renderGarantia(); msg('Termo de "'+fab+'" criado. As luminárias desse fabricante passam a mostrar este texto.');
-}
-async function apagarTermo(d){
-  const id=Number(d.id), t=S.termos.find(x=>x.id===id);
-  if(!confirm('Excluir o termo de "'+t.fabricante+'"? As luminárias dessa empresa voltam a mostrar o termo padrão.')) return;
-  const r=await sb.from("v2_garantia_termos").delete().eq("id",id).eq("padrao",false);
-  if(r.error) return msg("Erro ao excluir: "+r.error.message,false);
-  S.termoAberto=null; await carregarTermos(); renderGarantia(); msg("Termo excluído.");
-}
-
 // ---- situações especiais da peça (notas da empresa, no histórico) ----
 const PREF_NOTA="Nota da empresa: ";
 function blocoNotas(){
@@ -1145,7 +1099,6 @@ const ACT={
   relLimpa:()=>{S.relDe="";S.relAte="";renderRel()},
   relCsv:()=>{ if(S.relExp) baixarCsv(S.relExp.nome,S.relExp.cab,S.relExp.rows); },
   addSimilar, tirarSimilar, pickAp, cadNovoMan, decidirMan,
-  areaGarantia:async()=>{msg(""); if(await carregarTermos()) renderGarantia();}, salvarTermo, criarTermo, apagarTermo,
   notaAbrir:()=>{S.notaAberta=!S.notaAberta;renderPeca(); if(S.notaAberta){ const t=$("#nota_txt"); if(t) t.focus(); }}, notaSalvar,
   novaObra:()=>{S.editObra=false;S.addOpen=false;novaObra()},
   abrirObra:d=>{S.verGrupo=new Set();S.addOpen=false;S.editObra=false;abrirObra(Number(d.id))},

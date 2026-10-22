@@ -91,6 +91,7 @@ select.vsel{width:100%;border:1px solid var(--line);border-radius:10px;padding:7
 .alert.s{border-left-color:var(--green);background:rgba(52,211,153,.1);color:#bbf7d0}
 .reg{padding:12px 0;border-top:1px solid var(--line)}.reg:first-child{border-top:0}
 .reg .st{display:inline-block;border-radius:999px;padding:1px 10px;font-size:12px;border:1px solid var(--line);color:var(--muted);margin-left:4px}
+.vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none}
 .foot{padding:28px 0 8px;color:var(--muted);font-size:12px;text-align:center}
 </style>
 </head>
@@ -122,7 +123,7 @@ const NOME={led:"Barra de LED",driver:"Driver",optica:"Óptica",luminaria:"Lumin
 const MOTIVOS=["parou de funcionar","piscando","perdeu brilho","troca preventiva","outro"];
 const STATUS={novo:"Recebido",em_atendimento:"Em atendimento",entregue:"Entregue",instalado:"Instalado",resolvido:"Resolvido",cancelado:"Cancelado",aguardando_aprovacao:"Aguardando aprovação",aprovada:"Aprovada",reprovada:"Não aprovada"};
 const TIT={problema:"Aviso de problema",compra:"Pedido de peças",manutencao:"Manutenção informada"};
-let SERIAL="", P=null, PED=[], CART=[], QTD={}, VAR={}, SHEET=null;
+let SERIAL="", P=null, PED=[], CART=[], QTD={}, VAR={}, SHEET=null, FOTO=null;
 
 function guardado(){ try{ return JSON.parse(localStorage.getItem("lumidna_contato")||"{}"); }catch(e){ return {}; } }
 function guardar(n,f){ try{ localStorage.setItem("lumidna_contato",JSON.stringify({nome:n,fone:f})); }catch(e){} }
@@ -317,7 +318,7 @@ function reduzFoto(file){
   });
 }
 function manutencao(){
-  const c=guardado(), itens=P.itens||[];
+  FOTO=null; const c=guardado(), itens=P.itens||[];
   if(!itens.length){ abreSheet('<h3>Informar manutenção</h3><div class="small">Esta luminária não tem itens separados cadastrados para informar manutenção. Fale com a LDArti.</div><div class="acoes" style="margin-top:14px"><button type="button" class="btn" data-ac="fechar">Fechar</button></div>',"man"); return; }
   abreSheet('<h3>Informar manutenção feita</h3><div class="small" style="margin-bottom:14px">Trocou alguma parte desta luminária? Conte o que foi instalado. A LDArti confere e aprova para atualizar o cadastro da sua luminária; só vale depois de aprovada.</div>'
    +'<div class="field"><label>Qual item foi trocado? *</label><select id="m_item">'+itens.map(i=>'<option value="'+i.peca_item_id+'">'+esc(NOME[i.tipo])+' · '+esc(i.codigo)+(i.quantidade>1?' ('+i.quantidade+' instaladas)':'')+'</option>').join("")+'</select></div>'
@@ -325,12 +326,13 @@ function manutencao(){
    +'<div class="field"><label>O que foi instalado no lugar? *</label><div id="m_opc"></div></div>'
    +'<div id="m_outro" class="hidden"><div class="alert warn">Para modelos que a LDArti ainda não aprovou, mande o modelo e uma foto. A LDArti avalia e responde por aqui.</div>'
    +'<div class="field"><label>Modelo instalado *</label><input id="m_modelo"></div><div class="field"><label>Fabricante</label><input id="m_fab"></div>'
-   +'<div class="field"><label>Foto do item instalado *</label><input id="m_foto" type="file" accept="image/*"></div></div>'
+   +'<div class="field"><label>Foto do item instalado *</label><div class="acoes"><button type="button" class="btn" data-ac="camera">Tirar foto agora</button><button type="button" class="btn" data-ac="galeria">Escolher da galeria</button></div><input id="m_foto_cam" class="vh" type="file" accept="image/*" capture="environment"><input id="m_foto" class="vh" type="file" accept="image/*"><div id="m_prev" class="small" style="margin-top:8px">Nenhuma foto escolhida.</div></div></div>'
    +'<div class="field"><label>Por que foi trocado? (opcional)</label><select id="m_motivo"><option value="">—</option>'+MOTIVOS.map(m=>'<option>'+m+'</option>').join("")+'</select></div>'
    +'<div class="field"><label>Observação (opcional)</label><textarea id="m_obs"></textarea></div>'
    +'<div class="field"><label>Nome *</label><input id="m_nome" value="'+esc(c.nome||"")+'" autocomplete="name"></div><div class="field"><label>Telefone / WhatsApp *</label><input id="m_fone" value="'+esc(c.fone||"")+'" type="tel" autocomplete="tel"></div>'
    +'<div class="acoes"><button type="button" class="btn" data-ac="fechar">Cancelar</button><button type="button" class="btn p" id="enviar" data-ac="enviarManutencao">Enviar para aprovação</button></div>',"man");
   $("#m_item").onchange=opcoesMan; opcoesMan();
+  ["m_foto","m_foto_cam"].forEach(id=>{ $("#"+id).onchange=e=>{ const f=e.target.files[0]; if(!f) return; FOTO=f; $("#m_prev").innerHTML='<img src="'+esc(URL.createObjectURL(f))+'" alt="" style="max-width:140px;max-height:140px;border-radius:8px;background:#fff;display:block;margin-bottom:4px"> Foto escolhida. Para trocar, escolha outra.'; }; });
 }
 function itemMan(){ return (P.itens||[]).find(i=>String(i.peca_item_id)===$("#m_item").value); }
 function opcoesMan(){
@@ -350,7 +352,7 @@ async function enviarManutencao(){
   if(sel==="outro"){
     origem="outro"; modelo=$("#m_modelo").value.trim(); fab=$("#m_fab").value.trim()||null;
     if(!modelo) return msg("Informe o modelo do item instalado.","e");
-    const f=$("#m_foto").files[0]; if(!f) return msg("Envie uma foto do item instalado.","e");
+    const f=FOTO; if(!f) return msg("Envie uma foto do item instalado.","e");
     $("#enviar").disabled=true; $("#enviar").textContent="Enviando…";
     try{ foto=await reduzFoto(f); }catch(e){ $("#enviar").disabled=false; $("#enviar").textContent="Enviar para aprovação"; return msg(e.message,"e"); }
   }
@@ -374,6 +376,7 @@ document.addEventListener("click",e=>{
   if(a==="fundo"){ if(e.target===el) fechaSheet(); return; }
   if(e.target.tagName==="SELECT"||e.target.tagName==="INPUT") return;
   if(a==="problema") problema(); else if(a==="manutencao") manutencao(); else if(a==="carrinho") carrinho();
+  else if(a==="camera") $("#m_foto_cam").click(); else if(a==="galeria") $("#m_foto").click();
   else if(a==="fechar") fechaSheet(); else if(a==="checkout") checkout();
   else if(a==="enviarPedido") enviarPedido(); else if(a==="enviarProblema") enviarProblema(); else if(a==="enviarManutencao") enviarManutencao();
   else if(a==="instalei") instalei(Number(el.dataset.id));

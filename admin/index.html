@@ -500,11 +500,12 @@ async function carregarObras(){
   return true;
 }
 
+const temItens=p=>S.pitens.some(i=>i.peca_id===p.id&&!i.removido_em);
 function renderObras(){
   S.view="obras";
   const lista=S.obras.map(o=>{
-    const ps=S.pecas.filter(p=>p.obra_id===o.id), semKit=ps.filter(p=>precisaKit(p)&&!p.kit_id).length, bom=ps.length&&!semKit;
-    return '<div class="row" style="grid-template-columns:14px minmax(0,1.5fr) minmax(0,1fr) 90px minmax(0,1.2fr)" data-act="abrirObra" data-id="'+o.id+'"><span class="dot '+(bom?"g":"r")+'"></span><div><b>'+esc(o.nome)+'</b><div class="small">'+(esc(o.cliente)||"sem cliente")+' · código '+esc(o.codigo)+'</div></div><div class="small">início '+dmy(o.inicio_instalacao)+'</div><div><b>'+ps.length+'</b> peça(s)</div><div class="'+(bom?"ok":"no")+'">'+(!ps.length?"Sem peças ainda":(semKit?semKit+" sem kit":"Todas com kit"))+'</div></div>';
+    const ps=S.pecas.filter(p=>p.obra_id===o.id), semKit=ps.filter(p=>precisaKit(p)&&!p.kit_id&&!temItens(p)).length, bom=ps.length&&!semKit;
+    return '<div class="row" style="grid-template-columns:14px minmax(0,1.5fr) minmax(0,1fr) 90px minmax(0,1.2fr)" data-act="abrirObra" data-id="'+o.id+'"><span class="dot '+(bom?"g":"r")+'"></span><div><b>'+esc(o.nome)+'</b><div class="small">'+(esc(o.cliente)||"sem cliente")+' · código '+esc(o.codigo)+'</div></div><div class="small">início '+dmy(o.inicio_instalacao)+'</div><div><b>'+ps.length+'</b> peça(s)</div><div class="'+(bom?"ok":"no")+'">'+(!ps.length?"Sem peças ainda":(semKit?semKit+" sem itens":"Todas com itens"))+'</div></div>';
   }).join("");
   $("#app").innerHTML=navArea("obras")+'<div class="bar"><div class="small">'+S.obras.length+' obra(s)</div><div style="margin-left:auto"><button class="p" data-act="novaObra">+ Nova obra</button></div></div>'+(S.obras.length?'<div class="list">'+lista+'</div>':'<div class="small">Nenhuma obra ainda. Clique em "+ Nova obra".</div>');
 }
@@ -574,17 +575,17 @@ function blocoLuminarias(o,ps){
 }
 function cardGrupo(id,pcs){
   const l=porId(id), kits=S.kits.filter(k=>k.luminaria_id===id), pk=!!l&&!l.integrada;
-  const semKit=pcs.filter(p=>pk&&!p.kit_id).length, kitIds=[...new Set(pcs.map(p=>p.kit_id))], comum=kitIds.length===1?kitIds[0]:null;
+  const semKit=pcs.filter(p=>pk&&!p.kit_id&&!temItens(p)).length, kitIds=[...new Set(pcs.map(p=>p.kit_id))], comum=kitIds.length===1?kitIds[0]:null;
   const aberto=S.verGrupo.has(id);
   const foto=l&&l.foto_url?'<img class="thumb" style="width:56px;height:56px" src="'+esc(l.foto_url)+'" alt="">':(l?miniFotos(fotoAuto(l)):'<div class="thumb"></div>');
-  const status=pk?(semKit?'<span class="no">'+semKit+' sem kit</span>':'<span class="ok">kit definido</span>'):'<span class="small">lâmpada integrada</span>';
+  const status=pk?(semKit?'<span class="no">'+semKit+' sem itens</span>':'<span class="ok">itens definidos</span>'):'<span class="small">lâmpada integrada</span>';
   const kitSel=pk?'<div class="field" style="flex:1;min-width:210px;margin:0"><label>Kit (vale para as '+pcs.length+' peças)</label><select data-act="kitGrupo" data-id="'+id+'"><option value="">'+(kitIds.length>1?"— vários / escolher —":"— escolher kit —")+'</option>'+kits.map(k=>'<option value="'+k.id+'" '+(comum===k.id?"selected":"")+'>'+esc(k.nome)+'</option>').join("")+'</select>'+(!kits.length?'<div class="no">nenhum kit cadastrado para esta luminária</div>':'')+'</div>':'';
   const qtd='<div class="field" style="margin:0"><label>Quantidade</label><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input type="number" min="1" max="200" value="1" id="qn_'+id+'" style="width:76px"><button data-act="maisPeca" data-id="'+id+'">+ Adicionar</button><button data-act="menosPeca" data-id="'+id+'">− Remover</button></div></div>';
   const linhas=aberto?'<div style="margin-top:10px">'+pcs.map(p=>{
     const g=garantiaTxt(p), k=S.kits.find(x=>x.id===p.kit_id);
     return '<div class="prow"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><a href="#" data-act="abrirPeca" data-id="'+p.id+'"><b>'+esc(p.serial)+'</b></a><span class="'+g.c+'">'+g.t+'</span></div>'
      +'<div style="display:flex;gap:8px;align-items:center;margin-top:4px"><input data-loc="'+p.id+'" value="'+esc(p.local||"")+'" placeholder="Local (ex: Hall)" style="flex:1;min-width:0"><button data-act="abrirPeca" data-id="'+p.id+'" style="padding:6px 10px">Abrir</button></div>'
-     +(pk?'<div class="small" style="margin-top:2px">'+(k?esc(k.nome):'<span class="no">sem kit</span>')+'</div>':'')+'</div>';
+     +(pk?'<div class="small" style="margin-top:2px">'+(k?esc(k.nome):(temItens(p)?'itens avulsos (sem kit)':'<span class="no">sem itens</span>'))+'</div>':'')+'</div>';
   }).join("")+'</div>':'';
   return '<div class="card grp"><div style="display:flex;gap:12px;align-items:center"><div style="flex:none">'+foto+'</div><div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700">'+esc(l?l.codigo:"?")+'</div><div class="small">'+pcs.length+' peça(s) · '+status+'</div></div></div>'
    +'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;align-items:flex-end">'+kitSel+qtd+'</div>'

@@ -123,6 +123,16 @@ const NOME={led:"Barra de LED",driver:"Driver",optica:"Óptica",luminaria:"Lumin
 const MOTIVOS=["parou de funcionar","piscando","perdeu brilho","troca preventiva","outro"];
 const STATUS={novo:"Recebido",em_atendimento:"Em atendimento",entregue:"Entregue",instalado:"Instalado",resolvido:"Resolvido",cancelado:"Cancelado",aguardando_aprovacao:"Aguardando aprovação",aprovada:"Aprovada",reprovada:"Não aprovada"};
 const TIT={problema:"Aviso de problema",compra:"Pedido de peças",manutencao:"Manutenção informada"};
+// aviso por e-mail para a empresa (script do Google Apps Script; vazio = desligado)
+const NOTIFY_URL="";
+const NOTIFY_CHAVE="137c869c62f79f56a9";
+function avisaEmpresa(d){
+  if(!NOTIFY_URL) return;
+  try{
+    fetch(NOTIFY_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify(Object.assign({chave:NOTIFY_CHAVE,serial:SERIAL,modelo:P&&P.luminaria?P.luminaria.codigo:"",local:P&&P.local?P.local:""},d))}).catch(()=>{});
+  }catch(e){}
+}
 let SERIAL="", P=null, PED=[], CART=[], QTD={}, VAR={}, SHEET=null, FOTO=null, TERMOS=null;
 
 function guardado(){ try{ return JSON.parse(localStorage.getItem("lumidna_contato")||"{}"); }catch(e){ return {}; } }
@@ -151,9 +161,15 @@ async function carregar(){
 const keyCart=()=>"lumidna2_cart_"+SERIAL;
 function salvaCart(){ try{ localStorage.setItem(keyCart(),JSON.stringify(CART)); }catch(e){} }
 function lerCart(){ try{ CART=JSON.parse(localStorage.getItem(keyCart())||"[]"); }catch(e){ CART=[]; } if(!Array.isArray(CART)) CART=[]; CART=CART.filter(l=>l&&resolve(l)); salvaCart(); }
+// "Kit completo" = todos os itens que estão instalados nesta peça agora; o preço é a soma deles
+function kitTotal(){
+  const it=(P&&P.itens)||[]; if(!it.length||it.some(i=>i.preco==null)) return null;
+  return it.reduce((s,i)=>s+i.preco*i.quantidade,0);
+}
+function kitResumo(){ return ((P&&P.itens)||[]).map(i=>i.quantidade+"x "+i.codigo).join(" + "); }
 function resolve(l){
   const itens=P.itens||[];
-  if(l.k==="kit"){ if(!P.kit||P.luminaria.integrada) return null; return {nome:"Kit completo",sub:P.kit,preco:P.kit_preco,max:1,fotos:itens.filter(i=>i.foto_url).map(i=>i.foto_url).slice(0,2),pl:{escopo:"kit",quantidade:1}}; }
+  if(l.k==="kit"){ if(!P.kit||P.luminaria.integrada) return null; return {nome:"Kit completo",sub:P.kit,preco:kitTotal(),max:1,fotos:itens.filter(i=>i.foto_url).map(i=>i.foto_url).slice(0,2),pl:{escopo:"kit",quantidade:1}}; }
   if(l.k==="lum") return {nome:"Luminária inteira",sub:P.luminaria.codigo,preco:P.luminaria.preco,max:1,fotos:P.luminaria.foto_url?[P.luminaria.foto_url]:[],pl:{escopo:"luminaria",quantidade:1}};
   const m=/^item:(\d+):(\d+)$/.exec(String(l.k)); if(!m) return null;
   const i=itens.find(x=>x.peca_item_id===Number(m[1])); if(!i) return null;
@@ -226,7 +242,7 @@ function cardItem(i){
 }
 function renderLoja(){
   const l=P.luminaria, itens=P.itens||[], integ=l.integrada, cards=[];
-  if(!integ&&P.kit) cards.push(cardKitLum("kit","Kit completo",P.kit,"todos os itens da luminária",P.kit_preco,[...new Set(itens.filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,2)));
+  if(!integ&&P.kit) cards.push(cardKitLum("kit","Kit completo",P.kit,kitResumo(),kitTotal(),[...new Set(itens.filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,2)));
   if(!integ) itens.forEach(i=>cards.push(cardItem(i)));
   cards.push(cardKitLum("lum","Luminária inteira",l.codigo,l.fabricante||"",l.preco,l.foto_url?[l.foto_url]:[...new Set(itens.filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,2)));
   $("#loja").innerHTML='<div class="shop-grid">'+cards.join("")+'</div><div class="small" style="margin:10px 4px 0">Preços de referência. A LDArti confirma valor, prazo e entrega antes de fechar; nada é cobrado agora.</div>';
@@ -325,9 +341,10 @@ async function enviarPedido(){
   if(!nome||!fone) return msg("Informe seu nome e telefone para contato.","e");
   $("#enviar").disabled=true;
   const r=await sb.rpc("v2_criar_pedido",{p_serial:SERIAL,p_tipo:"compra",p_nome:nome,p_fone:fone,p_motivo:$("#c_motivo").value||null,p_obs:$("#c_obs").value.trim()||null,p_item_afetado:null,
-    p_linhas:CART.map(l=>{ const r=resolve(l); return {escopo:r.pl.escopo,peca_item_id:r.pl.peca_item_id||null,similar_id:r.pl.similar_id||null,quantidade:r.pl.quantidade}; })});
+    p_linhas:CART.flatMap(l=>{ const r=resolve(l); if(r.pl.escopo==="kit") return (P.itens||[]).map(i=>({escopo:"item",peca_item_id:i.peca_item_id,similar_id:null,quantidade:i.quantidade})); return [{escopo:r.pl.escopo,peca_item_id:r.pl.peca_item_id||null,similar_id:r.pl.similar_id||null,quantidade:r.pl.quantidade}]; })});
   if(r.error){ $("#enviar").disabled=false; return msg(r.error.message||"Não consegui enviar. Tente de novo.","e"); }
   guardar(nome,fone); const t=r.data.total, sem=r.data.itens_sem_preco>0, id=r.data.id;
+  avisaEmpresa({tipo:"compra",id:id,nome:nome,fone:fone,motivo:$("#c_motivo").value,obs:$("#c_obs").value.trim(),total:t,itens:CART.map(l=>{ const x=resolve(l); return x.pl.quantidade+"x "+x.nome+" "+x.sub; }).join("; ")});
   CART=[]; salvaCart(); await carregar(); render();
   abreSheet('<h3>Pedido enviado · #'+id+'</h3><div>Recebemos seu pedido'+(t?' (total '+(sem?"a combinar":brl(t))+')':'')+'. A LDArti entra em contato para confirmar valores e entrega.</div>'
    +(P.garantia_ate&&P.garantia_ate>=hoje()?'<div class="small" style="margin-top:8px">Sua luminária está em garantia; vamos avaliar o caso.</div>':'')
@@ -351,7 +368,9 @@ async function enviarProblema(){
   $("#enviar").disabled=true;
   const r=await sb.rpc("v2_criar_pedido",{p_serial:SERIAL,p_tipo:"problema",p_nome:nome,p_fone:fone,p_motivo:motivo,p_obs:$("#p_obs").value.trim()||null,p_item_afetado:item,p_linhas:[]});
   if(r.error){ $("#enviar").disabled=false; return msg(r.error.message||"Não consegui enviar. Tente de novo.","e"); }
-  guardar(nome,fone); const id=r.data.id; await carregar(); render();
+  guardar(nome,fone); const id=r.data.id;
+  avisaEmpresa({tipo:"problema",id:id,nome:nome,fone:fone,motivo:motivo,obs:$("#p_obs").value.trim(),item:$("#p_item").selectedOptions[0].text});
+  await carregar(); render();
   abreSheet('<h3>Aviso recebido · #'+id+'</h3><div>Recebemos seu aviso. A LDArti entra em contato para resolver.</div>'
    +(P.garantia_ate&&P.garantia_ate>=hoje()?'<div class="small" style="margin-top:8px">Sua luminária está em garantia; vamos avaliar o caso.</div>':'')
    +'<div class="acoes" style="margin-top:14px">'+((item&&!P.luminaria.integrada)?'<button type="button" class="btn p" data-ac="pedirDoProblema" data-item="'+item+'">Já quero pedir a peça</button>':'')+'<button type="button" class="btn" data-ac="fechar">Fechar</button></div>',"ok");
@@ -417,7 +436,9 @@ async function enviarManutencao(){
   const r=await sb.rpc("v2_criar_manutencao",{p_serial:SERIAL,p_nome:nome,p_fone:fone,p_item:i.peca_item_id,p_qtd:$("#m_q")?Number($("#m_q").value):i.quantidade,p_origem:origem,p_similar:similar,
     p_modelo:modelo,p_fabricante:fab,p_motivo:$("#m_motivo").value||null,p_obs:$("#m_obs").value.trim()||null,p_foto:foto});
   if(r.error){ $("#enviar").disabled=false; $("#enviar").textContent="Enviar para aprovação"; return msg(r.error.message||"Não consegui enviar. Tente de novo.","e"); }
-  guardar(nome,fone); const id=r.data.id; await carregar(); render();
+  guardar(nome,fone); const id=r.data.id;
+  avisaEmpresa({tipo:"manutencao",id:id,nome:nome,fone:fone,motivo:$("#m_motivo").value,obs:$("#m_obs").value.trim(),item:$("#m_item").selectedOptions[0].text,qtd:$("#m_q")?$("#m_q").value:i.quantidade,instalado:origem==="outro"?("Outro modelo (precisa de aprovação): "+modelo+(fab?" - "+fab:"")):(origem==="similar"?"Similar aprovado pela LDArti":"O mesmo item")});
+  await carregar(); render();
   abreSheet('<h3>Manutenção enviada · #'+id+'</h3><div>Recebemos a informação. A LDArti vai conferir e aprovar; você acompanha o andamento aqui nesta página, em "Seus registros".</div><div class="acoes" style="margin-top:14px"><button type="button" class="btn p" data-ac="fechar">Fechar</button></div>',"ok");
 }
 async function instalei(id){

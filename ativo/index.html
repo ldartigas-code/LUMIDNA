@@ -166,11 +166,18 @@ function kitTotal(){
   const it=(P&&P.itens)||[]; if(!it.length||it.some(i=>i.preco==null)) return null;
   return it.reduce((s,i)=>s+i.preco*i.quantidade,0);
 }
+// "Peça completa" = luminária + todos os itens instalados (LED, driver, óptica...)
+function completoTotal(){
+  const l=P.luminaria; if(l.preco==null) return null;
+  if(l.integrada||!((P.itens||[]).length)) return l.preco;
+  const k=kitTotal(); return k==null?null:l.preco+k;
+}
+function completoResumo(){ const l=P.luminaria; return (l.integrada||!((P.itens||[]).length))?(l.fabricante||""):("luminária + "+kitResumo()); }
 function kitResumo(){ return ((P&&P.itens)||[]).map(i=>i.quantidade+"x "+i.codigo).join(" + "); }
 function resolve(l){
   const itens=P.itens||[];
-  if(l.k==="kit"){ if(!P.kit||P.luminaria.integrada) return null; return {nome:"Kit completo",sub:P.kit,preco:kitTotal(),max:1,fotos:itens.filter(i=>i.foto_url).map(i=>i.foto_url).slice(0,2),pl:{escopo:"kit",quantidade:1}}; }
-  if(l.k==="lum") return {nome:"Luminária inteira",sub:P.luminaria.codigo,preco:P.luminaria.preco,max:1,fotos:P.luminaria.foto_url?[P.luminaria.foto_url]:[],pl:{escopo:"luminaria",quantidade:1}};
+  if(l.k==="kit"){ if(!P.kit||P.luminaria.integrada||P.kit_confere!==true) return null; return {nome:"Kit completo",sub:P.kit,preco:kitTotal(),max:1,fotos:itens.filter(i=>i.foto_url).map(i=>i.foto_url).slice(0,2),pl:{escopo:"kit",quantidade:1}}; }
+  if(l.k==="lum") return {nome:"Peça completa",sub:P.luminaria.codigo,preco:completoTotal(),max:1,fotos:P.luminaria.foto_url?[P.luminaria.foto_url]:[],pl:{escopo:"luminaria",quantidade:1}};
   const m=/^item:(\d+):(\d+)$/.exec(String(l.k)); if(!m) return null;
   const i=itens.find(x=>x.peca_item_id===Number(m[1])); if(!i) return null;
   const sid=Number(m[2])||null, s=sid?(i.similares||[]).find(x=>x.id===sid):null; if(sid&&!s) return null;
@@ -215,7 +222,7 @@ function render(){
    +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:none;max-width:52%;text-align:right"><span class="status '+(g?(gOk?"st-ok":"st-bad"):"st-off")+'"><span class="dot"></span>'+(g?(gOk?"Em garantia":"Garantia vencida"):"Sem garantia informada")+'</span>'
    +(TERMOS&&g?'<button type="button" class="btn" data-ac="termos" style="padding:8px 14px;font-size:13px;width:auto">Termos de garantia</button>':'')
    +(g?'<div class="small">Verificar condições direto com fabricante</div>':'')+'</div></div>'
-   +'<div class="tags"><span class="tag">'+esc(P.serial)+'</span>'+(P.local?'<span class="tag">'+esc(P.local)+'</span>':'')+(P.kit?'<span class="tag">'+esc(P.kit)+'</span>':'')+'</div></div>'
+   +'<div class="tags"><span class="tag">'+esc(P.serial)+'</span>'+(P.local?'<span class="tag">'+esc(P.local)+'</span>':'')+(P.kit&&P.kit_confere===true?'<span class="tag">'+esc(P.kit)+'</span>':'')+'</div></div>'
    +'<div class="tiles">'
    +'<div class="tile"><small>Potência</small><div class="v">'+(pot?fmt(Math.round(pot*100)/100)+'<i>W</i>':'—')+'</div></div>'
    +'<div class="tile"><small>Temperatura de cor</small><div class="v">'+(cct?cct+'<i>K</i>':'—')+'</div></div>'
@@ -242,9 +249,9 @@ function cardItem(i){
 }
 function renderLoja(){
   const l=P.luminaria, itens=P.itens||[], integ=l.integrada, cards=[];
-  if(!integ&&P.kit) cards.push(cardKitLum("kit","Kit completo",P.kit,kitResumo(),kitTotal(),[...new Set(itens.filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,2)));
+  if(!integ&&P.kit&&P.kit_confere===true) cards.push(cardKitLum("kit","Kit completo",P.kit,kitResumo(),kitTotal(),[...new Set(itens.filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,2)));
   if(!integ) itens.forEach(i=>cards.push(cardItem(i)));
-  cards.push(cardKitLum("lum","Luminária inteira",l.codigo,l.fabricante||"",l.preco,l.foto_url?[l.foto_url]:[...new Set(itens.filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,2)));
+  cards.push(cardKitLum("lum","Peça completa",l.codigo,completoResumo(),completoTotal(),l.foto_url?[l.foto_url]:[...new Set(itens.filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,2)));
   $("#loja").innerHTML='<div class="shop-grid">'+cards.join("")+'</div><div class="small" style="margin:10px 4px 0">Preços de referência. A LDArti confirma valor, prazo e entrega antes de fechar; nada é cobrado agora.</div>';
 }
 function renderRegs(){

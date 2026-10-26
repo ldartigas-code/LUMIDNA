@@ -268,12 +268,68 @@ function listaCompat(){
 }
 function resumoCompat(){ const n=S.compSel.size; $("#c_resumo").innerHTML=n?`<b>${n} luminária(s) marcada(s)</b>`:"Nenhuma marcada = serve em qualquer luminária."; }
 
+// ---- proteção contra cadastro duplicado ----
+// regra 1: o código é a chave; maiúsculas, espaços, traços, pontos e barras não contam como diferença
+const chaveCod=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+const FAMILIA=/^\d{4}\.[a-z]{2}\.[a-z]$/i;
+function distCod(a,b){ const m=a.length,n=b.length; if(Math.abs(m-n)>3) return 9; let p=Array.from({length:n+1},(_,j)=>j); for(let i=1;i<=m;i++){ const c=[i]; for(let j=1;j<=n;j++) c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1)); p=c; } return p[n]; }
+// regra 2: códigos parecidos (uma letra de diferença, ou um contido no outro)
+function codigosParecidos(codigo,exceptId,lista){
+  const k=chaveCod(codigo); if(k.length<4) return [];
+  return (lista||S.produtos).filter(x=>{
+    if(x.id===exceptId) return false;
+    const o=chaveCod(x.codigo); if(o===k||o.length<4) return false;
+    if(FAMILIA.test(String(codigo).trim())&&FAMILIA.test(String(x.codigo).trim())) return false; // variações de acabamento da mesma família
+    const d=distCod(k,o), menor=k.length<o.length?k:o, maior=menor===k?o:k;
+    if(menor.length>=4&&maior.startsWith(menor)) return true; // um é o começo do outro (ex.: CERTALINE / CERTALINE1115)
+    if(k.length<5||o.length<5) return false;
+    if(d<=1){ if(k.length!==o.length) return true; for(let i=0;i<k.length;i++) if(k[i]!==o[i]&&/[a-z]/.test(k[i]+o[i])) return true; return false; }
+    return menor.length>=6&&maior.includes(menor);
+  });
+}
+const nomeItem=x=>TIPO1[x.tipo]+" "+x.codigo+(x.fabricante?" ("+x.fabricante+")":"");
+// regra 3: já existe → mostra o que mudaria e mantém o cadastro existente
+function diferencas(ex,novo){
+  const d=[];
+  if(novo.preco!=null&&Number(novo.preco)!==Number(ex.preco)) d.push("preço digitado "+fmtR(novo.preco)+" (cadastrado: "+(ex.preco==null?"vazio":fmtR(ex.preco))+")");
+  if(novo.descricao&&norm(novo.descricao)!==norm(ex.descricao)) d.push("descrição diferente");
+  if(novo.fabricante&&norm(novo.fabricante)!==norm(ex.fabricante)) d.push("fabricante digitado "+novo.fabricante+" (cadastrado: "+(ex.fabricante||"vazio")+")");
+  return d;
+}
+const fmtR=v=>"R$ "+Number(v).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+// devolve true se pode seguir; senão já mostra a mensagem
+function conferirDuplicado(t,codigo,exceptId,novo){
+  const k=chaveCod(codigo);
+  const igual=S.produtos.find(x=>x.id!==exceptId&&x.tipo===t&&chaveCod(x.codigo)===k);
+  if(igual){
+    const d=diferencas(igual,novo||{});
+    msg('Já existe '+nomeItem(igual)+'. Nada foi cadastrado de novo: o cadastro que já existe foi mantido.'+(d.length?' Diferenças que você digitou: '+d.join("; ")+'. Se quiser mudar, edite o item existente.':' Procure na lista e edite o existente.'),false);
+    return false;
+  }
+  const outroTipo=S.produtos.filter(x=>x.id!==exceptId&&x.tipo!==t&&chaveCod(x.codigo)===k);
+  if(outroTipo.length&&!confirm('Esse código já existe como '+outroTipo.map(nomeItem).join(", ")+'.\n\nÉ um produto diferente de outro tipo?\nOK = cadastrar mesmo assim · Cancelar = voltar')) return false;
+  const par=codigosParecidos(codigo,exceptId);
+  if(par.length&&!confirm('"'+codigo+'" é muito parecido com:\n\n'+par.slice(0,6).map(nomeItem).join("\n")+'\n\nPode ser o mesmo produto escrito diferente.\nOK = é outro item, cadastrar · Cancelar = voltar e conferir')) return false;
+  return true;
+}
+// regra 4: foto repetida (comparada pelo conteúdo da imagem)
+async function hashFoto(file){ const b=await file.arrayBuffer(); const d=await crypto.subtle.digest("SHA-256",b); return [...new Uint8Array(d)].map(x=>x.toString(16).padStart(2,"0")).join(""); }
+async function conferirFoto(file,exceptId){
+  try{
+    const hh=await hashFoto(file);
+    const mesma=S.produtos.filter(x=>x.id!==exceptId&&x.detalhes&&x.detalhes.foto_hash===hh);
+    if(mesma.length&&!confirm('Essa foto já está em:\n\n'+mesma.slice(0,6).map(nomeItem).join("\n")+'\n\nOK = usar mesmo assim · Cancelar = voltar')) return {ok:false};
+    return {ok:true,hash:hh};
+  }catch(e){ return {ok:true,hash:null}; }
+}
+
 async function salvarItem(){
   const p=S.cur, t=p.tipo, g=id=>{const e=$("#"+id);return e?e.value:""};
   const codigo=g("f_codigo").trim();
   if(!codigo) return msg("Informe o código do item.",false);
-  const dup=S.produtos.find(x=>x.tipo===t&&norm(x.codigo)===norm(codigo)&&x.id!==p.id);
-  if(dup) return msg(`Já existe ${TIPO1[t]} "${dup.codigo}"${dup.fabricante?" ("+dup.fabricante+")":""}. Procure na lista e edite o existente.`,false);
+  if(!p.id||chaveCod(codigo)!==chaveCod(p.codigo)){
+    if(!conferirDuplicado(t,codigo,p.id,{preco:num(g("f_preco")),descricao:g("f_descricao").trim(),fabricante:g("f_fabricante").trim()})) return;
+  } else if(S.produtos.some(x=>x.id!==p.id&&x.tipo===t&&chaveCod(x.codigo)===chaveCod(codigo))) return msg("Já existe outro item com esse código. Procure na lista.",false);
   const detalhes={...(p.detalhes||{})}; document.querySelectorAll("[data-det]").forEach(i=>{ const v=i.value.trim(); if(v) detalhes[i.dataset.det]=v; else delete detalhes[i.dataset.det]; });
   { const dm=g("f_dimmer"); if(dm) detalhes.dimmer=dm; else delete detalhes.dimmer; const tp=[...document.querySelectorAll("[data-dim]")].filter(i=>i.checked).map(i=>i.dataset.dim); if(dm==="sim"&&tp.length) detalhes.dimmer_tipo=tp.join(", "); else delete detalhes.dimmer_tipo; }
   if(t==="driver"){ const mn=num(g("f_corrente_min")); if(mn!=null) detalhes.corrente_min_ma=mn; else delete detalhes.corrente_min_ma; }
@@ -286,6 +342,8 @@ async function salvarItem(){
   const file=$("#f_foto").files[0];
   if(file){
     if(!file.type.startsWith("image/")) return msg("O arquivo da foto precisa ser uma imagem.",false);
+    const cf=await conferirFoto(file,p.id); if(!cf.ok) return;
+    if(cf.hash) row.detalhes={...row.detalhes,foto_hash:cf.hash};
     const path="v2/"+`${t}_${codigo}_${Date.now()}_${file.name}`.replace(/[^\w.-]+/g,"_");
     const up=await sb.storage.from("fotos").upload(path,file,{upsert:true});
     if(up.error) return msg("Erro ao enviar a foto: "+up.error.message,false);
@@ -375,7 +433,7 @@ async function apagarKit(){
 
 // ---- importar lista (sem duplicar) ----
 const IMP_TIPOS={luminaria:"luminaria","luminária":"luminaria",led:"led",driver:"driver",optica:"optica","óptica":"optica"};
-const chaveImp=(tipo,cod)=>tipo+"|"+String(cod||"").replace(/\s*\(.*\)\s*$/,"").replace(/\s+/g," ").trim().toLowerCase();
+const chaveImp=(tipo,cod)=>tipo+"|"+String(cod||"").replace(/\s*\(.*\)\s*$/,"").toLowerCase().replace(/[^a-z0-9]/g,"");
 function lerCSV(texto){
   const linhas=texto.trim().split(/\r?\n/).filter(l=>l.trim());
   if(linhas.length<2) return [];
@@ -394,6 +452,8 @@ function classificar(rows,existentes){
     const k=chaveImp(tipo,codigo);
     if(mapa.has(k)){ const e=mapa.get(k); return {...l,status:"existe",motivo:`já cadastrado${e.fabricante?" ("+e.fabricante+")":""}`}; }
     if(vistas.has(k)) return {...l,status:"repetida",motivo:`repetida na lista (linha ${vistas.get(k)})`};
+    const par=codigosParecidos(codigo,null,existentes), outro=existentes.filter(e=>e.tipo!==tipo&&chaveCod(e.codigo)===chaveCod(codigo));
+    if(par.length||outro.length){ vistas.set(k,l.n); return {...l,status:"duvida",motivo:"parecido com "+par.concat(outro).slice(0,3).map(nomeItem).join("; ")+" — não será cadastrado; se for outro item, use + Novo item"}; }
     vistas.set(k,l.n); return {...l,status:"novo",motivo:"será cadastrado"};
   });
 }
@@ -411,7 +471,7 @@ function conferirImport(){
   const rows=lerCSV($("#i_txt").value);
   if(!rows.length) return msg("Cole a lista, com o cabeçalho na primeira linha.",false);
   IMP=classificar(rows,S.produtos);
-  const cor={novo:"ok",existe:"no",repetida:"no",erro:"no"}, rot={novo:"NOVO",existe:"JÁ EXISTE",repetida:"REPETIDA",erro:"ERRO"};
+  const cor={novo:"ok",existe:"no",repetida:"no",erro:"no",duvida:"no"}, rot={novo:"NOVO",existe:"JÁ EXISTE",repetida:"REPETIDA",erro:"ERRO",duvida:"CONFERIR"};
   const novos=IMP.filter(l=>l.status==="novo").length;
   $("#i_res").innerHTML=`<div class="small" style="margin-bottom:8px"><b>${novos}</b> novo(s) · <b>${IMP.length-novos}</b> ignorado(s)</div><table><tr><th>Linha</th><th>Tipo</th><th>Código</th><th>Situação</th></tr>${IMP.map(l=>`<tr><td>${l.n}</td><td>${esc(TIPO1[l.tipo]||"—")}</td><td>${esc(l.codigo)||"—"}</td><td class="${cor[l.status]}"><b>${rot[l.status]}</b> — ${esc(l.motivo)}</td></tr>`).join("")}</table>`;
   $("#i_ok").style.display=novos?"":"none";
@@ -457,8 +517,7 @@ async function salvarNovoNoKit(){
   const t=$("#nk_tipo").value, g=function(id){const e=$("#"+id);return e?e.value:""};
   const codigo=g("nk_codigo").trim();
   if(!codigo) return msg("Informe o código do item.",false);
-  const dup=S.produtos.find(function(x){return x.tipo===t&&norm(x.codigo)===norm(codigo)});
-  if(dup) return msg('Já existe '+TIPO1[t]+' "'+dup.codigo+'". Procure na busca e adicione o existente.',false);
+  if(!conferirDuplicado(t,codigo,null,{preco:num(g("nk_preco")),fabricante:g("nk_fabricante").trim()})) return;
   const detalhes={}; const cmin=num(g("nk_cmin")); if(t==="driver"&&cmin!=null) detalhes.corrente_min_ma=cmin;
   const cct=num(g("nk_cct"));
   const row={tipo:t,codigo:codigo,fabricante:nv(g("nk_fabricante").trim()),preco:num(g("nk_preco")),potencia_w:t==="led"?num(g("nk_potencia")):null,
@@ -466,6 +525,8 @@ async function salvarNovoNoKit(){
   const file=$("#nk_foto").files[0];
   if(file){
     if(!file.type.startsWith("image/")) return msg("O arquivo da foto precisa ser uma imagem.",false);
+    const cf=await conferirFoto(file,null); if(!cf.ok) return;
+    if(cf.hash) row.detalhes=Object.assign({},row.detalhes,{foto_hash:cf.hash});
     const path="v2/"+(t+"_"+codigo+"_"+Date.now()+"_"+file.name).replace(/[^\w.-]+/g,"_");
     const up=await sb.storage.from("fotos").upload(path,file,{upsert:true});
     if(up.error) return msg("Erro ao enviar a foto: "+up.error.message,false);
@@ -620,7 +681,6 @@ async function apagarObra(){
 }
 
 // ---- lista colada -> peças ----
-const chaveCod=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
 function classificarLinhas(linhas){
   const lums=S.produtos.filter(p=>p.tipo==="luminaria");
   return linhas.map((l,i)=>{

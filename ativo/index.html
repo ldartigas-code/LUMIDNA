@@ -251,7 +251,7 @@ function cardItem(i){
   return '<div class="shop-card"><div class="shop-photo r1">'+fotosHtml(c.foto_url?[c.foto_url]:[])+'</div>'
    +'<div class="shop-nome r2">'+NOME[i.tipo]+'</div><div class="shop-fab r3"><b style="color:var(--ink)">'+esc(c.codigo)+'</b>'+(s?'<span class="chip">aprovado</span>':'')+'</div>'
    +'<div class="shop-fab r4">'+esc(c.fabricante||"")+(spec(c)?(c.fabricante?' · ':'')+spec(c):'')+'</div>'
-   +((i.similares&&i.similares.length)?'<select class="vsel r5" data-ch="variante" data-base="'+base+'"><option value="0">Original</option>'+i.similares.map(x=>'<option value="'+x.id+'" '+(x.id===sid?"selected":"")+'>Similar aprovado pela LDArti · '+esc(x.codigo)+'</option>').join("")+'</select>':'')
+   +((i.similares&&i.similares.length)?'<select class="vsel r5" data-ch="variante" data-base="'+base+'"><option value="0">Original</option>'+i.similares.map(x=>'<option value="'+x.id+'" '+(x.id===sid?"selected":"")+'>Similar aprovado pela LumiDNA · '+esc(x.codigo)+'</option>').join("")+'</select>':'')
    +'<div class="shop-preco r6 '+(c.preco==null?"consulta":"")+'">'+brl(c.preco)+'</div>'
    +(i.quantidade>1?'<div class="small r7" style="margin:-4px 0 0">Instaladas: '+i.quantidade+'</div><div class="stepper r8"><button type="button" data-ac="qtd" data-base="'+base+'" data-d="-1">−</button><span>'+q+'</span><button type="button" data-ac="qtd" data-base="'+base+'" data-d="1">+</button></div>':'')
    +'<button type="button" class="addcart r9" data-ac="add" data-k="'+base+':'+sid+'" data-base="'+base+'">Adicionar ao carrinho</button></div>';
@@ -261,7 +261,7 @@ function renderLoja(){
   if(!integ&&P.kit&&P.kit_confere===true) cards.push(cardKitLum("kit","Kit completo",P.kit,kitResumo(),kitTotal(),[...new Set(itens.filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,2)));
   if(!integ) itens.forEach(i=>cards.push(cardItem(i)));
   cards.push(cardKitLum("lum","Peça completa",l.codigo,completoResumo(),completoTotal(),l.foto_url?[l.foto_url]:[...new Set(itens.filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,2)));
-  $("#loja").innerHTML='<div class="shop-grid">'+cards.join("")+'</div><div class="small" style="margin:10px 4px 0">Preços de referência. A LDArti confirma valor, prazo e entrega antes de fechar; nada é cobrado agora.</div>';
+  $("#loja").innerHTML='<div class="shop-grid">'+cards.join("")+'</div><div class="small" style="margin:10px 4px 0">Preços de referência. A LumiDNA confirma valor, prazo e entrega antes de fechar; nada é cobrado agora.</div>';
 }
 function renderRegs(){
   const el=$("#regs"); if(!PED.length){ el.innerHTML=""; return; }
@@ -270,7 +270,7 @@ function renderRegs(){
     return '<div class="reg"><div><b>#'+p.id+' · '+esc(TIT[p.tipo]||p.tipo)+'</b><span class="st">'+esc(STATUS[p.status]||p.status)+'</span></div>'
      +'<div class="small">'+dmy(p.criado_em)+(p.motivo?' · '+esc(p.motivo):'')+'</div>'
      +(p.tipo==="manutencao"?'<div class="small">Troca de '+esc(p.item||"item")+(p.novo?' por '+esc(p.novo):'')+(p.man_origem==="outro"?' (modelo não homologado)':'')+'</div>':'')
-     +(p.decisao_msg?'<div class="small" style="color:var(--ink)">Mensagem da LDArti: '+esc(p.decisao_msg)+'</div>':'')
+     +(p.decisao_msg?'<div class="small" style="color:var(--ink)">Mensagem da LumiDNA: '+esc(p.decisao_msg)+'</div>':'')
      +(p.linhas&&p.linhas.length?'<div class="small">'+p.linhas.map(x=>x.quantidade+'x '+esc(x.descricao)).join(" · ")+'</div><div class="small">Total: '+(sem?"a combinar":brl(p.total))+'</div>':'')
      +(p.tipo==="compra"&&p.status==="entregue"?'<button type="button" class="addcart" style="margin-top:8px;padding:9px 16px" data-ac="instalei" data-id="'+p.id+'">Já instalei</button>':'')
      +'</div>';
@@ -335,6 +335,7 @@ function termos(){
 function abreSheet(html,nome){ SHEET=nome; $("#sheet").innerHTML=html+'<div id="smsg"></div>'; $("#ov").classList.remove("hidden"); document.body.style.overflow="hidden"; }
 function fechaSheet(){ SHEET=null; $("#ov").classList.add("hidden"); $("#sheet").innerHTML=""; document.body.style.overflow=""; }
 function carrinho(){
+  location.href="../carrinho/?c="+encodeURIComponent(SERIAL); return;
   if(!CART.length){ abreSheet('<h3>Carrinho</h3><div class="small">Nenhuma peça no carrinho ainda. Escolha as peças desta luminária e toque em Adicionar ao carrinho.</div><div class="acoes" style="margin-top:14px"><button type="button" class="btn" data-ac="fechar">Fechar</button></div>',"cart"); return; }
   const t=totalCart();
   abreSheet('<h3>Carrinho</h3>'+CART.map((l,n)=>{ const r=resolve(l), q=r.pl.quantidade;
@@ -345,7 +346,7 @@ function carrinho(){
 }
 function checkout(){
   const c=guardado();
-  abreSheet('<h3>Fazer pedido</h3><div class="small" style="margin-bottom:14px">Você recebe o orçamento das peças do carrinho. Os preços são de referência; a LDArti confirma valor e prazo antes de fechar.</div>'
+  abreSheet('<h3>Fazer pedido</h3><div class="small" style="margin-bottom:14px">Você recebe o orçamento das peças do carrinho. Os preços são de referência; a LumiDNA confirma valor e prazo antes de fechar.</div>'
    +'<div class="field"><label>Seu nome *</label><input id="c_nome" value="'+esc(c.nome||"")+'" autocomplete="name"></div>'
    +'<div class="field"><label>Telefone / WhatsApp *</label><input id="c_fone" value="'+esc(c.fone||"")+'" type="tel" autocomplete="tel"></div>'
    +'<div class="field"><label>Por que está trocando? (opcional)</label><select id="c_motivo"><option value="">—</option>'+MOTIVOS.map(m=>'<option>'+m+'</option>').join("")+'</select></div>'
@@ -362,7 +363,7 @@ async function enviarPedido(){
   guardar(nome,fone); const t=r.data.total, sem=r.data.itens_sem_preco>0, id=r.data.id;
   avisaEmpresa({tipo:"compra",id:id,nome:nome,fone:fone,motivo:$("#c_motivo").value,obs:$("#c_obs").value.trim(),total:t,itens:CART.map(l=>{ const x=resolve(l); return x.pl.quantidade+"x "+x.nome+" "+x.sub; }).join("; ")});
   CART=[]; salvaCart(); await carregar(); render();
-  abreSheet('<h3>Pedido enviado · #'+id+'</h3><div>Recebemos seu pedido'+(t?' (total '+(sem?"a combinar":brl(t))+')':'')+'. A LDArti entra em contato para confirmar valores e entrega.</div>'
+  abreSheet('<h3>Pedido enviado · #'+id+'</h3><div>Recebemos seu pedido'+(t?' (total '+(sem?"a combinar":brl(t))+')':'')+'. A LumiDNA entra em contato para confirmar valores e entrega.</div>'
    +(P.garantia_ate&&P.garantia_ate>=hoje()?'<div class="small" style="margin-top:8px">Sua luminária está em garantia; vamos avaliar o caso.</div>':'')
    +'<div class="acoes" style="margin-top:14px"><button type="button" class="btn p" data-ac="fechar">Fechar</button></div>',"ok");
 }
@@ -370,7 +371,7 @@ async function enviarPedido(){
 // ---- reportar problema ----
 function problema(){
   const c=guardado(), itens=P.itens||[];
-  abreSheet('<h3>Reportar problema</h3><div class="small" style="margin-bottom:14px">Conte o que está acontecendo. A equipe da LDArti recebe o aviso e entra em contato. Se sentir cheiro de queimado, ver faísca ou fiação aquecida, desligue o circuito e chame um profissional agora.</div>'
+  abreSheet('<h3>Reportar problema</h3><div class="small" style="margin-bottom:14px">Conte o que está acontecendo. A equipe da LumiDNA recebe o aviso e entra em contato. Se sentir cheiro de queimado, ver faísca ou fiação aquecida, desligue o circuito e chame um profissional agora.</div>'
    +'<div class="field"><label>Qual parte está com problema?</label><select id="p_item"><option value="">Não sei / a luminária toda</option>'+itens.map(i=>'<option value="'+i.peca_item_id+'">'+esc(NOME[i.tipo])+' · '+esc(i.codigo)+'</option>').join("")+'</select></div>'
    +'<div class="field"><label>O que acontece? *</label><select id="p_motivo"><option value="">— escolher —</option>'+MOTIVOS.filter(m=>m!=="troca preventiva").map(m=>'<option>'+m+'</option>').join("")+'</select></div>'
    +'<div class="field"><label>Detalhes (opcional)</label><textarea id="p_obs"></textarea></div>'
@@ -387,12 +388,12 @@ async function enviarProblema(){
   guardar(nome,fone); const id=r.data.id;
   avisaEmpresa({tipo:"problema",id:id,nome:nome,fone:fone,motivo:motivo,obs:$("#p_obs").value.trim(),item:$("#p_item").selectedOptions[0].text});
   await carregar(); render();
-  abreSheet('<h3>Aviso recebido · #'+id+'</h3><div>Recebemos seu aviso. A LDArti entra em contato para resolver.</div>'
+  abreSheet('<h3>Aviso recebido · #'+id+'</h3><div>Recebemos seu aviso. A LumiDNA entra em contato para resolver.</div>'
    +(P.garantia_ate&&P.garantia_ate>=hoje()?'<div class="small" style="margin-top:8px">Sua luminária está em garantia; vamos avaliar o caso.</div>':'')
    +'<div class="acoes" style="margin-top:14px">'+((item&&!P.luminaria.integrada)?'<button type="button" class="btn p" data-ac="pedirDoProblema" data-item="'+item+'">Já quero pedir a peça</button>':'')+'<button type="button" class="btn" data-ac="fechar">Fechar</button></div>',"ok");
 }
 
-// ---- manutenção informada pelo cliente (a LDArti aprova) ----
+// ---- manutenção informada pelo cliente (a LumiDNA aprova) ----
 function reduzFoto(file){
   return new Promise((ok,err)=>{
     const img=new Image(), u=URL.createObjectURL(file);
@@ -411,12 +412,12 @@ function reduzFoto(file){
 }
 function manutencao(){
   FOTO=null; const c=guardado(), itens=P.itens||[];
-  if(!itens.length){ abreSheet('<h3>Informar manutenção</h3><div class="small">Esta luminária não tem itens separados cadastrados para informar manutenção. Fale com a LDArti.</div><div class="acoes" style="margin-top:14px"><button type="button" class="btn" data-ac="fechar">Fechar</button></div>',"man"); return; }
-  abreSheet('<h3>Informar manutenção feita</h3><div class="small" style="margin-bottom:14px">Trocou alguma parte desta luminária? Conte o que foi instalado. A LDArti confere e aprova para atualizar o cadastro da sua luminária; só vale depois de aprovada.</div>'
+  if(!itens.length){ abreSheet('<h3>Informar manutenção</h3><div class="small">Esta luminária não tem itens separados cadastrados para informar manutenção. Fale com a LumiDNA.</div><div class="acoes" style="margin-top:14px"><button type="button" class="btn" data-ac="fechar">Fechar</button></div>',"man"); return; }
+  abreSheet('<h3>Informar manutenção feita</h3><div class="small" style="margin-bottom:14px">Trocou alguma parte desta luminária? Conte o que foi instalado. A LumiDNA confere e aprova para atualizar o cadastro da sua luminária; só vale depois de aprovada.</div>'
    +'<div class="field"><label>Qual item foi trocado? *</label><select id="m_item">'+itens.map(i=>'<option value="'+i.peca_item_id+'">'+esc(NOME[i.tipo])+' · '+esc(i.codigo)+(i.quantidade>1?' ('+i.quantidade+' instaladas)':'')+'</option>').join("")+'</select></div>'
    +'<div id="m_qtd"></div>'
    +'<div class="field"><label>O que foi instalado no lugar? *</label><div id="m_opc"></div></div>'
-   +'<div id="m_outro" class="hidden"><div class="alert warn">Para modelos que a LDArti ainda não aprovou, mande o modelo e uma foto. A LDArti avalia e responde por aqui.</div>'
+   +'<div id="m_outro" class="hidden"><div class="alert warn">Para modelos que a LumiDNA ainda não aprovou, mande o modelo e uma foto. A LumiDNA avalia e responde por aqui.</div>'
    +'<div class="field"><label>Modelo instalado *</label><input id="m_modelo"></div><div class="field"><label>Fabricante</label><input id="m_fab"></div>'
    +'<div class="field"><label>Foto do item instalado *</label><div class="acoes"><button type="button" class="btn" data-ac="camera">Tirar foto agora</button><button type="button" class="btn" data-ac="galeria">Escolher da galeria</button></div><input id="m_foto_cam" class="vh" type="file" accept="image/*" capture="environment"><input id="m_foto" class="vh" type="file" accept="image/*"><div id="m_prev" class="small" style="margin-top:8px">Nenhuma foto escolhida.</div></div></div>'
    +'<div class="field"><label>Por que foi trocado? (opcional)</label><select id="m_motivo"><option value="">—</option>'+MOTIVOS.map(m=>'<option>'+m+'</option>').join("")+'</select></div>'
@@ -431,8 +432,8 @@ function opcoesMan(){
   const i=itemMan(); if(!i) return;
   $("#m_qtd").innerHTML=i.quantidade>1?'<div class="field"><label>Quantas unidades foram trocadas?</label><select id="m_q">'+Array.from({length:i.quantidade},(_,k)=>'<option value="'+(k+1)+'" '+((k+1)===i.quantidade?"selected":"")+'>'+(k+1)+'</option>').join("")+'</select></div>':'';
   $("#m_opc").innerHTML='<label class="rd"><input type="radio" name="m_o" value="original" checked><div><b>O mesmo item</b><div class="small">'+esc(i.codigo)+'</div></div></label>'
-   +(i.similares||[]).map(s=>'<label class="rd"><input type="radio" name="m_o" value="s'+s.id+'"><div><b>Similar aprovado pela LDArti · '+esc(s.codigo)+'</b><span class="chip">aprovado</span><div class="small">'+esc(s.fabricante||"")+(spec(s)?' · '+spec(s):'')+'</div></div></label>').join("")
-   +'<label class="rd"><input type="radio" name="m_o" value="outro"><div><b>Outro modelo</b><div class="small">Precisa de modelo e foto para a LDArti aprovar</div></div></label>';
+   +(i.similares||[]).map(s=>'<label class="rd"><input type="radio" name="m_o" value="s'+s.id+'"><div><b>Similar aprovado pela LumiDNA · '+esc(s.codigo)+'</b><span class="chip">aprovado</span><div class="small">'+esc(s.fabricante||"")+(spec(s)?' · '+spec(s):'')+'</div></div></label>').join("")
+   +'<label class="rd"><input type="radio" name="m_o" value="outro"><div><b>Outro modelo</b><div class="small">Precisa de modelo e foto para a LumiDNA aprovar</div></div></label>';
   document.querySelectorAll('input[name="m_o"]').forEach(r=>r.onchange=()=>{ $("#m_outro").classList.toggle("hidden",$('input[name="m_o"]:checked').value!=="outro"); });
   $("#m_outro").classList.add("hidden");
 }
@@ -453,9 +454,9 @@ async function enviarManutencao(){
     p_modelo:modelo,p_fabricante:fab,p_motivo:$("#m_motivo").value||null,p_obs:$("#m_obs").value.trim()||null,p_foto:foto});
   if(r.error){ $("#enviar").disabled=false; $("#enviar").textContent="Enviar para aprovação"; return msg(r.error.message||"Não consegui enviar. Tente de novo.","e"); }
   guardar(nome,fone); const id=r.data.id;
-  avisaEmpresa({tipo:"manutencao",id:id,nome:nome,fone:fone,motivo:$("#m_motivo").value,obs:$("#m_obs").value.trim(),item:$("#m_item").selectedOptions[0].text,qtd:$("#m_q")?$("#m_q").value:i.quantidade,instalado:origem==="outro"?("Outro modelo (precisa de aprovação): "+modelo+(fab?" - "+fab:"")):(origem==="similar"?"Similar aprovado pela LDArti":"O mesmo item")});
+  avisaEmpresa({tipo:"manutencao",id:id,nome:nome,fone:fone,motivo:$("#m_motivo").value,obs:$("#m_obs").value.trim(),item:$("#m_item").selectedOptions[0].text,qtd:$("#m_q")?$("#m_q").value:i.quantidade,instalado:origem==="outro"?("Outro modelo (precisa de aprovação): "+modelo+(fab?" - "+fab:"")):(origem==="similar"?"Similar aprovado pela LumiDNA":"O mesmo item")});
   await carregar(); render();
-  abreSheet('<h3>Manutenção enviada · #'+id+'</h3><div>Recebemos a informação. A LDArti vai conferir e aprovar; você acompanha o andamento aqui nesta página, em "Seus registros".</div><div class="acoes" style="margin-top:14px"><button type="button" class="btn p" data-ac="fechar">Fechar</button></div>',"ok");
+  abreSheet('<h3>Manutenção enviada · #'+id+'</h3><div>Recebemos a informação. A LumiDNA vai conferir e aprovar; você acompanha o andamento aqui nesta página, em "Seus registros".</div><div class="acoes" style="margin-top:14px"><button type="button" class="btn p" data-ac="fechar">Fechar</button></div>',"ok");
 }
 async function instalei(id){
   if(!confirm("Confirma que as peças deste pedido já foram instaladas?")) return;

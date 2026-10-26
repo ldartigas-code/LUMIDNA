@@ -52,6 +52,7 @@ h2.sec{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--
 .num{font:700 34px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--orange);letter-spacing:-.02em;margin:6px 0}
 ol.pass{margin:8px 0 0;padding-left:20px}ol.pass li{margin-bottom:6px}
 .foot{padding:20px 0 8px;color:var(--muted);font-size:12px;text-align:center}
+@media print{:root{--bg:#fff;--s1:#fff;--s2:#fff;--ink:#000;--muted:#444;--line:#bbb}body{background:#fff;color:#000;padding:0}.noprint,.badge{display:none!important}.card{border:1px solid #999;break-inside:avoid}.num{color:#000}.alert.s{background:#fff;border-color:#999;color:#000}}
 </style>
 </head>
 <body>
@@ -62,6 +63,7 @@ ol.pass{margin:8px 0 0;padding-left:20px}ol.pass li{margin-bottom:6px}
   <div class="foot">Registro técnico permanente da iluminação — LumiDNA</div>
 </div>
 <script src="../assets/supabase-config.js"></script>
+<script src="../assets/notificar.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const sb=supabase.createClient(LUMIDNA_SUPABASE_URL,LUMIDNA_SUPABASE_KEY);
@@ -213,19 +215,20 @@ async function enviar(){
   ENVIANDO=true; const b=$("#enviar"); b.disabled=true; b.textContent="Enviando…";
   const v=id=>($("#"+id).value||"").trim();
   const linhas=CART.flatMap(l=>{ const r=resolve(l); if(r.pl.escopo==="kit") return (P.itens||[]).map(i=>({escopo:"item",peca_item_id:i.peca_item_id,similar_id:null,quantidade:i.quantidade})); return [{escopo:r.pl.escopo,peca_item_id:r.pl.peca_item_id||null,similar_id:r.pl.similar_id||null,quantidade:r.pl.quantidade}]; });
-  let r;
+  let r; const tok=tokenEnvio();
   try{
     r=await sb.rpc("v2_finalizar_compra",{p_serial:SERIAL,p_nome:v("c_nome"),p_fone:v("c_fone"),p_email:v("c_email"),p_documento:so(v("c_doc")),
       p_endereco:{cep:so(v("e_cep")),rua:v("e_rua"),numero:v("e_num"),complemento:v("e_comp"),bairro:v("e_bairro"),cidade:v("e_cidade"),uf:v("e_uf")},
-      p_forma:FORMA,p_obs:v("c_obs")||null,p_motivo:v("c_motivo")||null,p_token:tokenEnvio(),p_linhas:linhas});
+      p_forma:FORMA,p_obs:v("c_obs")||null,p_motivo:v("c_motivo")||null,p_token:tok,p_linhas:linhas});
   }catch(e){ r={error:{message:"Failed to fetch"}}; }
   ENVIANDO=false;
   if(r.error){ b.disabled=false; b.textContent="Enviar pedido"; return msg(traduz(r.error.message),"e"); }
   guardar(v("c_nome"),v("c_fone"),v("c_email"));
-  const d=r.data, resumo={id:d.id,total:d.total,sem:d.itens_sem_preco>0,forma:d.forma_pagamento,itens:CART.map(l=>{ const x=resolve(l); return x.pl.quantidade+"x "+x.nome+" "+x.sub; })};
+  try{ const m=JSON.parse(localStorage.getItem("lumidna2_pedidos")||"{}"); m[r.data.id]=tok; localStorage.setItem("lumidna2_pedidos",JSON.stringify(m)); }catch(e){}
+  const d=r.data, resumo={id:d.id,token:tok,nome:v("c_nome"),fone:v("c_fone"),email:v("c_email"),entrega:[v("e_rua")+", "+v("e_num")+(v("e_comp")?" ("+v("e_comp")+")":""),v("e_bairro"),v("e_cidade")+"/"+v("e_uf"),"CEP "+v("e_cep")].join(" · "),data:new Date().toISOString(),total:d.total,sem:d.itens_sem_preco>0,forma:d.forma_pagamento,itens:CART.map(l=>{ const x=resolve(l); return x.pl.quantidade+"x "+x.nome+" "+x.sub; })};
   CART=[]; salvaCart();
   try{ sessionStorage.setItem("lumidna2_ok_"+SERIAL,JSON.stringify(resumo)); sessionStorage.removeItem("lumidna2_tok_"+SERIAL); }catch(e){}
-  confirmacao(resumo);
+  confirmacao(resumo); avisarEvento("novo",d.id,tok);
 }
 function confirmacao(d){
   window.scrollTo(0,0); msg("");
@@ -234,10 +237,11 @@ function confirmacao(d){
    +'<div class="small">Guarde este número. Ele identifica seu pedido com a LumiDNA.</div>'
    +'<table style="width:100%;margin-top:14px;font-size:14px;border-collapse:collapse"><tr><td class="small" style="padding:6px 0">Peça</td><td style="text-align:right">'+esc(SERIAL)+'</td></tr>'
    +'<tr><td class="small" style="padding:6px 0">Total de referência</td><td style="text-align:right"><b>'+(d.total?(d.sem?"a combinar":brl(d.total)):"a combinar")+'</b></td></tr>'
-   +'<tr><td class="small" style="padding:6px 0">Pagamento escolhido</td><td style="text-align:right">'+esc((FORMAS[d.forma]||{}).nome||"—")+'</td></tr></table>'
+   +'<tr><td class="small" style="padding:6px 0">Pagamento escolhido</td><td style="text-align:right">'+esc((FORMAS[d.forma]||{}).nome||"—")+'</td></tr>'+(d.nome?'<tr><td class="small" style="padding:6px 0">Cliente</td><td style="text-align:right">'+esc(d.nome)+' · '+esc(d.fone||"")+'</td></tr><tr><td class="small" style="padding:6px 0">Entrega</td><td style="text-align:right">'+esc(d.entrega||"")+'</td></tr>':'')+(d.data?'<tr><td class="small" style="padding:6px 0">Data</td><td style="text-align:right">'+new Date(d.data).toLocaleString("pt-BR")+'</td></tr>':'')+'</table>'
    +'<div style="margin-top:12px;font-size:14px">'+(d.itens||[]).map(x=>'<div class="small">• '+esc(x)+'</div>').join("")+'</div></div>'
-   +'<div class="card"><h2 class="sec">Próximos passos</h2><ol class="pass"><li>A LumiDNA confere preço, prazo e frete.</li><li>Você recebe o contato por telefone ou WhatsApp com o valor final.</li><li>Depois da confirmação, enviamos o pagamento pela forma escolhida.</li><li>Pago o pedido, combinamos a entrega.</li></ol></div>'
-   +'<button type="button" class="btn" id="copiar">Copiar número do pedido</button><div style="height:10px"></div><a class="btn p" href="'+voltaUrl()+'">Voltar à luminária</a>';
+   +'<div class="card noprint"><h2 class="sec">Próximos passos</h2><ol class="pass"><li>A LumiDNA confere preço, prazo e frete.</li><li>Você recebe o contato por telefone ou WhatsApp com o valor final.</li><li>Depois da confirmação, enviamos o pagamento pela forma escolhida.</li><li>Pago o pedido, combinamos a entrega.</li></ol></div>'
+   +(d.token?'<button type="button" class="btn noprint" id="imprimir">Imprimir pedido</button><div class="noprint" style="height:10px"></div><a class="btn p noprint" href="../pedido/?n='+encodeURIComponent(d.id)+'&t='+encodeURIComponent(d.token)+'">Acompanhar meu pedido</a><div style="height:10px"></div>':'')+'<button type="button" class="btn noprint" id="copiar">Copiar número do pedido</button><div class="noprint" style="height:10px"></div><a class="btn noprint" href="'+voltaUrl()+'">Voltar à luminária</a>';
+  if($("#imprimir")) $("#imprimir").onclick=()=>window.print();
   $("#copiar").onclick=async()=>{ try{ await navigator.clipboard.writeText("#"+d.id); $("#copiar").textContent="Número copiado"; }catch(e){ $("#copiar").textContent="Anote: #"+d.id; } };
 }
 document.addEventListener("click",e=>{

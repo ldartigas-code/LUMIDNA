@@ -56,13 +56,19 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;p
 .etqs{display:flex;flex-wrap:wrap;gap:8px}
 .etq{display:flex;gap:2mm;align-items:center;border:1px dashed #b4b2a9;padding:2mm;overflow:hidden;font-size:9pt;line-height:1.25;background:#fff;break-inside:avoid}
 .etq .qr svg{width:100%;height:100%;display:block}.etq .qr{flex:none}.etq .et{min-width:0;overflow-wrap:anywhere}.etq .et b{font-size:11pt}
+.home{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:6px}
+.tile{display:flex;flex-direction:column;gap:6px;text-align:left;padding:18px 18px 16px;border:1px solid var(--line);border-left:5px solid var(--orange);border-radius:12px;background:#fff;min-height:112px;cursor:pointer}
+.tile:hover{background:var(--soft);box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.tile b{font-size:19px;display:flex;align-items:center;gap:6px}
+.tile span.d{font-size:13px;color:var(--muted);font-weight:400}
+.homeh{margin:6px 0 2px;font-size:22px;font-weight:700}
 @media print{.noprint,header,#msg{display:none!important}.wrap{max-width:none;padding:0}.etq{border:0;outline:0.1mm dashed #bbb}.etqs{gap:0}}
 @media(max-width:640px){.row{grid-template-columns:14px 40px minmax(0,1fr) 80px}.row .c4,.row .c6{display:none}}
 </style>
 </head>
 <body>
 <div class="wrap">
-<header class="noprint"><b>Lumi<span>DNA</span> · Admin</b><div id="quem" class="small"></div></header>
+<header class="noprint"><b data-act="home" style="cursor:pointer" title="Página inicial">Lumi<span>DNA</span> · Admin</b><div id="quem" class="small"></div></header>
 <div id="msg"></div>
 <div id="app"><div class="small">Carregando…</div></div>
 </div>
@@ -549,7 +555,20 @@ const garantiaTxt=p=>!p.garantia_ate?{t:"sem data",c:"small"}:(p.garantia_ate>=h
 const precisaKit=p=>{ const l=porId(p.luminaria_id); return !!l&&!l.integrada; };
 const urlPeca=s=>new URL("../ativo/?c="+encodeURIComponent(s),location.href).href;
 function codigoObra(nome){ const s=String(nome||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase(); const c=s.replace(/[^BCDFGHJKLMNPQRSTVWXYZ]/g,""), l=s.replace(/[^A-Z]/g,""); if(c.length>=3) return c.slice(0,3); return (c+l).slice(0,3).padEnd(3,"X"); }
-const navArea=a=>'<div class="tabs noprint" style="border-bottom:1px solid var(--line);padding-bottom:10px"><button class="tab '+(a==="cat"?"on":"")+'" data-act="areaCat">Catálogo</button><button class="tab '+(a==="pend"?"on":"")+'" data-act="areaPend">Pendências '+badgePend()+'</button><button class="tab '+(a==="obras"?"on":"")+'" data-act="areaObras">Obras</button><button class="tab '+(a==="ped"?"on":"")+'" data-act="areaPedidos">Pedidos</button><button class="tab '+(a==="rel"?"on":"")+'" data-act="areaRel">Relatórios</button></div>';
+const NOME_AREA={cat:"Catálogo",pend:"Pendências",obras:"Obras",ped:"Pedidos",rel:"Relatórios"};
+const navArea=a=>'<div class="noprint" style="display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:12px"><button data-act="home">‹ Início</button><b style="font-size:18px">'+NOME_AREA[a]+'</b>'+(a==="pend"?badgePend():"")+'</div>';
+// ---- página inicial ----
+function renderHome(){
+  S.view="home";
+  const t=(act,nome,desc,extra)=>'<button class="tile" data-act="'+act+'"><b>'+nome+(extra||"")+'</b><span class="d">'+desc+'</span></button>';
+  $("#app").innerHTML='<div class="homeh">Painel</div><div class="small" style="margin-bottom:12px">Escolha uma área para trabalhar.</div><div class="home">'
+    +t("areaCat","Catálogo","Luminárias, LEDs, drivers, ópticas e kits",' <span class="small" style="font-weight:400">('+S.produtos.length+')</span>')
+    +t("areaPend","Pendências","Problemas em aberto e manutenções para aprovar",badgePend())
+    +t("areaObras","Obras","Obras, peças, etiquetas e fichas")
+    +t("areaPedidos","Pedidos","Compras, problemas e manutenções dos clientes")
+    +t("areaRel","Relatórios","Manutenção, vendas e componentes que mais falham")
+    +'</div>';
+}
 
 async function carregarObras(){
   try{
@@ -1178,7 +1197,7 @@ function renderPend(){
 // ---- cliques ----
 const ACT={
   nada:()=>{},
-  areaCat:()=>{msg("");renderLista()}, areaObras:async()=>{msg(""); if(await carregarObras()) renderObras();},
+  home:()=>{msg("");renderHome(); window.scrollTo(0,0);}, areaCat:()=>{msg("");renderLista()}, areaObras:async()=>{msg(""); if(await carregarObras()) renderObras();},
   areaPedidos:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderPedidos();},
   filtroPed:d=>{S.pedFiltro=d.f;renderPedidos()}, abrirPedido:d=>{S.voltaPara=null;abrirPedido(Number(d.id))}, abrirPendente:d=>{S.voltaPara="pend";abrirPedido(Number(d.id))}, voltaPedidos:()=>{msg(""); if(S.voltaPara==="pend") renderPend(); else renderPedidos();},
   areaPend:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderPend();}, mudaStatus, salvarObsPedido,
@@ -1223,7 +1242,7 @@ async function iniciar(){
   if(!s.data.session) return telaLogin();
   $("#quem").innerHTML=`${esc(s.data.session.user.email)} · <a href="#" id="sair">Sair</a>`;
   $("#sair").onclick=async e=>{e.preventDefault();await sb.auth.signOut();telaLogin()};
-  if(await carregar()){ await atualizaContPend(); renderLista(); if(!window._ptim) window._ptim=setInterval(atualizaContPend,60000); }
+  if(await carregar()){ await atualizaContPend(); renderHome(); if(!window._ptim) window._ptim=setInterval(atualizaContPend,60000); }
 }
 iniciar();
 </script>

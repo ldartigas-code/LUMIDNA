@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0a0e13"><meta name="color-scheme" content="dark"><meta name="robots" content="noindex">
+<title>LumiDNA — carrinho</title>
+<style>
+:root{color-scheme:dark;--bg:#0a0e13;--s1:#111821;--s2:#172130;--ink:#eef2f7;--muted:#8896a8;--line:#1f2b3b;--orange:#ff7a2f;--green:#34d399;--red:#f87171;--amber:#f5b942}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 Inter,"Segoe UI",Roboto,system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:40px;-webkit-font-smoothing:antialiased;background-image:radial-gradient(900px 380px at 50% -120px,rgba(255,122,47,.16),transparent 70%);background-repeat:no-repeat}
+.wrap{max-width:520px;margin:0 auto;padding:0 18px}
+.top{display:flex;justify-content:space-between;align-items:center;padding:18px 4px}
+.logo{font-weight:800;letter-spacing:-.03em;font-size:20px}.logo b{color:var(--orange)}
+.badge{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;border:1px solid var(--line);padding:4px 10px;border-radius:999px}
+.small{font-size:13px;color:var(--muted)}
+.hidden{display:none!important}
+a{color:var(--orange)}
+.back{display:inline-block;margin:0 4px 12px;font-size:14px;text-decoration:none;color:var(--muted)}
+.card{background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px}
+h1{font-size:22px;margin:0 4px 4px;letter-spacing:-.02em}
+h2.sec{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:0 0 12px}
+.item{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.item:last-of-type{border-bottom:0}
+.item .ph{width:56px;height:56px;border-radius:10px;background:var(--s2);flex:none;overflow:hidden;display:flex;align-items:center;justify-content:center;gap:2px}
+.item .ph img{max-width:100%;max-height:100%;object-fit:contain;background:#fff}
+.item .nome{font-weight:650;font-size:14px}
+.item .rm{background:none;border:0;color:var(--red);font-size:13px;cursor:pointer;padding:6px 0;font-family:inherit}
+.stepper{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:10px;overflow:hidden;width:104px;flex:none}
+.stepper button{background:var(--s2);border:0;color:var(--ink);width:36px;height:38px;font-size:18px;cursor:pointer}
+.stepper span{font-weight:650;min-width:22px;text-align:center}
+.tot{display:flex;justify-content:space-between;align-items:baseline;font-weight:700;font-size:17px;padding-top:14px}
+.tot .v{color:var(--orange)}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field label{font-size:12px;font-weight:700;color:var(--muted)}
+.field input,.field select,.field textarea{border:1px solid var(--line);border-radius:12px;padding:12px 13px;font-family:inherit;font-size:16px;background:var(--s2);color:var(--ink);width:100%}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,122,47,.18)}
+.field.err input,.field.err select{border-color:var(--red)}
+.field .e{font-size:12.5px;color:var(--red);display:none}.field.err .e{display:block}
+.field textarea{min-height:76px;resize:vertical}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g3{display:grid;grid-template-columns:1.4fr 1fr;gap:10px}
+.pay{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:10px;cursor:pointer;background:var(--s2)}
+.pay input{width:22px;height:22px;margin-top:2px;flex:none;accent-color:var(--orange)}
+.pay.on{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,122,47,.14)}
+.pay b{display:block;font-size:15px}
+.btn{display:inline-block;width:100%;padding:16px 12px;border-radius:14px;font:650 16px inherit;font-family:inherit;border:1px solid #2b3a50;background:var(--s2);color:var(--ink);cursor:pointer;text-align:center;text-decoration:none}
+.btn:active{transform:scale(.98)}.btn:disabled{opacity:.55;cursor:wait}
+.btn.p{background:var(--orange);border-color:var(--orange);color:#1a0d04;box-shadow:0 8px 24px rgba(255,122,47,.28)}
+.alert{padding:12px 14px;border-left:3px solid var(--orange);background:rgba(255,122,47,.09);border-radius:10px;margin:0 0 14px;font-size:14px}
+.alert.e{border-left-color:var(--red);background:rgba(248,113,113,.1);color:#fecaca}
+.alert.s{border-left-color:var(--green);background:rgba(52,211,153,.1);color:#bbf7d0}
+.num{font:700 34px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--orange);letter-spacing:-.02em;margin:6px 0}
+ol.pass{margin:8px 0 0;padding-left:20px}ol.pass li{margin-bottom:6px}
+.foot{padding:20px 0 8px;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div class="logo">Lumi<b>DNA</b></div><div class="badge">Carrinho</div></div>
+  <div id="msg"></div>
+  <div id="content"><div class="card small">Carregando…</div></div>
+  <div class="foot">Registro técnico permanente da iluminação — LumiDNA</div>
+</div>
+<script src="../assets/supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb=supabase.createClient(LUMIDNA_SUPABASE_URL,LUMIDNA_SUPABASE_KEY);
+const $=s=>document.querySelector(s);
+const esc=s=>(s??"").toString().replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=v=>String(Number(v)).replace(".",",");
+const brl=v=>v==null?"sob consulta":"R$ "+Number(v).toFixed(2).replace(".",",").replace(/\B(?=(\d{3})+(?!\d))/g,".");
+const NOME={led:"Barra de LED",driver:"Driver",optica:"Óptica",luminaria:"Luminária"};
+const MOTIVOS=["parou de funcionar","piscando","perdeu brilho","troca preventiva","outro"];
+const UFS=["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
+const FORMAS={pix:{nome:"PIX",desc:"Pagamento na hora, por QR code ou chave. A LumiDNA envia os dados depois de confirmar o pedido."},cartao:{nome:"Cartão de crédito",desc:"Pagamento por link seguro enviado pela LumiDNA depois da confirmação. Não digite o número do cartão aqui nem em mensagem."},boleto:{nome:"Boleto",desc:"Boleto enviado depois da confirmação. A peça sai quando o pagamento for compensado."}};
+let SERIAL="", P=null, CART=[], FORMA="", ENVIANDO=false;
+
+// ---------- utilidades ----------
+const so=s=>String(s||"").replace(/\D/g,"");
+function maskDoc(v){ const d=so(v).slice(0,14); return d.length<=11?d.replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d{1,2})$/,"$1-$2"):d.replace(/^(\d{2})(\d)/,"$1.$2").replace(/^(\d{2})\.(\d{3})(\d)/,"$1.$2.$3").replace(/\.(\d{3})(\d)/,".$1/$2").replace(/(\d{4})(\d)/,"$1-$2"); }
+function maskCep(v){ const d=so(v).slice(0,8); return d.length>5?d.slice(0,5)+"-"+d.slice(5):d; }
+function maskFone(v){ const d=so(v).slice(0,11); if(d.length<=2) return d; if(d.length<=6) return "("+d.slice(0,2)+") "+d.slice(2); if(d.length<=10) return "("+d.slice(0,2)+") "+d.slice(2,6)+"-"+d.slice(6); return "("+d.slice(0,2)+") "+d.slice(2,7)+"-"+d.slice(7); }
+function docValido(v){
+  const d=so(v);
+  if(d.length===11){ if(/^(\d)\1{10}$/.test(d)) return false; let s=0,i; for(i=0;i<9;i++) s+=+d[i]*(10-i); let a=(s*10%11)%10; s=0; for(i=0;i<10;i++) s+=+d[i]*(11-i); let b=(s*10%11)%10; return a===+d[9]&&b===+d[10]; }
+  if(d.length===14){ if(/^(\d)\1{13}$/.test(d)) return false; const w1=[5,4,3,2,9,8,7,6,5,4,3,2], w2=[6,5,4,3,2,9,8,7,6,5,4,3,2]; let s=0,i; for(i=0;i<12;i++) s+=+d[i]*w1[i]; let a=s%11<2?0:11-s%11; s=0; for(i=0;i<13;i++) s+=+d[i]*w2[i]; let b=s%11<2?0:11-s%11; return a===+d[12]&&b===+d[13]; }
+  return false;
+}
+const emailValido=v=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(v||"").trim())&&String(v).length<=120;
+function guardado(){ try{ return JSON.parse(localStorage.getItem("lumidna_contato")||"{}"); }catch(e){ return {}; } }
+function guardar(n,f,e){ try{ localStorage.setItem("lumidna_contato",JSON.stringify({nome:n,fone:f,email:e})); }catch(x){} }
+function msg(t,tipo){ $("#msg").innerHTML=t?'<div class="alert '+(tipo||"")+'">'+esc(t)+'</div>':""; if(t) window.scrollTo({top:0,behavior:"smooth"}); }
+
+// ---------- peça e carrinho (mesma lógica da página da luminária; preços sempre do cadastro) ----------
+async function carregar(){
+  const r=await sb.rpc("v2_peca_publica",{p_serial:SERIAL});
+  if(r.error||!r.data){ $("#content").innerHTML='<div class="card"><b>Não foi possível abrir esta luminária.</b><div class="small" style="margin-top:4px">Confira o código '+esc(SERIAL)+' ou tente de novo em instantes.</div></div>'; return false; }
+  P=r.data; return true;
+}
+const keyCart=()=>"lumidna2_cart_"+SERIAL;
+function salvaCart(){ try{ localStorage.setItem(keyCart(),JSON.stringify(CART)); }catch(e){} }
+function kitTotal(){ const it=(P&&P.itens)||[]; if(!it.length||it.some(i=>i.preco==null)) return null; return it.reduce((s,i)=>s+i.preco*i.quantidade,0); }
+function completoTotal(){ const l=P.luminaria; if(l.preco==null) return null; if(l.integrada||!((P.itens||[]).length)) return l.preco; const k=kitTotal(); return k==null?null:l.preco+k; }
+function resolve(l){
+  const itens=P.itens||[];
+  if(l.k==="kit"){ if(!P.kit||P.luminaria.integrada||P.kit_confere!==true) return null; return {nome:"Kit completo",sub:P.kit,preco:kitTotal(),max:1,fotos:itens.filter(i=>i.foto_url).map(i=>i.foto_url).slice(0,2),pl:{escopo:"kit",quantidade:1}}; }
+  if(l.k==="lum") return {nome:"Peça completa",sub:P.luminaria.codigo,preco:completoTotal(),max:1,fotos:P.luminaria.foto_url?[P.luminaria.foto_url]:[],pl:{escopo:"luminaria",quantidade:1}};
+  const m=/^item:(\d+):(\d+)$/.exec(String(l.k)); if(!m) return null;
+  const i=itens.find(x=>x.peca_item_id===Number(m[1])); if(!i) return null;
+  const sid=Number(m[2])||null, s=sid?(i.similares||[]).find(x=>x.id===sid):null; if(sid&&!s) return null;
+  const c=s||i, q=Math.max(1,Math.min(Number(l.q)||1,i.quantidade));
+  return {nome:NOME[i.tipo]+(s?" · similar aprovado":""),sub:c.codigo,preco:c.preco,max:i.quantidade,fotos:c.foto_url?[c.foto_url]:[],pl:{escopo:"item",peca_item_id:i.peca_item_id,similar_id:sid,quantidade:q}};
+}
+function lerCart(){
+  let bruto=[]; try{ bruto=JSON.parse(localStorage.getItem(keyCart())||"[]"); }catch(e){}
+  if(!Array.isArray(bruto)) bruto=[];
+  CART=bruto.filter(l=>l&&resolve(l));
+  const saiu=bruto.length-CART.length; salvaCart();
+  return saiu;
+}
+function totalCart(){ let tot=0, sem=0; CART.forEach(l=>{ const r=resolve(l); if(!r) return; if(r.preco==null) sem++; else tot+=r.preco*r.pl.quantidade; }); return {tot:tot,sem:sem}; }
+const textoTotal=t=>t.sem?(t.tot?brl(t.tot)+" + a combinar":"a combinar"):brl(t.tot);
+// um código por envio: se a internet falhar e a pessoa tocar de novo, o servidor devolve o mesmo pedido em vez de criar outro
+function tokenEnvio(){
+  const assin=JSON.stringify(CART.map(l=>[l.k,l.q||1])), k="lumidna2_tok_"+SERIAL;
+  try{ const g=JSON.parse(sessionStorage.getItem(k)||"null"); if(g&&g.a===assin&&g.t) return g.t; }catch(e){}
+  const t=(crypto&&crypto.randomUUID)?crypto.randomUUID():"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==="x"?r:(r&3|8)).toString(16);});
+  try{ sessionStorage.setItem(k,JSON.stringify({a:assin,t:t})); }catch(e){}
+  return t;
+}
+
+// ---------- telas ----------
+function linhasHtml(){
+  return CART.map((l,n)=>{ const r=resolve(l), q=r.pl.quantidade;
+    return '<div class="item"><div class="ph">'+(r.fotos.length?r.fotos.map(u=>'<img src="'+esc(u)+'" alt="">').join(""):'')+'</div>'
+     +'<div style="flex:1;min-width:0"><div class="nome">'+esc(r.nome)+'</div><div class="small">'+esc(r.sub)+' · '+(r.preco==null?"sob consulta":brl(r.preco*q))+'</div><button type="button" class="rm" data-ac="rm" data-n="'+n+'">Remover</button></div>'
+     +(r.max>1?'<div class="stepper"><button type="button" aria-label="Diminuir" data-ac="cq" data-n="'+n+'" data-d="-1">−</button><span>'+q+'</span><button type="button" aria-label="Aumentar" data-ac="cq" data-n="'+n+'" data-d="1">+</button></div>':'<div class="small" style="width:50px;text-align:right">'+q+'x</div>')+'</div>'; }).join("");
+}
+function campo(id,rot,extra,val,erro,attrs){ return '<div class="field" id="f_'+id+'"><label for="'+id+'">'+rot+'</label><input id="'+id+'" value="'+esc(val||"")+'" '+(attrs||"")+'><div class="e">'+esc(erro)+'</div></div>'; }
+function render(saiu){
+  if(!CART.length){
+    $("#content").innerHTML='<h1>Carrinho</h1><div class="card" style="margin-top:12px"><div>Seu carrinho está vazio.</div><div class="small" style="margin:6px 0 14px">Escolha as peças na página da luminária e toque em Adicionar ao carrinho.</div><a class="btn p" href="'+voltaUrl()+'">Ver peças da luminária</a></div>';
+    return;
+  }
+  const c=guardado(), t=totalCart();
+  $("#content").innerHTML='<a class="back" href="'+voltaUrl()+'">‹ Voltar à luminária '+esc(P.luminaria.codigo)+'</a><h1>Finalizar pedido</h1><div class="small" style="margin:0 4px 14px">Peça '+esc(P.serial)+'</div>'
+   +(saiu?'<div class="alert">'+saiu+' item(ns) saíram do carrinho porque não estão mais disponíveis para esta luminária.</div>':'')
+   +'<div class="card"><h2 class="sec">Seu pedido</h2><div id="linhas">'+linhasHtml()+'</div><div class="tot"><span>Total de referência</span><span class="v" id="total">'+textoTotal(t)+'</span></div>'
+   +'<div class="small" style="margin-top:6px">Preços de referência. O valor final, com frete, é confirmado pela LumiDNA antes de você pagar.</div></div>'
+   +'<form id="form" novalidate autocomplete="on">'
+   +'<div class="card"><h2 class="sec">Seus dados</h2>'
+   +campo("c_nome","Nome completo *","",c.nome,"Informe seu nome completo.",'autocomplete="name" maxlength="120"')
+   +campo("c_fone","Telefone / WhatsApp *","",c.fone,"Informe o telefone com DDD.",'type="tel" inputmode="tel" autocomplete="tel" maxlength="16"')
+   +campo("c_email","E-mail *","",c.email,"Informe um e-mail válido.",'type="email" inputmode="email" autocomplete="email" maxlength="120"')
+   +campo("c_doc","CPF ou CNPJ *","","","CPF ou CNPJ inválido. Confira os números.",'inputmode="numeric" autocomplete="off" maxlength="18"')
+   +'<div class="small">O CPF/CNPJ é necessário para boleto e nota fiscal. Usamos seus dados só para este pedido.</div></div>'
+   +'<div class="card"><h2 class="sec">Entrega</h2>'
+   +'<div class="g3">'+campo("e_cep","CEP *","","","CEP inválido.",'inputmode="numeric" autocomplete="postal-code" maxlength="9"')
+   +'<div class="field" id="f_e_uf"><label for="e_uf">Estado *</label><select id="e_uf" autocomplete="address-level1"><option value="">—</option>'+UFS.map(u=>'<option>'+u+'</option>').join("")+'</select><div class="e">Escolha o estado.</div></div></div>'
+   +campo("e_rua","Rua / avenida *","","","Informe a rua.",'autocomplete="address-line1" maxlength="120"')
+   +'<div class="g2">'+campo("e_num","Número *","","","Informe o número.",'autocomplete="off" maxlength="20"')+campo("e_comp","Complemento","","","",'autocomplete="address-line2" maxlength="80"')+'</div>'
+   +campo("e_bairro","Bairro *","","","Informe o bairro.",'autocomplete="address-level3" maxlength="80"')
+   +campo("e_cidade","Cidade *","","","Informe a cidade.",'autocomplete="address-level2" maxlength="80"')
+   +'<div class="small">O frete é combinado pela LumiDNA antes de você pagar.</div></div>'
+   +'<div class="card"><h2 class="sec">Como prefere pagar</h2><div id="formas">'+Object.keys(FORMAS).map(k=>'<label class="pay" data-forma="'+k+'"><input type="radio" name="forma" value="'+k+'"><span><b>'+FORMAS[k].nome+'</b><span class="small">'+FORMAS[k].desc+'</span></span></label>').join("")+'</div>'
+   +'<div class="field err" id="f_forma" style="margin:0"><div class="e">Escolha a forma de pagamento.</div></div>'
+   +'<div class="alert" style="margin:8px 0 0"><b>Nada é cobrado agora.</b> A LumiDNA confere preço, prazo e frete e envia o pagamento pela forma escolhida. Se alguém pedir seu cartão fora do link oficial, não envie.</div></div>'
+   +'<div class="card"><h2 class="sec">Observações</h2><div class="field"><label for="c_motivo">Por que está trocando? (opcional)</label><select id="c_motivo"><option value="">—</option>'+MOTIVOS.map(m=>'<option>'+m+'</option>').join("")+'</select></div>'
+   +'<div class="field" style="margin:0"><label for="c_obs">Observação (opcional)</label><textarea id="c_obs" maxlength="1000"></textarea></div></div>'
+   +'<button type="submit" class="btn p" id="enviar">Enviar pedido</button>'
+   +'<div class="small" style="text-align:center;margin-top:10px">Ao enviar, você recebe o número do pedido.</div></form>';
+  $("#f_forma").classList.remove("err");
+  ligaForm();
+}
+function voltaUrl(){ return "../ativo/?c="+encodeURIComponent(SERIAL); }
+function ligaForm(){
+  $("#c_fone").addEventListener("input",e=>{ e.target.value=maskFone(e.target.value); });
+  $("#c_doc").addEventListener("input",e=>{ e.target.value=maskDoc(e.target.value); });
+  $("#e_cep").addEventListener("input",e=>{ e.target.value=maskCep(e.target.value); });
+  $("#e_uf").addEventListener("change",()=>limpaErro("e_uf"));
+  document.querySelectorAll("#form input,#form select").forEach(el=>el.addEventListener("input",()=>limpaErro(el.id)));
+  $("#formas").addEventListener("change",e=>{ if(e.target.name==="forma"){ FORMA=e.target.value; document.querySelectorAll(".pay").forEach(p=>p.classList.toggle("on",p.dataset.forma===FORMA)); $("#f_forma").classList.remove("err"); } });
+  $("#form").addEventListener("submit",e=>{ e.preventDefault(); enviar(); });
+}
+function limpaErro(id){ const f=$("#f_"+id); if(f) f.classList.remove("err"); }
+function marca(id,ruim){ const f=$("#f_"+id); if(f&&ruim) f.classList.add("err"); return ruim; }
+function validar(){
+  let ruins=[];
+  const v=id=>($("#"+id).value||"").trim();
+  const t=(id,ruim)=>{ if(marca(id,ruim)) ruins.push(id); };
+  t("c_nome",v("c_nome").length<3);
+  t("c_fone",so(v("c_fone")).length<10||so(v("c_fone")).length>13);
+  t("c_email",!emailValido(v("c_email")));
+  t("c_doc",!docValido(v("c_doc")));
+  t("e_cep",so(v("e_cep")).length!==8);
+  t("e_uf",!UFS.includes(v("e_uf")));
+  t("e_rua",!v("e_rua")); t("e_num",!v("e_num")); t("e_bairro",!v("e_bairro")); t("e_cidade",!v("e_cidade"));
+  if(!FORMA){ $("#f_forma").classList.add("err"); ruins.push("f_forma"); }
+  return ruins;
+}
+function traduz(m){
+  m=String(m||"");
+  if(/Muitos envios/i.test(m)) return "Muitos pedidos em pouco tempo para esta luminária. Tente de novo mais tarde ou fale com a LumiDNA.";
+  if(/Failed to fetch|NetworkError|network/i.test(m)) return "Sem conexão com a internet. Confira o sinal e toque em Enviar pedido de novo; o pedido não será duplicado.";
+  return m||"Não consegui enviar o pedido agora. Tente de novo.";
+}
+async function enviar(){
+  if(ENVIANDO) return;
+  msg("");
+  if(!CART.length) return msg("Seu carrinho está vazio.","e");
+  const ruins=validar();
+  if(ruins.length){ msg("Confira os campos marcados em vermelho.","e"); const el=$("#"+ruins[0].replace(/^f_/,""))||$("#f_forma"); if(el&&el.focus&&ruins[0]!=="f_forma") el.focus(); else $("#f_forma").scrollIntoView({block:"center"}); return; }
+  ENVIANDO=true; const b=$("#enviar"); b.disabled=true; b.textContent="Enviando…";
+  const v=id=>($("#"+id).value||"").trim();
+  const linhas=CART.flatMap(l=>{ const r=resolve(l); if(r.pl.escopo==="kit") return (P.itens||[]).map(i=>({escopo:"item",peca_item_id:i.peca_item_id,similar_id:null,quantidade:i.quantidade})); return [{escopo:r.pl.escopo,peca_item_id:r.pl.peca_item_id||null,similar_id:r.pl.similar_id||null,quantidade:r.pl.quantidade}]; });
+  let r;
+  try{
+    r=await sb.rpc("v2_finalizar_compra",{p_serial:SERIAL,p_nome:v("c_nome"),p_fone:v("c_fone"),p_email:v("c_email"),p_documento:so(v("c_doc")),
+      p_endereco:{cep:so(v("e_cep")),rua:v("e_rua"),numero:v("e_num"),complemento:v("e_comp"),bairro:v("e_bairro"),cidade:v("e_cidade"),uf:v("e_uf")},
+      p_forma:FORMA,p_obs:v("c_obs")||null,p_motivo:v("c_motivo")||null,p_token:tokenEnvio(),p_linhas:linhas});
+  }catch(e){ r={error:{message:"Failed to fetch"}}; }
+  ENVIANDO=false;
+  if(r.error){ b.disabled=false; b.textContent="Enviar pedido"; return msg(traduz(r.error.message),"e"); }
+  guardar(v("c_nome"),v("c_fone"),v("c_email"));
+  const d=r.data, resumo={id:d.id,total:d.total,sem:d.itens_sem_preco>0,forma:d.forma_pagamento,itens:CART.map(l=>{ const x=resolve(l); return x.pl.quantidade+"x "+x.nome+" "+x.sub; })};
+  CART=[]; salvaCart();
+  try{ sessionStorage.setItem("lumidna2_ok_"+SERIAL,JSON.stringify(resumo)); sessionStorage.removeItem("lumidna2_tok_"+SERIAL); }catch(e){}
+  confirmacao(resumo);
+}
+function confirmacao(d){
+  window.scrollTo(0,0); msg("");
+  $("#content").innerHTML='<div class="card" style="margin-top:6px"><div class="alert s" style="margin-bottom:10px">Pedido enviado com sucesso.</div>'
+   +'<div class="small">Número do seu pedido</div><div class="num">#'+esc(d.id)+'</div>'
+   +'<div class="small">Guarde este número. Ele identifica seu pedido com a LumiDNA.</div>'
+   +'<table style="width:100%;margin-top:14px;font-size:14px;border-collapse:collapse"><tr><td class="small" style="padding:6px 0">Peça</td><td style="text-align:right">'+esc(SERIAL)+'</td></tr>'
+   +'<tr><td class="small" style="padding:6px 0">Total de referência</td><td style="text-align:right"><b>'+(d.total?(d.sem?"a combinar":brl(d.total)):"a combinar")+'</b></td></tr>'
+   +'<tr><td class="small" style="padding:6px 0">Pagamento escolhido</td><td style="text-align:right">'+esc((FORMAS[d.forma]||{}).nome||"—")+'</td></tr></table>'
+   +'<div style="margin-top:12px;font-size:14px">'+(d.itens||[]).map(x=>'<div class="small">• '+esc(x)+'</div>').join("")+'</div></div>'
+   +'<div class="card"><h2 class="sec">Próximos passos</h2><ol class="pass"><li>A LumiDNA confere preço, prazo e frete.</li><li>Você recebe o contato por telefone ou WhatsApp com o valor final.</li><li>Depois da confirmação, enviamos o pagamento pela forma escolhida.</li><li>Pago o pedido, combinamos a entrega.</li></ol></div>'
+   +'<button type="button" class="btn" id="copiar">Copiar número do pedido</button><div style="height:10px"></div><a class="btn p" href="'+voltaUrl()+'">Voltar à luminária</a>';
+  $("#copiar").onclick=async()=>{ try{ await navigator.clipboard.writeText("#"+d.id); $("#copiar").textContent="Número copiado"; }catch(e){ $("#copiar").textContent="Anote: #"+d.id; } };
+}
+document.addEventListener("click",e=>{
+  const el=e.target.closest("[data-ac]"); if(!el||!P) return;
+  const a=el.dataset.ac, n=Number(el.dataset.n);
+  if(a==="rm"){ CART.splice(n,1); salvaCart(); render(0); }
+  else if(a==="cq"){ const l=CART[n], r=l&&resolve(l); if(!r) return; l.q=Math.max(1,Math.min(r.max,(l.q||1)+Number(el.dataset.d))); salvaCart(); const keep=guardaCampos(); render(0); voltaCampos(keep); }
+});
+// ao mudar a quantidade a tela é redesenhada; os campos já digitados voltam
+function guardaCampos(){ const o={}; document.querySelectorAll("#form input,#form select,#form textarea").forEach(el=>{ if(el.id) o[el.id]=el.value; }); o._forma=FORMA; return o; }
+function voltaCampos(o){ Object.keys(o).forEach(k=>{ if(k==="_forma") return; const el=$("#"+k); if(el&&o[k]) el.value=o[k]; }); if(o._forma){ FORMA=o._forma; const r=document.querySelector('input[name="forma"][value="'+FORMA+'"]'); if(r){ r.checked=true; document.querySelectorAll(".pay").forEach(p=>p.classList.toggle("on",p.dataset.forma===FORMA)); } } }
+async function iniciar(){
+  const qs=new URLSearchParams(location.search); SERIAL=(qs.get("c")||qs.get("s")||"").trim();
+  if(!SERIAL){ $("#content").innerHTML='<div class="card">Abra o carrinho pela página da sua luminária (QR ou etiqueta).</div>'; return; }
+  if(!await carregar()) return;
+  const saiu=lerCart();
+  if(!CART.length){ let ok=null; try{ ok=JSON.parse(sessionStorage.getItem("lumidna2_ok_"+SERIAL)||"null"); }catch(e){} if(ok){ confirmacao(ok); return; } }
+  render(saiu);
+}
+iniciar();
+</script>
+</body>
+</html>

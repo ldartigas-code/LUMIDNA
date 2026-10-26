@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0a0e13"><meta name="color-scheme" content="dark"><meta name="robots" content="noindex">
+<title>LumiDNA — seu pedido</title>
+<style>
+:root{color-scheme:dark;--bg:#0a0e13;--s1:#111821;--s2:#172130;--ink:#eef2f7;--muted:#8896a8;--line:#1f2b3b;--orange:#ff7a2f;--green:#34d399;--red:#f87171;--amber:#f5b942}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 Inter,"Segoe UI",Roboto,system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:40px;-webkit-font-smoothing:antialiased;background-image:radial-gradient(900px 380px at 50% -120px,rgba(255,122,47,.16),transparent 70%);background-repeat:no-repeat}
+.wrap{max-width:520px;margin:0 auto;padding:0 18px}
+.top{display:flex;justify-content:space-between;align-items:center;padding:18px 4px}
+.logo{font-weight:800;letter-spacing:-.03em;font-size:20px}.logo b{color:var(--orange)}
+.badge{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;border:1px solid var(--line);padding:4px 10px;border-radius:999px}
+.small{font-size:13px;color:var(--muted)}
+a{color:var(--orange)}
+.card{background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px}
+h1{font-size:22px;margin:0 4px 2px;letter-spacing:-.02em}
+h2.sec{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:0 0 12px}
+.num{font:700 15px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--orange)}
+.demo{background:rgba(245,185,66,.12);border:1px dashed var(--amber);color:#fde9b8;border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:14px}
+.steps{list-style:none;margin:0;padding:0}
+.steps li{display:flex;gap:12px;align-items:flex-start;padding:8px 0;position:relative}
+.steps li:not(:last-child)::after{content:"";position:absolute;left:11px;top:34px;bottom:-6px;width:2px;background:var(--line)}
+.dotp{width:24px;height:24px;border-radius:50%;border:2px solid var(--line);flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;color:#06130c;background:var(--s1)}
+.steps li.ok .dotp{background:var(--green);border-color:var(--green)}
+.steps li.now .dotp{border-color:var(--orange);box-shadow:0 0 0 4px rgba(255,122,47,.18)}
+.steps li.now b{color:var(--orange)}
+.steps li:not(.ok):not(.now){color:var(--muted)}
+table.v{width:100%;border-collapse:collapse;font-size:14px}
+table.v td{padding:6px 0;border-bottom:1px solid var(--line)}table.v tr:last-child td{border-bottom:0}
+table.v td:last-child{text-align:right;white-space:nowrap}
+.big{font-size:26px;font-weight:700;letter-spacing:-.02em;color:var(--orange)}
+.btn{display:inline-block;width:100%;padding:16px 12px;border-radius:14px;font:650 16px inherit;font-family:inherit;border:1px solid #2b3a50;background:var(--s2);color:var(--ink);cursor:pointer;text-align:center;text-decoration:none}
+.btn:active{transform:scale(.98)}.btn:disabled{opacity:.6;cursor:wait}
+.btn.p{background:var(--orange);border-color:var(--orange);color:#1a0d04;box-shadow:0 8px 24px rgba(255,122,47,.28)}
+.btn.s{padding:10px 12px;font-size:14px}
+.qr{background:#fff;border-radius:14px;padding:14px;width:210px;height:210px;margin:6px auto 10px}
+.qr svg{width:100%;height:100%;display:block}
+.cod{font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-all;background:var(--s2);border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.field label{font-size:12px;font-weight:700;color:var(--muted)}
+.field input,.field select{border:1px solid var(--line);border-radius:12px;padding:12px 13px;font-family:inherit;font-size:16px;background:var(--s2);color:var(--ink);width:100%}
+.field input[readonly]{opacity:.85}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.alert{padding:12px 14px;border-left:3px solid var(--orange);background:rgba(255,122,47,.09);border-radius:10px;margin:0 0 14px;font-size:14px}
+.alert.e{border-left-color:var(--red);background:rgba(248,113,113,.1);color:#fecaca}
+.alert.s{border-left-color:var(--green);background:rgba(52,211,153,.1);color:#bbf7d0}
+.ok-big{text-align:center;padding:10px 0 4px}
+.check{width:64px;height:64px;border-radius:50%;background:var(--green);color:#06130c;font-size:36px;line-height:64px;margin:0 auto 10px;animation:pop .5s ease}
+@keyframes pop{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+.foot{padding:20px 0 8px;color:var(--muted);font-size:12px;text-align:center}
+.pr{display:none}
+@media print{:root{--bg:#fff;--s1:#fff;--s2:#fff;--ink:#000;--muted:#444;--line:#bbb}body{background:#fff;color:#000;padding:0}.noprint,.badge{display:none!important}.pr{display:block}.card{border:1px solid #999;break-inside:avoid}.demo{border-color:#999;color:#000;background:#fff}.big,.num{color:#000}.steps li.ok .dotp{background:#000;border-color:#000;color:#fff}.dotp{border-color:#666}.alert{background:#fff;border-color:#999;color:#000}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div class="logo">Lumi<b>DNA</b></div><div class="badge">Seu pedido</div></div>
+  <div id="msg"></div>
+  <div id="content"><div class="card small">Carregando…</div></div>
+  <div class="foot">Registro técnico permanente da iluminação — LumiDNA</div>
+</div>
+<script src="../assets/supabase-config.js"></script>
+<script src="../assets/notificar.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script>
+const sb=supabase.createClient(LUMIDNA_SUPABASE_URL,LUMIDNA_SUPABASE_KEY);
+const $=s=>document.querySelector(s);
+const esc=s=>(s??"").toString().replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const brl=v=>v==null?"sob consulta":"R$ "+Number(v).toFixed(2).replace(".",",").replace(/\B(?=(\d{3})+(?!\d))/g,".");
+const dmy=d=>{ if(!d) return "—"; const x=new Date(d); return x.toLocaleDateString("pt-BR"); };
+const FORMAS={pix:"PIX",cartao:"Cartão de crédito",boleto:"Boleto"};
+let ID=0, TOKEN="", D=null, OCUPADO=false, ULTIMO="";
+
+function msg(t,tipo){ $("#msg").innerHTML=t?'<div class="alert '+(tipo||"")+'">'+esc(t)+'</div>':""; }
+async function carregar(){
+  const r=await sb.rpc("v2_pedido_cliente",{p_id:ID,p_token:TOKEN});
+  if(r.error){ if(!D) $("#content").innerHTML='<div class="card"><b>Não foi possível abrir o pedido agora.</b><div class="small" style="margin-top:4px">Tente de novo em instantes.</div></div>'; return false; }
+  if(!r.data){ $("#content").innerHTML='<div class="card"><b>Pedido não encontrado.</b><div class="small" style="margin-top:4px">Confira o link que você recebeu. Ele tem um código que só você tem.</div></div>'; return false; }
+  D=r.data; return true;
+}
+function etapas(){
+  const ps=D.pagamento_status, st=D.status;
+  const conferido=ps&&ps!=="aguardando_confirmacao"||["em_atendimento","entregue","instalado"].includes(st);
+  const pago=ps==="pago", lib=ps==="aguardando_pagamento", ent=["entregue","instalado"].includes(st), ins=st==="instalado";
+  const L=[["Pedido recebido","em "+dmy(D.criado_em),true,false],
+    ["Conferido pela LumiDNA","preço, prazo e frete",conferido,!conferido],
+    [pago?"Pagamento confirmado":(lib?"Pagamento liberado — falta pagar":"Pagamento"),pago?(D.pago_em?"em "+dmy(D.pago_em):""):(lib?"pague abaixo":"liberado depois da conferência"),pago,conferido&&!pago],
+    ["Entrega","combinada com você",ent,pago&&!ent],
+    ["Instalação",ins?"em "+dmy(D.instalado_em):"depois da entrega",ins,ent&&!ins]];
+  return '<ul class="steps">'+L.map(x=>'<li class="'+(x[2]?"ok":(x[3]?"now":""))+'"><span class="dotp">'+(x[2]?"✓":"")+'</span><div><b>'+esc(x[0])+'</b><div class="small">'+esc(x[1])+'</div></div></li>').join("")+'</ul>';
+}
+const txtEnd=e=>{ if(!e) return ""; return [(e.rua||"")+(e.numero?", "+e.numero:"")+(e.complemento?" ("+e.complemento+")":""),e.bairro,(e.cidade||"")+(e.uf?"/"+e.uf:""),e.cep?"CEP "+String(e.cep).replace(/(\d{5})(\d{3})/,"$1-$2"):""].filter(Boolean).join(" · "); };
+function resumo(){
+  const its=(D.itens||[]).map(i=>'<tr><td>'+esc(i.quantidade+"x "+i.descricao)+'</td><td>'+(i.preco_unit!=null?brl(i.preco_unit*i.quantidade):"sob consulta")+'</td></tr>').join("");
+  const tot=D.itens_sem_preco>0?"a combinar":brl(D.total_itens);
+  return '<table class="v">'+its+'<tr><td><b>Itens (referência)</b></td><td><b>'+tot+'</b></td></tr>'
+   +(D.frete!=null?'<tr><td>Frete</td><td>'+brl(D.frete)+'</td></tr>':'')
+   +(D.valor_final!=null?'<tr><td><b>Valor final</b></td><td><span class="big" style="font-size:18px">'+brl(D.valor_final)+'</span></td></tr>':'')
+   +'<tr><td>Pagamento escolhido</td><td>'+esc(FORMAS[D.forma_pagamento]||"—")+'</td></tr></table>';
+}
+function telaPagar(){
+  const f=D.forma_pagamento, v=D.valor_final, cod="DEMO-LUMIDNA-"+D.id+"-"+Number(v).toFixed(2);
+  let corpo="";
+  if(f==="pix"){
+    let svg=""; try{ const q=qrcode(0,"M"); q.addData(cod); q.make(); svg=q.createSvgTag({cellSize:4,margin:0,scalable:true}); }catch(e){}
+    corpo='<div class="qr">'+svg+'</div><div class="small" style="text-align:center">Aponte a câmera do app do seu banco para o QR code ou use o PIX copia e cola.</div>'
+     +'<div class="cod" id="cod">'+esc(cod)+'</div><button type="button" class="btn s" data-ac="copiar">Copiar código PIX</button>'
+     +'<div style="height:12px"></div><button type="button" class="btn p" data-ac="pagar">Simular pagamento aprovado</button>';
+  }else if(f==="boleto"){
+    const venc=new Date(Date.now()+3*864e5), lin="99999.00009 00000.000000 "+String(D.id).padStart(5,"0")+".000000 9 "+String(Math.round(v*100)).padStart(14,"0");
+    corpo='<table class="v"><tr><td>Vencimento</td><td>'+venc.toLocaleDateString("pt-BR")+'</td></tr><tr><td>Valor</td><td><b>'+brl(v)+'</b></td></tr></table>'
+     +'<div class="small" style="margin-top:8px">Linha digitável</div><div class="cod" id="cod">'+esc(lin)+'</div><button type="button" class="btn s" data-ac="copiar">Copiar linha digitável</button>'
+     +'<div style="height:12px"></div><button type="button" class="btn p" data-ac="pagar">Simular pagamento do boleto</button>';
+  }else{
+    corpo='<div class="small" style="margin-bottom:10px">Cartão de demonstração: os campos abaixo já vêm preenchidos e não podem ser editados. Nenhum dado de cartão é pedido ou guardado.</div>'
+     +'<div class="field"><label>Número do cartão</label><input value="4242 4242 4242 4242" readonly></div>'
+     +'<div class="field"><label>Nome impresso</label><input value="CLIENTE DEMONSTRAÇÃO" readonly></div>'
+     +'<div class="g2"><div class="field"><label>Validade</label><input value="12/30" readonly></div><div class="field"><label>CVV</label><input value="123" readonly></div></div>'
+     +'<div class="field"><label>Parcelas</label><select id="parc">'+[1,2,3].map(n=>'<option>'+n+'x de '+brl(v/n)+' sem juros</option>').join("")+'</select></div>'
+     +'<button type="button" class="btn p" data-ac="pagar">Pagar '+brl(v)+' (simulado)</button>';
+  }
+  return '<div class="card noprint"><h2 class="sec">Pagamento · '+esc(FORMAS[f]||"")+'</h2>'
+   +'<div class="demo noprint"><b>MODO DEMONSTRAÇÃO.</b> Esta tela é uma simulação para você conhecer a experiência. Nenhum valor real é cobrado.</div>'
+   +'<div style="text-align:center;margin-bottom:8px"><div class="small">Valor a pagar</div><div class="big">'+brl(v)+'</div></div>'+corpo+'</div>';
+}
+function render(){
+  const ps=D.pagamento_status, cancelado=D.status==="cancelado"||ps==="cancelado";
+  let h='<h1>Pedido <span class="num">#'+D.id+'</span></h1><div class="small" style="margin:0 4px 14px">Luminária '+esc(D.luminaria||"")+' · peça '+esc(D.serial)+'</div>';
+  if(cancelado) h+='<div class="alert e">Este pedido foi cancelado. Se precisar, fale com a LumiDNA.</div>';
+  if(D.tipo!=="compra") h+='<div class="card">Este número é de um aviso, não de uma compra.</div>';
+  else{
+    if(!cancelado&&ps==="aguardando_confirmacao") h+='<div class="alert">A LumiDNA está conferindo preço, prazo e frete. Você recebe o aviso por e-mail quando o pagamento for liberado. Nada foi cobrado.</div>';
+    if(!cancelado&&ps==="aguardando_pagamento"){
+      h+=D.demo?telaPagar():'<div class="alert">Pagamento liberado: '+brl(D.valor_final)+'. A LumiDNA enviará os dados de pagamento pela forma escolhida ('+esc(FORMAS[D.forma_pagamento]||"")+').</div>';
+    }
+    if(ps==="pago") h+='<div class="card ok-big"><div class="check">✓</div><b style="font-size:18px">Pagamento confirmado</b><div class="small" style="margin-top:4px">'+brl(D.valor_final)+' · '+esc(FORMAS[D.forma_pagamento]||"")+(D.pago_em?' · '+dmy(D.pago_em):'')+'</div>'
+      +(D.simulado?'<div class="demo" style="margin:12px 0 0">Pagamento SIMULADO (demonstração). Nenhum valor real foi cobrado.</div>':'')+'<div class="small" style="margin-top:10px">Agora a LumiDNA combina a entrega com você.</div></div>';
+    h+='<div class="card"><h2 class="sec">Andamento</h2>'+etapas()+'</div><div class="card"><h2 class="sec">Seu pedido</h2>'+resumo()+'</div>';
+  }
+  if(D.tipo==="compra"&&D.nome) h+='<div class="card"><h2 class="sec">Dados e entrega</h2><table class="v"><tr><td>Nome</td><td>'+esc(D.nome)+'</td></tr><tr><td>Telefone</td><td>'+esc(D.fone||"")+'</td></tr><tr><td>E-mail</td><td style="white-space:normal">'+esc(D.email||"")+'</td></tr><tr><td>Entrega</td><td style="white-space:normal">'+esc(txtEnd(D.endereco))+'</td></tr></table></div>';
+  h+='<div class="pr small" style="text-align:center">Pedido #'+D.id+' · impresso em '+new Date().toLocaleString("pt-BR")+' · LumiDNA</div>';
+  h+='<button type="button" class="btn noprint" data-ac="imprimir" style="margin-bottom:10px">Imprimir pedido</button><a class="btn noprint" href="../ativo/?c='+encodeURIComponent(D.serial)+'">Voltar à luminária</a>';
+  const assin=JSON.stringify([D.status,ps,D.valor_final,D.pago_em]);
+  if(assin!==ULTIMO||!$("#content").innerHTML){ ULTIMO=assin; $("#content").innerHTML=h; }
+}
+document.addEventListener("click",async e=>{
+  const el=e.target.closest("[data-ac]"); if(!el) return; const a=el.dataset.ac;
+  if(a==="imprimir"){ window.print(); }
+  else if(a==="copiar"){ try{ await navigator.clipboard.writeText($("#cod").innerText); el.textContent="Copiado"; }catch(x){ el.textContent="Selecione e copie o código acima"; } }
+  else if(a==="pagar"&&!OCUPADO){
+    OCUPADO=true; el.disabled=true; el.textContent="Processando pagamento…"; msg("");
+    await new Promise(r=>setTimeout(r,1800));
+    const r=await sb.rpc("v2_simular_pagamento",{p_id:ID,p_token:TOKEN});
+    OCUPADO=false;
+    if(r.error){ el.disabled=false; el.textContent="Tentar de novo"; return msg(r.error.message||"Não foi possível concluir agora.","e"); }
+    D=r.data; ULTIMO=""; render(); window.scrollTo(0,0); avisarEvento("pago",ID,TOKEN);
+  }
+});
+async function iniciar(){
+  const q=new URLSearchParams(location.search); ID=Number(q.get("n"))||0; TOKEN=(q.get("t")||"").trim();
+  if(!ID||!/^[0-9a-f-]{36}$/i.test(TOKEN)){ $("#content").innerHTML='<div class="card"><b>Link do pedido incompleto.</b><div class="small" style="margin-top:4px">Abra o pedido pelo link que você recebeu na confirmação ou por e-mail.</div></div>'; return; }
+  if(await carregar()) render();
+  setInterval(async()=>{ if(OCUPADO||document.hidden) return; if(await carregar()) render(); },20000);
+}
+iniciar();
+</script>
+</body>
+</html>

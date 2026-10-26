@@ -119,6 +119,7 @@ select.vsel{width:100%;border:1px solid var(--line);border-radius:10px;padding:7
 <div id="ov" class="overlay hidden" data-ac="fundo"><div class="sheet" id="sheet"></div></div>
 
 <script src="../assets/supabase-config.js"></script>
+<script src="../assets/notificar.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const sb=supabase.createClient(LUMIDNA_SUPABASE_URL,LUMIDNA_SUPABASE_KEY);
@@ -133,8 +134,6 @@ const MOTIVOS=["parou de funcionar","piscando","perdeu brilho","troca preventiva
 const STATUS={novo:"Recebido",em_atendimento:"Em atendimento",entregue:"Entregue",instalado:"Instalado",resolvido:"Resolvido",cancelado:"Cancelado",aguardando_aprovacao:"Aguardando aprovação",aprovada:"Aprovada",reprovada:"Não aprovada"};
 const TIT={problema:"Aviso de problema",compra:"Pedido de peças",manutencao:"Manutenção informada"};
 // aviso por e-mail para a empresa (script do Google Apps Script; vazio = desligado)
-const NOTIFY_URL="";
-const NOTIFY_CHAVE="137c869c62f79f56a9";
 function avisaEmpresa(d){
   if(!NOTIFY_URL) return;
   try{
@@ -263,6 +262,7 @@ function renderLoja(){
   cards.push(cardKitLum("lum","Peça completa",l.codigo,completoResumo(),completoTotal(),l.foto_url?[l.foto_url]:[...new Set(itens.filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,2)));
   $("#loja").innerHTML='<div class="shop-grid">'+cards.join("")+'</div><div class="small" style="margin:10px 4px 0">Preços de referência. A LumiDNA confirma valor, prazo e entrega antes de fechar; nada é cobrado agora.</div>';
 }
+function meuToken(id){ try{ const m=JSON.parse(localStorage.getItem("lumidna2_pedidos")||"{}"); return m[id]||""; }catch(e){ return ""; } }
 function renderRegs(){
   const el=$("#regs"); if(!PED.length){ el.innerHTML=""; return; }
   el.innerHTML='<h2 class="sec">Seus registros nesta luminária</h2><div class="card" style="padding:6px 18px">'+PED.map(p=>{
@@ -272,6 +272,7 @@ function renderRegs(){
      +(p.tipo==="manutencao"?'<div class="small">Troca de '+esc(p.item||"item")+(p.novo?' por '+esc(p.novo):'')+(p.man_origem==="outro"?' (modelo não homologado)':'')+'</div>':'')
      +(p.decisao_msg?'<div class="small" style="color:var(--ink)">Mensagem da LumiDNA: '+esc(p.decisao_msg)+'</div>':'')
      +(p.linhas&&p.linhas.length?'<div class="small">'+p.linhas.map(x=>x.quantidade+'x '+esc(x.descricao)).join(" · ")+'</div><div class="small">Total: '+(sem?"a combinar":brl(p.total))+'</div>':'')
+     +(p.tipo==="compra"&&meuToken(p.id)?'<a class="addcart" style="display:inline-block;margin-top:8px;padding:9px 16px;text-decoration:none" href="../pedido/?n='+p.id+'&t='+encodeURIComponent(meuToken(p.id))+'">Acompanhar pedido / pagar</a> ':'')
      +(p.tipo==="compra"&&p.status==="entregue"?'<button type="button" class="addcart" style="margin-top:8px;padding:9px 16px" data-ac="instalei" data-id="'+p.id+'">Já instalei</button>':'')
      +'</div>';
   }).join("")+'</div>';

@@ -62,7 +62,7 @@ body:has(.homebg) header b span{color:#2c2c2a}
 .homewrap{display:flex;flex-direction:column;height:calc(100vh - 100px);height:calc(100dvh - 100px);min-height:400px}
 .homeh{margin:0;font-size:20px;font-weight:700;color:#fff}
 .homesub{font-size:13px;color:#fff;opacity:.92;margin:0 0 10px}
-.home{flex:1;min-height:0;display:grid;grid-template-columns:1fr;grid-template-rows:repeat(5,minmax(0,1fr));gap:10px}
+.home{flex:1;min-height:0;display:grid;grid-template-columns:1fr;grid-template-rows:repeat(6,minmax(0,1fr));gap:10px}
 .tile{display:flex;flex-direction:column;justify-content:center;gap:2px;text-align:left;padding:6px 16px;min-height:0;border:0;border-left:6px solid var(--orange);border-radius:12px;background:rgba(255,255,255,.94);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.10)}
 .tile:hover{background:#fff;box-shadow:0 3px 12px rgba(0,0,0,.16)}
 .tile b{font-size:18px;display:flex;align-items:center;gap:6px;line-height:1.2}
@@ -578,7 +578,7 @@ const garantiaTxt=p=>!p.garantia_ate?{t:"sem data",c:"small"}:(p.garantia_ate>=h
 const precisaKit=p=>{ const l=porId(p.luminaria_id); return !!l&&!l.integrada; };
 const urlPeca=s=>new URL("../ativo/?c="+encodeURIComponent(s),location.href).href;
 function codigoObra(nome){ const s=String(nome||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase(); const c=s.replace(/[^BCDFGHJKLMNPQRSTVWXYZ]/g,""), l=s.replace(/[^A-Z]/g,""); if(c.length>=3) return c.slice(0,3); return (c+l).slice(0,3).padEnd(3,"X"); }
-const NOME_AREA={cat:"Catálogo",pend:"Pendências",obras:"Obras",ped:"Pedidos",rel:"Relatórios"};
+const NOME_AREA={cat:"Catálogo",pend:"Pendências",obras:"Obras",etq:"Etiquetar",ped:"Pedidos",rel:"Relatórios"};
 const navArea=a=>'<div class="noprint" style="display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:12px"><button data-act="home">‹ Início</button><b style="font-size:18px">'+NOME_AREA[a]+'</b>'+(a==="pend"?badgePend():"")+'</div>';
 // ---- página inicial ----
 function renderHome(){
@@ -588,6 +588,7 @@ function renderHome(){
     +t("areaCat","Catálogo","Luminárias, LEDs, drivers, ópticas e kits",' <span class="small" style="font-weight:400">('+S.produtos.length+')</span>')
     +t("areaPend","Pendências","Problemas em aberto e manutenções para aprovar",badgePend())
     +t("areaObras","Obras","Obras, peças, etiquetas e fichas")
+    +t("areaEtiquetar","Etiquetar","Etiquetas fixadas por obra e link para o fabricante")
     +t("areaPedidos","Pedidos","Compras, problemas e manutenções dos clientes")
     +t("areaRel","Relatórios","Manutenção, vendas e componentes que mais falham")
     +'</div></div>';
@@ -633,7 +634,7 @@ function renderObra(){
    +'<div class="bar"><button class="p" data-act="salvarObra">Salvar obra</button>'+(!novo&&!ps.length?'<button class="danger" data-act="apagarObra">Excluir obra</button>':'')+'</div></div>':'';
   $("#app").innerHTML='<button data-act="voltaObras" style="margin-bottom:12px">‹ Obras</button>'
    +'<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h3 style="margin:0">'+(novo?"Nova obra":esc(o.nome))+'</h3>'+resumo+'</div>'
-   +(novo?'':'<div class="bar" style="margin:0"><button data-act="editObra">'+(S.editObra?"Fechar edição":"Editar dados da obra")+'</button>'+(ps.length?'<button data-act="etiquetas">Etiquetas e NFC</button>':'')+'</div>')+'</div>'+form+'</div>'
+   +(novo?'':'<div class="bar" style="margin:0"><button data-act="editObra">'+(S.editObra?"Fechar edição":"Editar dados da obra")+'</button>'+(ps.length?'<button data-act="etiquetas">Etiquetas e NFC</button><button class="p" data-act="etqObra" data-id="'+o.id+'">Etiquetar</button>':'')+'</div>')+'</div>'+form+'</div>'
    +(novo?'<div class="small">Salve a obra para começar a adicionar as luminárias.</div>':blocoLuminarias(o,ps));
   if($("#o_nome")){ const upd=()=>{ const c=codigoObra($("#o_nome").value); $("#o_cod").innerHTML=novo?'Código do serial: <b>'+esc(c)+'</b> (fica fixo depois de salvar). Exemplo: '+esc(c)+'-NNN-001':'Código do serial: <b>'+esc(o.codigo)+'</b> · número da obra '+String(o.id).padStart(3,"0"); }; upd(); $("#o_nome").oninput=upd; }
   if($("#a_lum")){ $("#a_lum").oninput=atualizaKitAdd; atualizaKitAdd(); }
@@ -791,7 +792,7 @@ function renderPeca(){
   const formAddItem='<h4 style="margin:14px 0 6px">Adicionar item a esta peça</h4><div class="grid"><div class="field"><label>Tipo</label><select id="ad_tipo" data-act="trocaTipoAdd">'+[["led","LED"],["driver","Driver"],["optica","Óptica"]].map(x=>'<option value="'+x[0]+'" '+(x[0]===tAdd?"selected":"")+'>'+x[1]+'</option>').join("")+'</select></div><div class="field"><label>Item</label><select id="ad_prod">'+optsAdd.map(x=>'<option value="'+x.id+'">'+esc(x.codigo)+'</option>').join("")+'</select></div><div class="field"><label>Quantidade</label><input id="ad_qtd" type="number" min="1" value="1"></div></div><button data-act="addItemPeca">Adicionar item</button>';
   $("#app").innerHTML='<button data-act="voltaObra" style="margin-bottom:12px">‹ '+esc(o.nome)+'</button>'
    +'<div class="card"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">'+(l?(l.foto_url?'<img class="thumb" style="width:64px;height:64px" src="'+esc(l.foto_url)+'" alt="">':miniFotos(fotoAuto(l))):'')
-   +'<div style="flex:1;min-width:200px"><h3 style="margin:0">'+esc(p.serial)+'</h3><div class="small">'+esc(l?l.codigo:"?")+(kit?' · '+esc(kit.nome):'')+' · obra '+esc(o.nome)+'</div></div><div class="'+g.c+'" style="font-size:14px">'+g.t+'</div></div></div>'
+   +'<div style="flex:1;min-width:200px"><h3 style="margin:0">'+esc(p.serial)+'</h3><div class="small">'+esc(l?l.codigo:"?")+(kit?' · '+esc(kit.nome):'')+' · obra '+esc(o.nome)+'</div><div class="small">Etiqueta: '+(p.etiquetada_em?'<span class="ok">fixada em '+dataHora(p.etiquetada_em)+(p.etiquetada_por?' por '+esc(p.etiquetada_por):'')+'</span>':'<span class="no">ainda não fixada</span>')+'</div></div><div class="'+g.c+'" style="font-size:14px">'+g.t+'</div></div></div>'
    +blocoNotas()
    +'<div class="card"><div class="field"><label>Local</label><input id="p_local" value="'+esc(p.local||"")+'"></div>'
    +(precisaKit(p)?'<div class="field"><label>Kit desta peça</label><select data-act="trocaKitPeca" data-id="'+p.id+'"><option value="">— escolher kit —</option>'+S.kits.filter(k=>k.luminaria_id===p.luminaria_id).map(k=>'<option value="'+k.id+'" '+(p.kit_id===k.id?"selected":"")+'>'+esc(k.nome)+'</option>').join("")+'</select></div>':'')
@@ -843,6 +844,58 @@ function renderEtiquetas(){
   $("#e_w").oninput=aj; $("#e_h").oninput=aj;
 }
 async function copiarUrl(d){ try{ await navigator.clipboard.writeText(d.u); msg("Endereço copiado."); }catch(e){ msg("Não consegui copiar. Selecione o endereço e copie à mão.",false); } }
+
+// ---- etiquetar: equipe da LumiDNA e terceiros (ex.: fabricante na bancada) por link de obra ----
+Object.assign(S,{etqLinks:[],etqObra:null});
+async function carregarEtqLinks(){
+  const r=await sb.from("v2_etiq_links").select("*").order("criado_em",{ascending:false});
+  if(r.error){ $("#app").innerHTML='<div class="msg e">Não consegui abrir o Etiquetar: '+esc(r.error.message)+'<br>Se for "does not exist" ou "permission denied", falta rodar o SQL v2_11_etiquetar no Supabase.</div>'; return false; }
+  S.etqLinks=r.data; return true;
+}
+const progObra=oid=>{ const ps=S.pecas.filter(p=>p.obra_id===oid); return {f:ps.filter(p=>p.etiquetada_em).length,t:ps.length}; };
+const urlEtq=id=>new URL("../etiquetar/?t="+id,location.href).href;
+const linkAtivo=l=>!l.revogado_em&&new Date(l.valido_ate)>new Date();
+const trilho=(f,t)=>'<div style="height:8px;background:var(--soft);border-radius:99px;overflow:hidden;margin:8px 0"><i style="display:block;height:100%;width:'+(t?Math.round(f*100/t):0)+'%;background:var(--green)"></i></div>';
+function renderEtiquetarHome(){
+  S.view="etq";
+  const rows=S.obras.map(o=>{ const g=progObra(o.id);
+    return '<div class="card"><b>'+esc(o.nome)+'</b><div class="small">'+(o.cliente?esc(o.cliente)+' · ':'')+g.f+' de '+g.t+' etiquetas fixadas'+(g.t&&g.f===g.t?' · <span class="ok">completa</span>':'')+'</div>'+trilho(g.f,g.t)
+     +'<div class="bar" style="margin:0"><button class="p" data-act="etqAbrir" data-id="'+o.id+'" '+(g.t?'':'disabled')+'>Etiquetar agora</button><button data-act="etqObra" data-id="'+o.id+'">Links e andamento</button></div></div>'; }).join("");
+  $("#app").innerHTML=navArea("etq")+'<div class="small" style="margin-bottom:12px">Escolha a obra. <b>Etiquetar agora</b> abre a tela de etiquetar no celular. <b>Links e andamento</b> permite compartilhar a obra com o fabricante, sem senha.</div>'+(S.obras.length?rows:'<div class="small">Nenhuma obra ainda.</div>');
+}
+function renderEtqObra(){
+  S.view="etqo"; const o=S.obras.find(x=>x.id===S.etqObra), g=progObra(o.id), links=S.etqLinks.filter(l=>l.obra_id===o.id&&!l.interno);
+  const st=l=>l.revogado_em?'<span class="no">cancelado</span>':(new Date(l.valido_ate)<new Date()?'<span class="no">vencido</span>':'<span class="ok">ativo</span>');
+  $("#app").innerHTML='<button data-act="areaEtiquetar" style="margin-bottom:12px">‹ Etiquetar</button>'
+   +'<div class="card"><h3 style="margin:0">'+esc(o.nome)+'</h3><div class="small">'+g.f+' de '+g.t+' etiquetas fixadas</div>'+trilho(g.f,g.t)
+   +'<div class="bar" style="margin:0"><button class="p" data-act="etqAbrir" data-id="'+o.id+'" '+(g.t?'':'disabled')+'>Etiquetar agora (equipe LumiDNA)</button><button data-act="etiquetasDaObra" data-id="'+o.id+'">Etiquetas e NFC</button></div></div>'
+   +'<div class="card"><h3 style="margin-top:0">Compartilhar com o fabricante ou parceiro</h3><div class="small" style="margin-bottom:10px">Gera um link só desta obra, sem senha. Quem abrir vê apenas série, modelo e ambiente das luminárias (sem preços, pedidos, CPF ou relatórios) e só consegue marcar a etiqueta como fixada ou imprimir as etiquetas. Você cancela quando quiser.</div>'
+   +'<div class="grid"><div class="field"><label>Para quem é o link *</label><input id="lk_nome" placeholder="Ex.: LDArti — bancada" maxlength="60"></div><div class="field"><label>Vale por quantos dias</label><input id="lk_dias" type="number" min="1" max="180" value="30"></div></div><button class="p" data-act="etqGerar" data-id="'+o.id+'">Gerar link</button></div>'
+   +'<div class="card"><h3 style="margin-top:0">Links desta obra</h3>'+(links.length?'<table><tr><th>Para quem</th><th>Situação</th><th></th></tr>'+links.map(l=>'<tr><td><b>'+esc(l.nome)+'</b><div class="small">criado em '+dataHora(l.criado_em)+' · até '+dmy(l.valido_ate)+(l.ultimo_uso_em?' · último uso '+dataHora(l.ultimo_uso_em):' · ainda não usado')+'</div></td><td>'+st(l)+'</td><td>'
+     +(linkAtivo(l)?'<button data-act="etqCopiar" data-id="'+l.id+'" style="padding:2px 8px">Copiar</button> <a href="https://wa.me/?text='+encodeURIComponent("Link para etiquetar a obra "+o.nome+": "+urlEtq(l.id))+'" target="_blank" rel="noopener">WhatsApp</a> <button class="danger" data-act="etqCancelar" data-id="'+l.id+'" style="padding:2px 8px">Cancelar</button>':'')+'</td></tr>').join("")+'</table>':'<div class="small">Nenhum link gerado ainda.</div>')+'</div>';
+}
+async function etqAbrir(d){
+  const oid=Number(d.id); if(!S.etqLinks.length&&!await carregarEtqLinks()) return;
+  let l=S.etqLinks.find(x=>x.obra_id===oid&&x.interno&&linkAtivo(x)&&new Date(x.valido_ate)>new Date(Date.now()+864e5));
+  if(!l){ const r=await sb.from("v2_etiq_links").insert({obra_id:oid,nome:"Equipe LumiDNA",interno:true,valido_ate:new Date(Date.now()+30*864e5).toISOString()}).select().single();
+    if(r.error) return msg("Não consegui abrir a tela de etiquetar: "+r.error.message,false); l=r.data; S.etqLinks.unshift(l); }
+  location.href=urlEtq(l.id);
+}
+async function etqGerar(d){
+  const nome=($("#lk_nome").value||"").trim(), dias=parseInt($("#lk_dias").value);
+  if(nome.length<3) return msg("Escreva para quem é o link (ex.: LDArti — bancada).",false);
+  if(!(dias>=1&&dias<=180)) return msg("A validade deve ser de 1 a 180 dias.",false);
+  const r=await sb.from("v2_etiq_links").insert({obra_id:Number(d.id),nome:nome,interno:false,valido_ate:new Date(Date.now()+dias*864e5).toISOString()}).select().single();
+  if(r.error) return msg("Erro ao gerar o link: "+r.error.message,false);
+  if(!await carregarEtqLinks()) return; renderEtqObra(); msg("Link criado. Use Copiar ou WhatsApp para enviar.");
+}
+async function etqCopiar(d){ try{ await navigator.clipboard.writeText(urlEtq(d.id)); msg("Link copiado."); }catch(e){ prompt("Copie o link:",urlEtq(d.id)); } }
+async function etqCancelar(d){
+  if(!confirm("Cancelar este link? Quem estiver com ele deixa de conseguir abrir.")) return;
+  const r=await sb.from("v2_etiq_links").update({revogado_em:new Date().toISOString()}).eq("id",d.id);
+  if(r.error) return msg("Erro ao cancelar: "+r.error.message,false);
+  if(!await carregarEtqLinks()) return; renderEtqObra(); msg("Link cancelado.");
+}
 
 // ---- editar peças da obra e itens da peça ----
 async function adicionarPeca(){
@@ -1261,7 +1314,11 @@ function renderPend(){
 // ---- cliques ----
 const ACT={
   nada:()=>{},
-  home:()=>{msg("");renderHome(); window.scrollTo(0,0);}, areaCat:()=>{msg("");renderLista()}, areaObras:async()=>{msg(""); if(await carregarObras()) renderObras();},
+  home:()=>{msg("");renderHome(); window.scrollTo(0,0);}, areaEtiquetar:async()=>{msg(""); if(await carregarObras()&&await carregarEtqLinks()) renderEtiquetarHome();},
+  etqObra:async d=>{msg(""); if(!await carregarEtqLinks()) return; S.etqObra=Number(d.id); renderEtqObra();},
+  etqAbrir, etqGerar, etqCopiar, etqCancelar,
+  etiquetasDaObra:d=>{ S.obra=JSON.parse(JSON.stringify(S.obras.find(o=>o.id===Number(d.id)))); renderEtiquetas(); },
+  areaCat:()=>{msg("");renderLista()}, areaObras:async()=>{msg(""); if(await carregarObras()) renderObras();},
   areaPedidos:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderPedidos();},
   filtroPed:d=>{S.pedFiltro=d.f;renderPedidos()}, abrirPedido:d=>{S.voltaPara=null;abrirPedido(Number(d.id))}, abrirPendente:d=>{S.voltaPara="pend";abrirPedido(Number(d.id))}, voltaPedidos:()=>{msg(""); if(S.voltaPara==="pend") renderPend(); else renderPedidos();},
   areaPend:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderPend();}, mudaStatus, salvarObsPedido, salvarPag, imprimirPedido:()=>window.print(), copiaLinkPedido:async()=>{ const pd=S.pedidos.find(x=>x.id===S.ped); const u=new URL("../pedido/?n="+pd.id+"&t="+pd.token,location.href).href; try{ await navigator.clipboard.writeText(u); msg("Link do cliente copiado."); }catch(e){ prompt("Copie o link:",u); } },

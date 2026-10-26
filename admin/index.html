@@ -72,6 +72,12 @@ body:has(.homebg) header b span{color:#2c2c2a}
 @media(max-width:640px){.row{grid-template-columns:14px 40px minmax(0,1fr) 80px}.row .c4,.row .c6{display:none}}
 .orow{grid-template-columns:14px minmax(0,1.5fr) minmax(0,1fr) minmax(96px,auto) minmax(0,1.2fr)}
 .orow .np{white-space:nowrap}
+.iitem{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;background:#fff}
+.ihead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:12px}
+.iqtd{flex:none;text-align:center;background:var(--soft);border-radius:8px;padding:4px 14px}.iqtd b{display:block;font-size:20px;line-height:1.2}
+.ibtns{display:flex;gap:12px;flex-wrap:wrap}
+.ibtns button{flex:1;min-width:84px;min-height:46px;padding:10px 10px;font-size:15px}
+.iedit input{max-width:160px;margin-bottom:10px}
 .tscroll{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch}
 @media(max-width:640px){.tscroll table{font-size:12px}.tscroll th,.tscroll td{padding:6px 4px}}
 .pdrow{grid-template-columns:14px minmax(0,1.3fr) minmax(0,1.2fr) minmax(96px,auto) minmax(110px,auto)}
@@ -766,7 +772,10 @@ function renderPeca(){
   S.view="peca";
   const p=S.pecas.find(x=>x.id===S.peca), o=S.obras.find(x=>x.id===p.obra_id), l=porId(p.luminaria_id), g=garantiaTxt(p), kit=S.kits.find(k=>k.id===p.kit_id);
   const itens=S.pitens.filter(i=>i.peca_id===p.id), atuais=itens.filter(i=>!i.removido_em), antigos=itens.filter(i=>i.removido_em);
-  const linhaAtual=i=>{ const c=porId(i.produto_id); return '<tr><td>'+TIPO1[c.tipo]+' <b data-act="info" data-id="'+c.id+'" style="cursor:pointer;text-decoration:underline dotted">'+esc(c.codigo)+'</b> <span class="small">'+(esc(c.fabricante)||"")+'</span></td><td>'+(S.qtdItem===i.id?'<input id="q_novo" type="number" min="1" value="'+i.quantidade+'" style="width:80px"> <button data-act="salvarQtd" data-id="'+i.id+'" style="padding:2px 8px">Salvar</button> <button data-act="cancelaQtd" style="padding:2px 8px">Cancelar</button>':i.quantidade+' <button data-act="editarQtd" data-id="'+i.id+'" style="padding:2px 8px">Editar</button>')+'</td><td>'+dmy(i.instalado_em)+'</td><td><button data-act="trocar" data-id="'+i.id+'" style="padding:2px 8px">Trocar</button> <button class="danger" data-act="removerItem" data-id="'+i.id+'" style="padding:2px 8px">Retirar</button></td></tr>'; };
+  const linhaAtual=i=>{ const c=porId(i.produto_id), edit=S.qtdItem===i.id;
+    return '<div class="iitem"><div class="ihead"><div style="min-width:0"><div>'+TIPO1[c.tipo]+' <b data-act="info" data-id="'+c.id+'" style="cursor:pointer;text-decoration:underline dotted">'+esc(c.codigo)+'</b></div><div class="small">'+(esc(c.fabricante)||"")+' · instalado em '+dmy(i.instalado_em)+'</div></div><div class="iqtd"><span class="small">Qtd</span><b>'+i.quantidade+'</b></div></div>'
+     +(edit?'<div class="iedit"><label>Nova quantidade</label><input id="q_novo" type="number" min="1" value="'+i.quantidade+'"><div class="ibtns"><button class="p" data-act="salvarQtd" data-id="'+i.id+'">Salvar</button><button data-act="cancelaQtd">Cancelar</button></div></div>'
+      :'<div class="ibtns"><button data-act="editarQtd" data-id="'+i.id+'">Editar qtd</button><button data-act="trocar" data-id="'+i.id+'">Trocar</button><button class="danger" data-act="removerItem" data-id="'+i.id+'">Retirar</button></div>')+'</div>'; };
   let formTroca="";
   if(S.trocando){
     const it=itens.find(i=>i.id===S.trocando), c=porId(it.produto_id);
@@ -788,7 +797,7 @@ function renderPeca(){
    +'<div class="field"><label>Garantia até (a empresa pode ajustar)</label><input id="p_gar" type="date" value="'+esc(p.garantia_ate||"")+'"></div>'
    +'<div class="field"><label>Observação desta peça (só desta peça)</label><textarea id="p_obs" style="min-height:70px">'+esc(p.observacao||"")+'</textarea></div>'
    +'<div class="bar"><button class="p" data-act="salvarPeca">Salvar peça</button><button class="danger" data-act="apagarPeca">Excluir peça (cadastrada por engano)</button></div></div>'
-   +'<div class="card"><h3 style="margin-top:0">Itens instalados agora</h3>'+(atuais.length?'<table><tr><th>Item</th><th>Qtd</th><th>Instalado em</th><th></th></tr>'+atuais.map(linhaAtual).join("")+'</table>':'<div class="small">'+(precisaKit(p)?'Nenhum item. Escolha o kit na lista da obra.':'Lâmpada integrada: não tem itens separados.')+'</div>')+formTroca
+   +'<div class="card"><h3 style="margin-top:0">Itens instalados agora</h3>'+(atuais.length?atuais.map(linhaAtual).join(""):'<div class="small">'+(precisaKit(p)?'Nenhum item. Escolha o kit na lista da obra.':'Lâmpada integrada: não tem itens separados.')+'</div>')+formTroca
    +(antigos.length?'<h4 style="margin:14px 0 6px">Itens que já saíram</h4><table><tr><th>Item</th><th>Qtd</th><th>Instalado</th><th>Saiu</th><th>Motivo</th></tr>'+antigos.map(i=>{const c=porId(i.produto_id);return '<tr><td>'+esc(c.codigo)+'</td><td>'+i.quantidade+'</td><td>'+dmy(i.instalado_em)+'</td><td>'+dmy(i.removido_em)+'</td><td>'+esc(i.motivo_remocao)+'</td></tr>'}).join("")+'</table>':'')+(precisaKit(p)?formAddItem:'')+'</div>'
    +'<div class="card"><h3 style="margin-top:0">Histórico <span class="small">(só acrescenta, nunca se apaga)</span></h3>'+(S.hist.length?'<table>'+S.hist.map(h=>'<tr><td style="width:130px" class="small">'+dmy(h.data)+'</td><td>'+esc(h.descricao||h.tipo)+(h.motivo?' <span class="small">· '+esc(h.motivo)+'</span>':'')+'</td></tr>').join("")+'</table>':'<div class="small">Sem registros.</div>')+'</div>'
    +'<div class="card"><h3 style="margin-top:0">Endereço da etiqueta</h3><div class="small" style="overflow-wrap:anywhere;margin-bottom:8px">'+esc(url)+'</div><div class="bar"><a href="'+esc(url)+'" target="_blank" rel="noopener"><button>Abrir página pública</button></a><button data-act="copiarUrl" data-u="'+esc(url)+'">Copiar endereço</button></div></div>';

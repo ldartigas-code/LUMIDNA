@@ -958,14 +958,50 @@ function renderPedido(){
    +'<table><tr><th style="width:32%">Peça</th><td>'+(pc?'<a href="#" data-act="abrirPeca" data-id="'+pc.id+'"><b>'+esc(pc.serial)+'</b></a> · '+esc(l?l.codigo:"?")+' · obra '+esc(o?o.nome:"?")+(pc.local?' · '+esc(pc.local):''):'?')+'</td></tr>'
    +'<tr><th>Garantia</th><td><span class="'+g.c+'">'+g.t+'</span> <span class="small">(na hora do pedido: '+(pd.em_garantia?"em garantia":"fora da garantia")+')</span></td></tr>'
    +'<tr><th>Cliente</th><td><b>'+esc(pd.contato_nome)+'</b> · '+esc(pd.contato_fone)+(wa?' · <a href="'+wa+'" target="_blank" rel="noopener">chamar no WhatsApp</a>':'')+'</td></tr>'
+   +(pd.contato_email?'<tr><th>E-mail</th><td><a href="mailto:'+esc(pd.contato_email)+'">'+esc(pd.contato_email)+'</a></td></tr>':'')
+   +(pd.documento?'<tr><th>CPF / CNPJ</th><td>'+esc(fmtDoc(pd.documento))+'</td></tr>':'')
+   +(pd.endereco?'<tr><th>Entrega</th><td>'+esc(txtEndereco(pd.endereco))+'</td></tr>':'')
+   +(pd.forma_pagamento?'<tr><th>Pagamento</th><td><b>'+esc(PAG[pd.forma_pagamento]||pd.forma_pagamento)+'</b> · <span class="'+(pd.pagamento_status==="pago"?"ok":"no")+'">'+esc(PAGST[pd.pagamento_status]||"—")+'</span></td></tr>':'')
    +(pd.motivo?'<tr><th>Motivo</th><td>'+esc(pd.motivo)+'</td></tr>':'')
    +(afet?'<tr><th>Item com problema</th><td>'+esc(porId(afet.produto_id).codigo)+'</td></tr>':'')
    +(pd.observacao?'<tr><th>Observação do cliente</th><td>'+esc(pd.observacao)+'</td></tr>':'')+'</table></div>'
    +(pd.tipo==="manutencao"?painelMan(pd):"")
    +(ls.length?'<div class="card"><h3 style="margin-top:0">Itens pedidos</h3><table><tr><th>Item</th><th>Qtd</th><th>Preço</th><th>Subtotal</th></tr>'+ls.map(i=>'<tr><td>'+esc(i.descricao)+'</td><td>'+i.quantidade+'</td><td>'+(i.preco_unit!=null?brl(i.preco_unit):'<span class="no">sem preço</span>')+'</td><td>'+(i.preco_unit!=null?brl(i.preco_unit*i.quantidade):'—')+'</td></tr>').join("")+'</table><div style="text-align:right;margin-top:8px"><b>Total: '+(t.sem?'a combinar ('+brl(t.total)+' + itens sem preço)':brl(t.total))+'</b></div></div>':'')
+   +painelPag(pd,t)
    +'<div class="card"><div class="field"><label>Anotação interna (o cliente não vê)</label><textarea id="pd_obs" style="min-height:70px">'+esc(pd.obs_interna||"")+'</textarea></div><div class="bar">'+botoes+'<button data-act="salvarObsPedido">Salvar anotação</button></div>'
    +(pd.tipo==="compra"?'<div class="small">Entregue: o cliente passa a ver o botão "Já instalei" na página da peça. Quando ele confirma (ou você registra a instalação), os itens da peça são trocados e entram no histórico.</div>':'')+'</div>';
   posPedido(pd);
+}
+const PAG={pix:"PIX",cartao:"Cartão de crédito",boleto:"Boleto"};
+const PAGST={aguardando_confirmacao:"Aguardando confirmação",aguardando_pagamento:"Aguardando pagamento",pago:"Pago",cancelado:"Cancelado",estornado:"Estornado"};
+const fmtDoc=v=>{ const d=String(v||"").replace(/\D/g,""); return d.length===11?d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4"):(d.length===14?d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,"$1.$2.$3/$4-$5"):d); };
+const txtEndereco=e=>{ if(!e) return ""; return [ (e.rua||"")+(e.numero?", "+e.numero:"")+(e.complemento?" ("+e.complemento+")":""), e.bairro, (e.cidade||"")+(e.uf?"/"+e.uf:""), e.cep?"CEP "+String(e.cep).replace(/(\d{5})(\d{3})/,"$1-$2"):"" ].filter(Boolean).join(" · "); };
+// pagamento: a empresa confere preço, prazo e frete, define o valor final e libera o pagamento
+function painelPag(pd,t){
+  if(!pd.forma_pagamento) return "";
+  const sug=(t.sem?null:t.total+(pd.frete||0));
+  const vf=pd.valor_final!=null?pd.valor_final:sug;
+  return '<div class="card"><h3 style="margin-top:0">Pagamento</h3>'
+   +'<div class="small" style="margin-bottom:10px">O cliente escolheu <b>'+esc(PAG[pd.forma_pagamento])+'</b>. Nada foi cobrado. Confira preço, prazo e frete, defina o valor final e libere o pagamento. Dados de cartão nunca ficam no sistema.</div>'
+   +'<div class="grid"><div class="field"><label>Frete (R$)</label><input id="pg_frete" inputmode="decimal" value="'+(pd.frete!=null?String(pd.frete).replace(".",","):"")+'" placeholder="0,00"></div>'
+   +'<div class="field"><label>Valor final a cobrar (R$)</label><input id="pg_valor" inputmode="decimal" value="'+(vf!=null?String(vf).replace(".",","):"")+'" placeholder="itens + frete"></div>'
+   +'<div class="field"><label>Situação do pagamento</label><select id="pg_status">'+Object.keys(PAGST).map(k=>'<option value="'+k+'" '+(pd.pagamento_status===k?"selected":"")+'>'+PAGST[k]+'</option>').join("")+'</select></div></div>'
+   +'<div class="small" style="margin-bottom:10px">Itens: '+(t.sem?'a combinar':brl(t.total))+(pd.pago_em?' · pago em '+dataHora(pd.pago_em):'')+'</div>'
+   +'<button class="p" data-act="salvarPag">Salvar pagamento</button></div>';
+}
+async function salvarPag(){
+  const pd=S.pedidos.find(x=>x.id===S.ped);
+  const frete=num($("#pg_frete").value), valor=num($("#pg_valor").value), st=$("#pg_status").value;
+  if(frete!=null&&frete<0) return msg("O frete não pode ser negativo.",false);
+  if(valor!=null&&valor<0) return msg("O valor final não pode ser negativo.",false);
+  if((st==="aguardando_pagamento"||st==="pago")&&!(valor>0)) return msg("Defina o valor final antes de liberar ou marcar como pago.",false);
+  if(st==="pago"&&pd.pagamento_status!=="pago"&&!confirm("Marcar o pedido #"+pd.id+" como PAGO no valor de "+brl(valor)+"?")) return;
+  const row={frete:frete,valor_final:valor,pagamento_status:st};
+  if(st==="pago"&&pd.pagamento_status!=="pago") row.pago_em=new Date().toISOString();
+  if(st!=="pago") row.pago_em=null;
+  const r=await sb.from("v2_pedidos").update(row).eq("id",pd.id);
+  if(r.error) return msg("Erro ao salvar o pagamento: "+r.error.message,false);
+  await carregarPedidos(); renderPedido(); msg("Pagamento do pedido #"+pd.id+" salvo.");
 }
 async function mudaStatus(d){
   const pd=S.pedidos.find(x=>x.id===S.ped), s=d.s;
@@ -1225,7 +1261,7 @@ const ACT={
   home:()=>{msg("");renderHome(); window.scrollTo(0,0);}, areaCat:()=>{msg("");renderLista()}, areaObras:async()=>{msg(""); if(await carregarObras()) renderObras();},
   areaPedidos:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderPedidos();},
   filtroPed:d=>{S.pedFiltro=d.f;renderPedidos()}, abrirPedido:d=>{S.voltaPara=null;abrirPedido(Number(d.id))}, abrirPendente:d=>{S.voltaPara="pend";abrirPedido(Number(d.id))}, voltaPedidos:()=>{msg(""); if(S.voltaPara==="pend") renderPend(); else renderPedidos();},
-  areaPend:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderPend();}, mudaStatus, salvarObsPedido,
+  areaPend:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderPend();}, mudaStatus, salvarObsPedido, salvarPag,
   areaRel:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderRel();},
   relAba:d=>{S.relTab=d.t;S.relObra=null;renderRel()}, relAbrirObra:d=>{S.relObra=Number(d.id);renderRel()}, relVoltaObra:()=>{S.relObra=null;renderRel()},
   relFiltra:()=>{ const de=$("#r_de").value, ate=$("#r_ate").value; if(de&&ate&&de>ate) return msg("A data inicial é depois da final.",false); msg(""); S.relDe=de; S.relAte=ate; renderRel(); },

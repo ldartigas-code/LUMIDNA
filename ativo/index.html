@@ -55,6 +55,15 @@ h2.sec{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--
 .stepper span{font-weight:650;min-width:20px;text-align:center}
 .addcart{margin-top:auto;background:var(--orange);border:0;color:#1a0d04;font-weight:700;border-radius:10px;padding:9px;font-size:13px;cursor:pointer;font-family:inherit}
 .addcart:active{transform:scale(.98)}
+@supports (grid-template-rows:subgrid){
+  .shop-grid{row-gap:0}
+  .shop-card{display:grid;grid-row:span 9;grid-template-rows:subgrid;gap:0;align-content:start;margin-bottom:10px}
+  .shop-card>*{margin-top:8px;min-width:0}
+  .shop-card>.r1{margin-top:0}
+  .shop-card>.r1{grid-row:1}.shop-card>.r2{grid-row:2}.shop-card>.r3{grid-row:3}.shop-card>.r4{grid-row:4}.shop-card>.r5{grid-row:5}
+  .shop-card>.r6{grid-row:6}.shop-card>.r7{grid-row:7}.shop-card>.r8{grid-row:8}.shop-card>.r9{grid-row:9}
+  .shop-card>.addcart{margin-top:8px}
+}
 select.vsel{width:100%;border:1px solid var(--line);border-radius:10px;padding:7px 8px;font:inherit;font-size:12.5px;background:var(--s2);color:var(--ink)}
 .cart-fab{position:fixed;right:18px;bottom:96px;z-index:6;width:54px;height:54px;border-radius:50%;background:var(--orange);border:0;color:#1a0d04;box-shadow:0 8px 20px rgba(255,122,47,.4);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .cart-fab svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -234,18 +243,18 @@ function render(){
   $("#bar").classList.remove("hidden"); $("#fab").classList.remove("hidden");
 }
 function cardKitLum(k,nome,sub,fab,preco,fotos){
-  return '<div class="shop-card"><div class="shop-photo '+(fotos.length>1?"duo":"")+'">'+fotosHtml(fotos)+'</div><div class="shop-nome">'+nome+'</div><div class="shop-fab">'+esc(sub)+'</div><div class="shop-fab">'+esc(fab)+'</div>'
-   +'<div class="shop-preco '+(preco==null?"consulta":"")+'">'+brl(preco)+'</div><button type="button" class="addcart" data-ac="add" data-k="'+k+'">Adicionar ao carrinho</button></div>';
+  return '<div class="shop-card"><div class="shop-photo r1 '+(fotos.length>1?"duo":"")+'">'+fotosHtml(fotos)+'</div><div class="shop-nome r2">'+nome+'</div><div class="shop-fab r3">'+esc(sub)+'</div><div class="shop-fab r4">'+esc(fab)+'</div>'
+   +'<div class="shop-preco r6 '+(preco==null?"consulta":"")+'">'+brl(preco)+'</div><button type="button" class="addcart r9" data-ac="add" data-k="'+k+'">Adicionar ao carrinho</button></div>';
 }
 function cardItem(i){
   const base="item:"+i.peca_item_id, sid=VAR[base]||0, s=sid?(i.similares||[]).find(x=>x.id===sid):null, c=s||i, q=Math.min(QTD[base]||1,i.quantidade);
-  return '<div class="shop-card"><div class="shop-photo">'+fotosHtml(c.foto_url?[c.foto_url]:[])+'</div>'
-   +'<div class="shop-nome">'+NOME[i.tipo]+'</div><div class="shop-fab"><b style="color:var(--ink)">'+esc(c.codigo)+'</b>'+(s?'<span class="chip">aprovado</span>':'')+'</div>'
-   +'<div class="shop-fab">'+esc(c.fabricante||"")+(spec(c)?(c.fabricante?' · ':'')+spec(c):'')+'</div>'
-   +((i.similares&&i.similares.length)?'<select class="vsel" data-ch="variante" data-base="'+base+'"><option value="0">Original</option>'+i.similares.map(x=>'<option value="'+x.id+'" '+(x.id===sid?"selected":"")+'>Similar aprovado pela LDArti · '+esc(x.codigo)+'</option>').join("")+'</select>':'')
-   +'<div class="shop-preco '+(c.preco==null?"consulta":"")+'">'+brl(c.preco)+'</div>'
-   +(i.quantidade>1?'<div class="small" style="margin:-4px 0 0">Instaladas: '+i.quantidade+'</div><div class="stepper"><button type="button" data-ac="qtd" data-base="'+base+'" data-d="-1">−</button><span>'+q+'</span><button type="button" data-ac="qtd" data-base="'+base+'" data-d="1">+</button></div>':'')
-   +'<button type="button" class="addcart" data-ac="add" data-k="'+base+':'+sid+'" data-base="'+base+'">Adicionar ao carrinho</button></div>';
+  return '<div class="shop-card"><div class="shop-photo r1">'+fotosHtml(c.foto_url?[c.foto_url]:[])+'</div>'
+   +'<div class="shop-nome r2">'+NOME[i.tipo]+'</div><div class="shop-fab r3"><b style="color:var(--ink)">'+esc(c.codigo)+'</b>'+(s?'<span class="chip">aprovado</span>':'')+'</div>'
+   +'<div class="shop-fab r4">'+esc(c.fabricante||"")+(spec(c)?(c.fabricante?' · ':'')+spec(c):'')+'</div>'
+   +((i.similares&&i.similares.length)?'<select class="vsel r5" data-ch="variante" data-base="'+base+'"><option value="0">Original</option>'+i.similares.map(x=>'<option value="'+x.id+'" '+(x.id===sid?"selected":"")+'>Similar aprovado pela LDArti · '+esc(x.codigo)+'</option>').join("")+'</select>':'')
+   +'<div class="shop-preco r6 '+(c.preco==null?"consulta":"")+'">'+brl(c.preco)+'</div>'
+   +(i.quantidade>1?'<div class="small r7" style="margin:-4px 0 0">Instaladas: '+i.quantidade+'</div><div class="stepper r8"><button type="button" data-ac="qtd" data-base="'+base+'" data-d="-1">−</button><span>'+q+'</span><button type="button" data-ac="qtd" data-base="'+base+'" data-d="1">+</button></div>':'')
+   +'<button type="button" class="addcart r9" data-ac="add" data-k="'+base+':'+sid+'" data-base="'+base+'">Adicionar ao carrinho</button></div>';
 }
 function renderLoja(){
   const l=P.luminaria, itens=P.itens||[], integ=l.integrada, cards=[];

@@ -94,7 +94,7 @@ function faltas(p){
   if(p.tipo==="led"){ if(p.potencia_w==null) f.push("potência"); if(!p.cct_k) f.push("temp. de cor"); }
   if(p.tipo==="driver"){ if(p.corrente_ma==null) f.push("corrente"); }
   if(p.tipo==="optica"){ if(p.facho_graus==null) f.push("facho"); }
-  if(p.tipo==="luminaria"&&p.integrada&&p.potencia_w==null) f.push("potência");
+  if(p.tipo==="luminaria"&&p.integrada&&p.potencia_w==null&&!(p.detalhes&&p.detalhes.sem_potencia)) f.push("potência");
   return f;
 }
 function specLinha(p){

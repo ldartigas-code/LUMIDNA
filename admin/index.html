@@ -72,6 +72,8 @@ body:has(.homebg) header b span{color:#2c2c2a}
 @media(max-width:640px){.row{grid-template-columns:14px 40px minmax(0,1fr) 80px}.row .c4,.row .c6{display:none}}
 .orow{grid-template-columns:14px minmax(0,1.5fr) minmax(0,1fr) minmax(96px,auto) minmax(0,1.2fr)}
 .orow .np{white-space:nowrap}
+.tscroll{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch}
+@media(max-width:640px){.tscroll table{font-size:12px}.tscroll th,.tscroll td{padding:6px 4px}}
 .pdrow{grid-template-columns:14px minmax(0,1.3fr) minmax(0,1.2fr) minmax(96px,auto) minmax(110px,auto)}
 .pdrow .np{white-space:nowrap}
 .pnrow{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(110px,auto)}
@@ -1067,7 +1069,7 @@ function renderRel(){
   $("#app").innerHTML=navArea("rel")
    +'<div class="bar"><div class="tabs" style="margin:0">'+abas.map(a=>'<button class="tab '+(S.relTab===a[0]?"on":"")+'" data-act="relAba" data-t="'+a[0]+'">'+a[1]+'</button>').join("")+'</div></div>'
    +'<div class="bar"><div><label>De</label><input id="r_de" type="date" value="'+esc(S.relDe)+'" style="width:160px"></div><div><label>Até</label><input id="r_ate" type="date" value="'+esc(S.relAte)+'" style="width:160px"></div><button data-act="relFiltra" style="align-self:end">Aplicar período</button><button data-act="relLimpa" style="align-self:end">Limpar</button><button data-act="relCsv" style="align-self:end;margin-left:auto">Baixar planilha (CSV)</button></div>'
-   +'<div class="card">'+corpo+'</div>';
+   +'<div class="card"><div class="tscroll">'+corpo+'</div></div>';
 }
 
 // ---- similares homologados (cadastro no item) ----

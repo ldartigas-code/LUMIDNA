@@ -207,7 +207,7 @@ function compFotos(){
   const lum=P.luminaria.foto_url, kit=[...new Set((P.itens||[]).filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,4);
   if(!lum&&!kit.length) return '<div class="comp"><div class="main"><span class="small">Foto ainda não cadastrada</span></div></div>';
   return '<div class="comp">'+(lum?'<div class="main"><img src="'+esc(lum)+'" alt=""></div>':'')
-   +(kit.length?(lum?'<div class="cap">Kit instalado</div>':'')+'<div class="kitrow '+(lum?"":"solo")+'" style="grid-template-columns:repeat('+Math.min(kit.length,lum?4:2)+',1fr)">'+kit.map(u=>'<div class="kb"><img src="'+esc(u)+'" alt=""></div>').join("")+'</div>':'')+'</div>';
+   +(kit.length&&!lum?'<div class="kitrow solo" style="grid-template-columns:repeat('+Math.min(kit.length,2)+',1fr)">'+kit.map(u=>'<div class="kb"><img src="'+esc(u)+'" alt=""></div>').join("")+'</div>':'')+'</div>';
 }
 function render(){
   const l=P.luminaria, itens=P.itens||[], g=P.garantia_ate;

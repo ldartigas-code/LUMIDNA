@@ -95,6 +95,7 @@ body:has(.homebg) header b span{color:#2c2c2a}
 <div id="app"><div class="small">Carregando…</div></div>
 </div>
 <script src="../assets/supabase-config.js"></script>
+<script src="../assets/notificar.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script>
@@ -952,7 +953,7 @@ function renderPedido(){
     if(pd.status==="novo") botoes=bt("em_atendimento","Em atendimento","p")+bt("resolvido","Resolvido")+bt("cancelado","Cancelar","danger");
     else if(pd.status==="em_atendimento") botoes=bt("resolvido","Resolvido","p")+bt("cancelado","Cancelar","danger");
   }
-  $("#app").innerHTML='<button data-act="voltaPedidos" style="margin-bottom:12px">‹ '+(S.voltaPara==="pend"?"Pendências":"Pedidos")+'</button>'
+  $("#app").innerHTML='<div class="bar noprint" style="margin-bottom:12px"><button data-act="voltaPedidos">‹ '+(S.voltaPara==="pend"?"Pendências":"Pedidos")+'</button><button data-act="imprimirPedido" style="margin-left:auto">Imprimir pedido</button></div>'
    +'<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0">Pedido #'+pd.id+' · '+(pd.tipo==="problema"?"Aviso de problema":(pd.tipo==="manutencao"?"Manutenção informada":"Compra de peças"))+'</h3><b class="'+(pd.status==="novo"?"no":"")+'">'+ST[pd.status]+'</b></div>'
    +'<div class="small" style="margin:4px 0 10px">Recebido em '+dataHora(pd.criado_em)+(pd.entregue_em?' · entregue em '+dataHora(pd.entregue_em):'')+(pd.instalado_em?' · instalado em '+dataHora(pd.instalado_em):'')+'</div>'
    +'<table><tr><th style="width:32%">Peça</th><td>'+(pc?'<a href="#" data-act="abrirPeca" data-id="'+pc.id+'"><b>'+esc(pc.serial)+'</b></a> · '+esc(l?l.codigo:"?")+' · obra '+esc(o?o.nome:"?")+(pc.local?' · '+esc(pc.local):''):'?')+'</td></tr>'
@@ -961,14 +962,14 @@ function renderPedido(){
    +(pd.contato_email?'<tr><th>E-mail</th><td><a href="mailto:'+esc(pd.contato_email)+'">'+esc(pd.contato_email)+'</a></td></tr>':'')
    +(pd.documento?'<tr><th>CPF / CNPJ</th><td>'+esc(fmtDoc(pd.documento))+'</td></tr>':'')
    +(pd.endereco?'<tr><th>Entrega</th><td>'+esc(txtEndereco(pd.endereco))+'</td></tr>':'')
-   +(pd.forma_pagamento?'<tr><th>Pagamento</th><td><b>'+esc(PAG[pd.forma_pagamento]||pd.forma_pagamento)+'</b> · <span class="'+(pd.pagamento_status==="pago"?"ok":"no")+'">'+esc(PAGST[pd.pagamento_status]||"—")+'</span></td></tr>':'')
+   +(pd.forma_pagamento?'<tr><th>Pagamento</th><td><b>'+esc(PAG[pd.forma_pagamento]||pd.forma_pagamento)+'</b> · <span class="'+(pd.pagamento_status==="pago"?"ok":"no")+'">'+esc(PAGST[pd.pagamento_status]||"—")+'</span>'+(String(pd.pagamento_ref||"").startsWith("DEMO")?' <b class="no">· SIMULADO (demonstração, não é dinheiro real)</b>':'')+'</td></tr>':'')
    +(pd.motivo?'<tr><th>Motivo</th><td>'+esc(pd.motivo)+'</td></tr>':'')
    +(afet?'<tr><th>Item com problema</th><td>'+esc(porId(afet.produto_id).codigo)+'</td></tr>':'')
    +(pd.observacao?'<tr><th>Observação do cliente</th><td>'+esc(pd.observacao)+'</td></tr>':'')+'</table></div>'
    +(pd.tipo==="manutencao"?painelMan(pd):"")
    +(ls.length?'<div class="card"><h3 style="margin-top:0">Itens pedidos</h3><table><tr><th>Item</th><th>Qtd</th><th>Preço</th><th>Subtotal</th></tr>'+ls.map(i=>'<tr><td>'+esc(i.descricao)+'</td><td>'+i.quantidade+'</td><td>'+(i.preco_unit!=null?brl(i.preco_unit):'<span class="no">sem preço</span>')+'</td><td>'+(i.preco_unit!=null?brl(i.preco_unit*i.quantidade):'—')+'</td></tr>').join("")+'</table><div style="text-align:right;margin-top:8px"><b>Total: '+(t.sem?'a combinar ('+brl(t.total)+' + itens sem preço)':brl(t.total))+'</b></div></div>':'')
    +painelPag(pd,t)
-   +'<div class="card"><div class="field"><label>Anotação interna (o cliente não vê)</label><textarea id="pd_obs" style="min-height:70px">'+esc(pd.obs_interna||"")+'</textarea></div><div class="bar">'+botoes+'<button data-act="salvarObsPedido">Salvar anotação</button></div>'
+   +'<div class="card noprint"><div class="field"><label>Anotação interna (o cliente não vê)</label><textarea id="pd_obs" style="min-height:70px">'+esc(pd.obs_interna||"")+'</textarea></div><div class="bar">'+botoes+'<button data-act="salvarObsPedido">Salvar anotação</button></div>'
    +(pd.tipo==="compra"?'<div class="small">Entregue: o cliente passa a ver o botão "Já instalei" na página da peça. Quando ele confirma (ou você registra a instalação), os itens da peça são trocados e entram no histórico.</div>':'')+'</div>';
   posPedido(pd);
 }
@@ -981,12 +982,13 @@ function painelPag(pd,t){
   if(!pd.forma_pagamento) return "";
   const sug=(t.sem?null:t.total+(pd.frete||0));
   const vf=pd.valor_final!=null?pd.valor_final:sug;
-  return '<div class="card"><h3 style="margin-top:0">Pagamento</h3>'
+  return '<div class="card noprint"><h3 style="margin-top:0">Pagamento</h3>'
    +'<div class="small" style="margin-bottom:10px">O cliente escolheu <b>'+esc(PAG[pd.forma_pagamento])+'</b>. Nada foi cobrado. Confira preço, prazo e frete, defina o valor final e libere o pagamento. Dados de cartão nunca ficam no sistema.</div>'
    +'<div class="grid"><div class="field"><label>Frete (R$)</label><input id="pg_frete" inputmode="decimal" value="'+(pd.frete!=null?String(pd.frete).replace(".",","):"")+'" placeholder="0,00"></div>'
    +'<div class="field"><label>Valor final a cobrar (R$)</label><input id="pg_valor" inputmode="decimal" value="'+(vf!=null?String(vf).replace(".",","):"")+'" placeholder="itens + frete"></div>'
    +'<div class="field"><label>Situação do pagamento</label><select id="pg_status">'+Object.keys(PAGST).map(k=>'<option value="'+k+'" '+(pd.pagamento_status===k?"selected":"")+'>'+PAGST[k]+'</option>').join("")+'</select></div></div>'
    +'<div class="small" style="margin-bottom:10px">Itens: '+(t.sem?'a combinar':brl(t.total))+(pd.pago_em?' · pago em '+dataHora(pd.pago_em):'')+'</div>'
+   +(pd.token?'<div class="small" style="margin-bottom:10px">Link do cliente (acompanhar e pagar): <a href="../pedido/?n='+pd.id+'&t='+esc(pd.token)+'" target="_blank" rel="noopener">abrir</a> · <a href="#" data-act="copiaLinkPedido">copiar link</a></div>':'')
    +'<button class="p" data-act="salvarPag">Salvar pagamento</button></div>';
 }
 async function salvarPag(){
@@ -1001,7 +1003,8 @@ async function salvarPag(){
   if(st!=="pago") row.pago_em=null;
   const r=await sb.from("v2_pedidos").update(row).eq("id",pd.id);
   if(r.error) return msg("Erro ao salvar o pagamento: "+r.error.message,false);
-  await carregarPedidos(); renderPedido(); msg("Pagamento do pedido #"+pd.id+" salvo.");
+  if(st!==pd.pagamento_status){ if(st==="aguardando_pagamento") avisarEvento("liberado",pd.id,pd.token); else if(st==="pago") avisarEvento("pago",pd.id,pd.token); }
+  await carregarPedidos(); renderPedido(); msg("Pagamento do pedido #"+pd.id+" salvo."+(st==="aguardando_pagamento"&&pd.pagamento_status!=="aguardando_pagamento"?" O cliente já pode pagar pelo link do pedido.":""));
 }
 async function mudaStatus(d){
   const pd=S.pedidos.find(x=>x.id===S.ped), s=d.s;
@@ -1261,7 +1264,7 @@ const ACT={
   home:()=>{msg("");renderHome(); window.scrollTo(0,0);}, areaCat:()=>{msg("");renderLista()}, areaObras:async()=>{msg(""); if(await carregarObras()) renderObras();},
   areaPedidos:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderPedidos();},
   filtroPed:d=>{S.pedFiltro=d.f;renderPedidos()}, abrirPedido:d=>{S.voltaPara=null;abrirPedido(Number(d.id))}, abrirPendente:d=>{S.voltaPara="pend";abrirPedido(Number(d.id))}, voltaPedidos:()=>{msg(""); if(S.voltaPara==="pend") renderPend(); else renderPedidos();},
-  areaPend:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderPend();}, mudaStatus, salvarObsPedido, salvarPag,
+  areaPend:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderPend();}, mudaStatus, salvarObsPedido, salvarPag, imprimirPedido:()=>window.print(), copiaLinkPedido:async()=>{ const pd=S.pedidos.find(x=>x.id===S.ped); const u=new URL("../pedido/?n="+pd.id+"&t="+pd.token,location.href).href; try{ await navigator.clipboard.writeText(u); msg("Link do cliente copiado."); }catch(e){ prompt("Copie o link:",u); } },
   areaRel:async()=>{msg(""); if(await carregarObras()&&await carregarPedidos()) renderRel();},
   relAba:d=>{S.relTab=d.t;S.relObra=null;renderRel()}, relAbrirObra:d=>{S.relObra=Number(d.id);renderRel()}, relVoltaObra:()=>{S.relObra=null;renderRel()},
   relFiltra:()=>{ const de=$("#r_de").value, ate=$("#r_ate").value; if(de&&ate&&de>ate) return msg("A data inicial é depois da final.",false); msg(""); S.relDe=de; S.relAte=ate; renderRel(); },

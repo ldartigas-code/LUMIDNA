@@ -56,12 +56,18 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;p
 .etqs{display:flex;flex-wrap:wrap;gap:8px}
 .etq{display:flex;gap:2mm;align-items:center;border:1px dashed #b4b2a9;padding:2mm;overflow:hidden;font-size:9pt;line-height:1.25;background:#fff;break-inside:avoid}
 .etq .qr svg{width:100%;height:100%;display:block}.etq .qr{flex:none}.etq .et{min-width:0;overflow-wrap:anywhere}.etq .et b{font-size:11pt}
-.home{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:6px}
-.tile{display:flex;flex-direction:column;gap:6px;text-align:left;padding:18px 18px 16px;border:1px solid var(--line);border-left:5px solid var(--orange);border-radius:12px;background:#fff;min-height:112px;cursor:pointer}
-.tile:hover{background:var(--soft);box-shadow:0 2px 10px rgba(0,0,0,.06)}
-.tile b{font-size:19px;display:flex;align-items:center;gap:6px}
-.tile span.d{font-size:13px;color:var(--muted);font-weight:400}
-.homeh{margin:6px 0 2px;font-size:22px;font-weight:700}
+.homebg{position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg,#ff7a2f 0%,#ffa66b 30%,#f1ddcf 62%,#e7e6e1 100%)}
+body:has(.homebg) header b,body:has(.homebg) header .small,body:has(.homebg) header a{color:#fff}
+body:has(.homebg) header b span{color:#2c2c2a}
+.homewrap{display:flex;flex-direction:column;height:calc(100vh - 100px);height:calc(100dvh - 100px);min-height:400px}
+.homeh{margin:0;font-size:20px;font-weight:700;color:#fff}
+.homesub{font-size:13px;color:#fff;opacity:.92;margin:0 0 10px}
+.home{flex:1;min-height:0;display:grid;grid-template-columns:1fr;grid-template-rows:repeat(5,minmax(0,1fr));gap:10px}
+.tile{display:flex;flex-direction:column;justify-content:center;gap:2px;text-align:left;padding:6px 16px;min-height:0;border:0;border-left:6px solid var(--orange);border-radius:12px;background:rgba(255,255,255,.94);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.10)}
+.tile:hover{background:#fff;box-shadow:0 3px 12px rgba(0,0,0,.16)}
+.tile b{font-size:18px;display:flex;align-items:center;gap:6px;line-height:1.2}
+.tile span.d{font-size:12.5px;color:var(--muted);font-weight:400;line-height:1.3}
+@media(min-width:700px){.home{grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,minmax(0,1fr))}.homewrap{height:calc(100vh - 120px);height:calc(100dvh - 120px)}}
 @media print{.noprint,header,#msg{display:none!important}.wrap{max-width:none;padding:0}.etq{border:0;outline:0.1mm dashed #bbb}.etqs{gap:0}}
 @media(max-width:640px){.row{grid-template-columns:14px 40px minmax(0,1fr) 80px}.row .c4,.row .c6{display:none}}
 </style>
@@ -561,13 +567,13 @@ const navArea=a=>'<div class="noprint" style="display:flex;align-items:center;ga
 function renderHome(){
   S.view="home";
   const t=(act,nome,desc,extra)=>'<button class="tile" data-act="'+act+'"><b>'+nome+(extra||"")+'</b><span class="d">'+desc+'</span></button>';
-  $("#app").innerHTML='<div class="homeh">Painel</div><div class="small" style="margin-bottom:12px">Escolha uma área para trabalhar.</div><div class="home">'
+  $("#app").innerHTML='<div class="homebg"></div><div class="homewrap"><div class="homeh">Painel</div><div class="homesub">Escolha uma área para trabalhar.</div><div class="home">'
     +t("areaCat","Catálogo","Luminárias, LEDs, drivers, ópticas e kits",' <span class="small" style="font-weight:400">('+S.produtos.length+')</span>')
     +t("areaPend","Pendências","Problemas em aberto e manutenções para aprovar",badgePend())
     +t("areaObras","Obras","Obras, peças, etiquetas e fichas")
     +t("areaPedidos","Pedidos","Compras, problemas e manutenções dos clientes")
     +t("areaRel","Relatórios","Manutenção, vendas e componentes que mais falham")
-    +'</div>';
+    +'</div></div>';
 }
 
 async function carregarObras(){

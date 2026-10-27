@@ -72,6 +72,7 @@ body:has(.homebg) header b span{color:#2c2c2a}
 @media(max-width:640px){.row{grid-template-columns:14px 40px minmax(0,1fr) 80px}.row .c4,.row .c6{display:none}}
 .orow{grid-template-columns:14px minmax(0,1.5fr) minmax(0,1fr) minmax(96px,auto) minmax(0,1.2fr)}
 .orow .np{white-space:nowrap}
+.gcard{display:flex;gap:12px;align-items:flex-start}.gcard .gimg{width:60px;height:60px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px;flex:none}.gcard .gimg.v{background:var(--soft)}
 .iitem{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;background:#fff}
 .ihead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:12px}
 .iqtd{flex:none;text-align:center;background:var(--soft);border-radius:8px;padding:4px 14px}.iqtd b{display:block;font-size:20px;line-height:1.2}
@@ -634,7 +635,7 @@ function renderObra(){
    +'<div class="bar"><button class="p" data-act="salvarObra">Salvar obra</button>'+(!novo&&!ps.length?'<button class="danger" data-act="apagarObra">Excluir obra</button>':'')+'</div></div>':'';
   $("#app").innerHTML='<button data-act="voltaObras" style="margin-bottom:12px">‹ Obras</button>'
    +'<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h3 style="margin:0">'+(novo?"Nova obra":esc(o.nome))+'</h3>'+resumo+'</div>'
-   +(novo?'':'<div class="bar" style="margin:0"><button data-act="editObra">'+(S.editObra?"Fechar edição":"Editar dados da obra")+'</button>'+(ps.length?'<button data-act="etiquetas">Etiquetas e NFC</button><button class="p" data-act="etqObra" data-id="'+o.id+'">Etiquetar</button>':'')+'</div>')+'</div>'+form+'</div>'
+   +(novo?'':'<div class="bar" style="margin:0"><button data-act="editObra">'+(S.editObra?"Fechar edição":"Editar dados da obra")+'</button>'+(ps.length?'<button data-act="etiquetas">Etiquetas e NFC</button><button data-act="grupos">Grupos</button><button class="p" data-act="etqObra" data-id="'+o.id+'">Etiquetar</button>':'')+'</div>')+'</div>'+form+'</div>'
    +(novo?'<div class="small">Salve a obra para começar a adicionar as luminárias.</div>':blocoLuminarias(o,ps));
   if($("#o_nome")){ const upd=()=>{ const c=codigoObra($("#o_nome").value); $("#o_cod").innerHTML=novo?'Código do serial: <b>'+esc(c)+'</b> (fica fixo depois de salvar). Exemplo: '+esc(c)+'-NNN-001':'Código do serial: <b>'+esc(o.codigo)+'</b> · número da obra '+String(o.id).padStart(3,"0"); }; upd(); $("#o_nome").oninput=upd; }
   if($("#a_lum")){ $("#a_lum").oninput=atualizaKitAdd; atualizaKitAdd(); }
@@ -844,6 +845,54 @@ function renderEtiquetas(){
   $("#e_w").oninput=aj; $("#e_h").oninput=aj;
 }
 async function copiarUrl(d){ try{ await navigator.clipboard.writeText(d.u); msg("Endereço copiado."); }catch(e){ msg("Não consegui copiar. Selecione o endereço e copie à mão.",false); } }
+
+// ---- grupos: luminárias iguais no mesmo ambiente (obra + local + luminária + kit), sem tabela nova ----
+const partesLocal=l=>String(l||"").split(">").map(s=>s.trim()).filter(Boolean);
+const setorDe=l=>{ const p=partesLocal(l); return p.length>1?p.slice(0,-1).join(" › "):"Geral"; };
+const ambDe=l=>{ const p=partesLocal(l); return p.length?p[p.length-1]:"(sem ambiente)"; };
+const urlGrupo=s=>new URL("../ativo/?c="+encodeURIComponent(s)+"&g=1",location.href).href;
+function gruposDaObra(oid){
+  const m=new Map();
+  S.pecas.filter(p=>p.obra_id===oid&&p.status!=="retirada").forEach(p=>{ const k=[p.local||"",p.luminaria_id,p.kit_id||0].join("|"); if(!m.has(k)) m.set(k,{k:k,local:p.local||"",luminaria_id:p.luminaria_id,kit_id:p.kit_id||null,ps:[]}); m.get(k).ps.push(p); });
+  const arr=[...m.values()]; arr.forEach(g=>{ g.ps.sort((a,b)=>a.numero-b.numero); g.ancora=g.ps[0]; g.fixadas=g.ps.filter(p=>p.etiquetada_em).length; });
+  const cod=g=>String((porId(g.luminaria_id)||{}).codigo||"");
+  return arr.sort((a,b)=>setorDe(a.local).localeCompare(setorDe(b.local),"pt-BR")||ambDe(a.local).localeCompare(ambDe(b.local),"pt-BR",{numeric:true})||cod(a).localeCompare(cod(b),"pt-BR",{numeric:true}));
+}
+const assinaItens=p=>S.pitens.filter(x=>x.peca_id===p.id&&!x.removido_em).map(x=>x.produto_id+":"+x.quantidade).sort().join(",");
+const textoItens=p=>{ const m=new Map(); S.pitens.filter(x=>x.peca_id===p.id&&!x.removido_em).forEach(x=>m.set(x.produto_id,(m.get(x.produto_id)||0)+x.quantidade)); return [...m.entries()].map(([id,q])=>q+"x "+((porId(id)||{}).codigo||"?")).join(" + "); };
+Object.assign(S,{grupos:[],grpAberto:null,grupoEtq:null,grupoQtd:null});
+function renderGrupos(){
+  S.view="grupos"; const o=S.obra; S.grupos=gruposDaObra(o.id);
+  const total=S.grupos.reduce((s,g)=>s+g.ps.length,0), fix=S.grupos.reduce((s,g)=>s+g.fixadas,0);
+  let atual="", corpo="";
+  S.grupos.forEach((g,i)=>{
+    const cab=(setorDe(g.local)!=="Geral"?setorDe(g.local)+" › ":"")+ambDe(g.local);
+    if(cab!==atual){ atual=cab; corpo+='<h3 style="margin:18px 0 8px">'+esc(cab)+'</h3>'; }
+    const l=porId(g.luminaria_id)||{}, kit=S.kits.find(k=>k.id===g.kit_id), iguais=g.ps.every(p=>assinaItens(p)===assinaItens(g.ancora)), its=textoItens(g.ancora);
+    corpo+='<div class="card"><div class="gcard">'+(l.foto_url?'<img class="gimg" src="'+esc(l.foto_url)+'" alt="">':'<div class="gimg v"></div>')
+     +'<div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b style="font-size:16px">'+esc(l.codigo||"?")+'</b><b>'+g.ps.length+' unidade(s)</b></div>'
+     +'<div class="small">'+esc(l.fabricante||"")+(kit?' · kit '+esc(kit.nome):'')+'</div>'
+     +(its?'<div class="small">'+esc(its)+' <span class="small">(por unidade)</span></div>':(l.integrada?'<div class="small">lâmpada integrada</div>':'<div class="no">sem itens cadastrados</div>'))
+     +(iguais?'':'<div class="no">Atenção: as unidades deste grupo têm itens diferentes entre si.</div>')
+     +'<div class="small">Séries '+esc(g.ps[0].serial)+(g.ps.length>1?' … '+esc(g.ps[g.ps.length-1].serial):'')+' · etiquetas fixadas '+g.fixadas+' de '+g.ps.length+'</div></div></div>'
+     +'<div class="bar" style="margin:10px 0 0"><button class="p" data-act="grpEtq" data-i="'+i+'">Etiquetas do grupo</button><a href="'+esc(urlGrupo(g.ancora.serial))+'" target="_blank" rel="noopener" style="align-self:center">Página do grupo</a><button data-act="grpUnidades" data-i="'+i+'">'+(S.grpAberto===i?"Esconder unidades":"Ver unidades")+'</button></div>'
+     +(S.grpAberto===i?'<div style="margin-top:8px">'+g.ps.map(p=>'<a href="#" data-act="abrirPeca" data-id="'+p.id+'" style="display:inline-block;margin:2px 10px 2px 0">'+esc(p.serial)+(p.etiquetada_em?' ✓':'')+'</a>').join("")+'</div>':'')+'</div>';
+  });
+  $("#app").innerHTML='<button data-act="voltaObra" style="margin-bottom:12px">‹ '+esc(o.nome)+'</button>'
+   +'<div class="card"><h3 style="margin:0">Grupos da obra '+esc(o.nome)+'</h3><div class="small"><b>'+total+'</b> luminária(s) em <b>'+S.grupos.length+'</b> grupo(s) · etiquetas fixadas '+fix+' de '+total+'</div>'
+   +'<div class="small" style="margin-top:6px">Grupo = luminárias iguais (mesmo modelo e kit) no mesmo ambiente. Elas podem receber a <b>mesma etiqueta</b>; a série individual só é usada quando uma delas precisa de histórico próprio. Para separar por setor, escreva o local assim: <b>Torre A &gt; 4º andar &gt; Corredor Norte</b>.</div></div>'+(corpo||'<div class="small">Esta obra ainda não tem peças.</div>');
+}
+function renderEtiquetasGrupo(){
+  const g=S.grupos[S.grupoEtq], o=S.obra, l=porId(g.luminaria_id)||{}, w=S.etq.w, h2=S.etq.h, n=Math.max(1,Math.min(500,S.grupoQtd||g.ps.length));
+  let qr=""; try{ const q=qrcode(0,"M"); q.addData(urlGrupo(g.ancora.serial)); q.make(); qr=q.createSvgTag({cellSize:4,margin:0,scalable:true}); }catch(e){}
+  const un='<div class="etq" style="width:'+w+'mm;height:'+h2+'mm"><div class="qr" style="width:'+(h2-4)+'mm;height:'+(h2-4)+'mm">'+qr+'</div><div class="et"><b>'+esc(ambDe(g.local))+'</b><br>'+esc(l.codigo||"")+'<br>Grupo de '+g.ps.length+'<br><span>'+esc(g.ancora.serial)+'</span></div></div>';
+  $("#app").innerHTML='<div class="noprint"><button data-act="grupos" style="margin-bottom:12px">‹ Grupos</button>'
+   +'<div class="card"><h3 style="margin-top:0">Etiquetas do grupo: '+esc(ambDe(g.local))+' · '+esc(l.codigo||"")+'</h3><div class="small" style="margin-bottom:8px">Todas as etiquetas são <b>iguais</b>: o QR abre a página do grupo ('+g.ps.length+' luminária(s)). O código sob o QR ('+esc(g.ancora.serial)+') serve para digitar na consulta se o QR falhar.</div>'
+   +'<div class="bar"><div><label>Quantidade de etiquetas</label><input id="g_n" type="number" min="1" max="500" value="'+n+'" style="width:110px"></div><div><label>Largura (mm)</label><input id="e_w" type="number" min="20" max="200" value="'+w+'" style="width:100px"></div><div><label>Altura (mm)</label><input id="e_h" type="number" min="15" max="100" value="'+h2+'" style="width:100px"></div><button class="p" data-act="imprimir" style="align-self:end">Imprimir</button></div></div></div>'
+   +'<div class="etqs">'+Array.from({length:n},()=>un).join("")+'</div>';
+  const aj=()=>{ const w2=Math.max(20,parseInt($("#e_w").value)||60), h3=Math.max(15,parseInt($("#e_h").value)||30); S.etq={w:w2,h:h3}; document.querySelectorAll(".etq").forEach(e=>{e.style.width=w2+"mm";e.style.height=h3+"mm"}); document.querySelectorAll(".etq .qr").forEach(e=>{e.style.width=(h3-4)+"mm";e.style.height=(h3-4)+"mm"}); };
+  $("#e_w").oninput=aj; $("#e_h").oninput=aj; $("#g_n").onchange=e=>{ S.grupoQtd=parseInt(e.target.value)||g.ps.length; renderEtiquetasGrupo(); };
+}
 
 // ---- etiquetar: equipe da LumiDNA e terceiros (ex.: fabricante na bancada) por link de obra ----
 Object.assign(S,{etqLinks:[],etqObra:null});
@@ -1314,7 +1363,8 @@ function renderPend(){
 // ---- cliques ----
 const ACT={
   nada:()=>{},
-  home:()=>{msg("");renderHome(); window.scrollTo(0,0);}, areaEtiquetar:async()=>{msg(""); if(await carregarObras()&&await carregarEtqLinks()) renderEtiquetarHome();},
+  home:()=>{msg("");renderHome(); window.scrollTo(0,0);}, grupos:()=>{msg(""); renderGrupos();}, grpEtq:d=>{S.grupoEtq=Number(d.i); S.grupoQtd=null; renderEtiquetasGrupo();}, grpUnidades:d=>{S.grpAberto=S.grpAberto===Number(d.i)?null:Number(d.i); renderGrupos();},
+  areaEtiquetar:async()=>{msg(""); if(await carregarObras()&&await carregarEtqLinks()) renderEtiquetarHome();},
   etqObra:async d=>{msg(""); if(!await carregarEtqLinks()) return; S.etqObra=Number(d.id); renderEtqObra();},
   etqAbrir, etqGerar, etqCopiar, etqCancelar,
   etiquetasDaObra:d=>{ S.obra=JSON.parse(JSON.stringify(S.obras.find(o=>o.id===Number(d.id)))); renderEtiquetas(); },

@@ -141,6 +141,7 @@ function avisaEmpresa(d){
       body:JSON.stringify(Object.assign({chave:NOTIFY_CHAVE,serial:SERIAL,modelo:P&&P.luminaria?P.luminaria.codigo:"",local:P&&P.local?P.local:""},d))}).catch(()=>{});
   }catch(e){}
 }
+const GRUPO=new URLSearchParams(location.search).get("g")==="1"; let GI=null;
 let SERIAL="", P=null, PED=[], CART=[], QTD={}, VAR={}, SHEET=null, FOTO=null, TERMOS=null;
 
 function guardado(){ try{ return JSON.parse(localStorage.getItem("lumidna_contato")||"{}"); }catch(e){ return {}; } }
@@ -162,6 +163,7 @@ async function carregar(){
   P=r.data; if(!P){ $("#content").innerHTML='<div class="card"><b>Luminária não encontrada.</b><div class="small" style="margin-top:4px">Confira o código da etiqueta: '+esc(SERIAL)+'</div></div>'; return false; }
   const p=await sb.rpc("v2_pedidos_peca",{p_serial:SERIAL}); PED=(p.error||!p.data)?[]:p.data;
   TERMOS=termoDaPeca(P.luminaria.fabricante);
+  if(GRUPO&&!GI){ try{ const g=await sb.rpc("v2_grupo_info",{p_serial:SERIAL}); if(!g.error&&g.data&&g.data.quantidade>1) GI=g.data; }catch(e){} }
   return true;
 }
 
@@ -217,6 +219,7 @@ function compFotos(){
   return '<div class="comp">'+(lum?'<div class="main"><img src="'+esc(lum)+'" alt=""></div>':'')
    +(kit.length&&!lum?'<div class="kitrow solo" style="grid-template-columns:repeat('+Math.min(kit.length,2)+',1fr)">'+kit.map(u=>'<div class="kb"><img src="'+esc(u)+'" alt=""></div>').join("")+'</div>':'')+'</div>';
 }
+function grupoBanner(){ return (GRUPO&&GI)?'<div class="alert"><b>Etiqueta de grupo.</b> Esta luminária é uma das <b>'+GI.quantidade+'</b> iguais em <b>'+esc(GI.local||"este ambiente")+'</b>. Os dados, as peças e a garantia valem para todas. Ao pedir ou reportar, diga qual luminária é.</div>':""; }
 function render(){
   const l=P.luminaria, itens=P.itens||[], g=P.garantia_ate;
   const gOk=g&&g>=hoje();
@@ -225,7 +228,7 @@ function render(){
   const cct=l.integrada?l.cct_k:(leds[0]&&leds[0].cct_k);
   const fotos=l.foto_url?[l.foto_url]:[...new Set(itens.filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,2);
   $("#content").innerHTML=
-   '<div class="hero">'+compFotos()
+   grupoBanner()+'<div class="hero">'+compFotos()
    +'<div class="row"><div><div class="id">'+esc(l.codigo)+'</div><div class="model">'+esc(l.fabricante||"")+'</div></div>'
    +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:none;max-width:52%;text-align:right"><span class="status '+(g?(gOk?"st-ok":"st-bad"):"st-off")+'"><span class="dot"></span>'+(g?(gOk?"Em garantia":"Garantia vencida"):"Sem garantia informada")+'</span>'
    +(TERMOS&&g?'<button type="button" class="btn" data-ac="termos" style="padding:8px 14px;font-size:13px;width:auto">Termos de garantia</button>':'')
@@ -273,7 +276,7 @@ function renderRegs(){
      +(p.decisao_msg?'<div class="small" style="color:var(--ink)">Mensagem da LumiDNA: '+esc(p.decisao_msg)+'</div>':'')
      +(p.linhas&&p.linhas.length?'<div class="small">'+p.linhas.map(x=>x.quantidade+'x '+esc(x.descricao)).join(" · ")+'</div><div class="small">Total: '+(sem?"a combinar":brl(p.total))+'</div>':'')
      +(p.tipo==="compra"&&meuToken(p.id)?'<a class="addcart" style="display:inline-block;margin-top:8px;padding:9px 16px;text-decoration:none" href="../pedido/?n='+p.id+'&t='+encodeURIComponent(meuToken(p.id))+'">Acompanhar pedido / pagar</a> ':'')
-     +(p.tipo==="compra"&&p.status==="entregue"?'<button type="button" class="addcart" style="margin-top:8px;padding:9px 16px" data-ac="instalei" data-id="'+p.id+'">Já instalei</button>':'')
+     +(p.tipo==="compra"&&p.status==="entregue"&&!(GRUPO&&GI)?'<button type="button" class="addcart" style="margin-top:8px;padding:9px 16px" data-ac="instalei" data-id="'+p.id+'">Já instalei</button>':'')
      +'</div>';
   }).join("")+'</div>';
 }
@@ -336,7 +339,7 @@ function termos(){
 function abreSheet(html,nome){ SHEET=nome; $("#sheet").innerHTML=html+'<div id="smsg"></div>'; $("#ov").classList.remove("hidden"); document.body.style.overflow="hidden"; }
 function fechaSheet(){ SHEET=null; $("#ov").classList.add("hidden"); $("#sheet").innerHTML=""; document.body.style.overflow=""; }
 function carrinho(){
-  location.href="../carrinho/?c="+encodeURIComponent(SERIAL); return;
+  location.href="../carrinho/?c="+encodeURIComponent(SERIAL)+((GRUPO&&GI)?"&g=1":""); return;
   if(!CART.length){ abreSheet('<h3>Carrinho</h3><div class="small">Nenhuma peça no carrinho ainda. Escolha as peças desta luminária e toque em Adicionar ao carrinho.</div><div class="acoes" style="margin-top:14px"><button type="button" class="btn" data-ac="fechar">Fechar</button></div>',"cart"); return; }
   const t=totalCart();
   abreSheet('<h3>Carrinho</h3>'+CART.map((l,n)=>{ const r=resolve(l), q=r.pl.quantidade;
@@ -374,6 +377,7 @@ function problema(){
   const c=guardado(), itens=P.itens||[];
   abreSheet('<h3>Reportar problema</h3><div class="small" style="margin-bottom:14px">Conte o que está acontecendo. A equipe da LumiDNA recebe o aviso e entra em contato. Se sentir cheiro de queimado, ver faísca ou fiação aquecida, desligue o circuito e chame um profissional agora.</div>'
    +'<div class="field"><label>Qual parte está com problema?</label><select id="p_item"><option value="">Não sei / a luminária toda</option>'+itens.map(i=>'<option value="'+i.peca_item_id+'">'+esc(NOME[i.tipo])+' · '+esc(i.codigo)+'</option>').join("")+'</select></div>'
+   +((GRUPO&&GI)?'<div class="field"><label>Qual luminária do grupo? *</label><input id="p_un" placeholder="Ex.: terceira da esquerda, perto da porta" maxlength="120"></div>':'')
    +'<div class="field"><label>O que acontece? *</label><select id="p_motivo"><option value="">— escolher —</option>'+MOTIVOS.filter(m=>m!=="troca preventiva").map(m=>'<option>'+m+'</option>').join("")+'</select></div>'
    +'<div class="field"><label>Detalhes (opcional)</label><textarea id="p_obs"></textarea></div>'
    +'<div class="field"><label>Nome *</label><input id="p_nome" value="'+esc(c.nome||"")+'" autocomplete="name"></div><div class="field"><label>Telefone / WhatsApp *</label><input id="p_fone" value="'+esc(c.fone||"")+'" type="tel" autocomplete="tel"></div>'
@@ -382,9 +386,10 @@ function problema(){
 async function enviarProblema(){
   const motivo=$("#p_motivo").value, nome=$("#p_nome").value.trim(), fone=$("#p_fone").value.trim(), item=$("#p_item").value?Number($("#p_item").value):null;
   if(!motivo) return msg("Escolha o que está acontecendo.","e");
+  const un=(GRUPO&&GI)?(($("#p_un")||{}).value||"").trim():""; if(GRUPO&&GI&&!un) return msg("Diga qual luminária do grupo é (posição ou referência).","e");
   if(!nome||!fone) return msg("Informe seu nome e telefone para contato.","e");
   $("#enviar").disabled=true;
-  const r=await sb.rpc("v2_criar_pedido",{p_serial:SERIAL,p_tipo:"problema",p_nome:nome,p_fone:fone,p_motivo:motivo,p_obs:$("#p_obs").value.trim()||null,p_item_afetado:item,p_linhas:[]});
+  const r=await sb.rpc("v2_criar_pedido",{p_serial:SERIAL,p_tipo:"problema",p_nome:nome,p_fone:fone,p_motivo:motivo,p_obs:((un?"[Grupo "+SERIAL+"] Luminária: "+un+($("#p_obs").value.trim()?" — "+$("#p_obs").value.trim():""):$("#p_obs").value.trim())||null),p_item_afetado:item,p_linhas:[]});
   if(r.error){ $("#enviar").disabled=false; return msg(r.error.message||"Não consegui enviar. Tente de novo.","e"); }
   guardar(nome,fone); const id=r.data.id;
   avisaEmpresa({tipo:"problema",id:id,nome:nome,fone:fone,motivo:motivo,obs:$("#p_obs").value.trim(),item:$("#p_item").selectedOptions[0].text});
@@ -412,6 +417,7 @@ function reduzFoto(file){
   });
 }
 function manutencao(){
+  if(GRUPO&&GI){ abreSheet('<h3>Informar manutenção</h3><div class="small" style="margin-bottom:14px">Esta etiqueta é de um grupo de luminárias iguais. Para o histórico ficar certo, a manutenção é registrada pela equipe da LumiDNA: use <b>Reportar problema</b> dizendo qual luminária é.</div><div class="acoes"><button type="button" class="btn p" data-ac="problema">Reportar problema</button><button type="button" class="btn" data-ac="fechar">Fechar</button></div>',"man"); return; }
   FOTO=null; const c=guardado(), itens=P.itens||[];
   if(!itens.length){ abreSheet('<h3>Informar manutenção</h3><div class="small">Esta luminária não tem itens separados cadastrados para informar manutenção. Fale com a LumiDNA.</div><div class="acoes" style="margin-top:14px"><button type="button" class="btn" data-ac="fechar">Fechar</button></div>',"man"); return; }
   abreSheet('<h3>Informar manutenção feita</h3><div class="small" style="margin-bottom:14px">Trocou alguma parte desta luminária? Conte o que foi instalado. A LumiDNA confere e aprova para atualizar o cadastro da sua luminária; só vale depois de aprovada.</div>'

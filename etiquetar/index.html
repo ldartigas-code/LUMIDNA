@@ -79,8 +79,9 @@ const LINK=(new URLSearchParams(location.search).get("t")||"").trim();
 const urlPeca=s=>LUMIDNA_SITE_BASE+"/ativo/?c="+encodeURIComponent(s);
 const urlGrupo=s=>LUMIDNA_SITE_BASE+"/ativo/?c="+encodeURIComponent(s)+"&g=1";
 const ambDe=l=>{ const p=String(l||"").split(">").map(s=>s.trim()).filter(Boolean); return p.length?p[p.length-1]:"(sem ambiente)"; };
-function gruposFiltrados(){ const m=new Map(); filtradas().forEach(p=>{ const k=[p.local||"",p.modelo,p.kit||0].join("|"); if(!m.has(k)) m.set(k,{local:p.local||"",modelo:p.modelo,foto:p.foto_url,ps:[]}); m.get(k).ps.push(p); }); const a=[...m.values()]; a.forEach(g=>g.ps.sort((x,y)=>(x.numero||0)-(y.numero||0)||x.serial.localeCompare(y.serial))); return a; }
-let GR=[], MODO="ind"; let D=null, ABA="etiquetar", AMB="", SO_PEND=true, NOME="", ETQ={w:60,h:30}, STREAM=null, LOOP=null, ULT={c:"",t:0}, BUSY=false;
+const chaveLocal=l=>String(l||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/\s+/g," ").trim();
+function gruposFiltrados(){ const m=new Map(); filtradas().forEach(p=>{ const k=[chaveLocal(p.local),p.modelo,p.kit||0].join("|"); if(!m.has(k)) m.set(k,{local:p.local||"",modelo:p.modelo,foto:p.foto_url,ps:[]}); m.get(k).ps.push(p); }); const a=[...m.values()]; a.forEach(g=>g.ps.sort((x,y)=>(x.numero||0)-(y.numero||0)||x.serial.localeCompare(y.serial))); return a; }
+let GR=[], MODO="ind", PEND_IMP=[]; let D=null, ABA="etiquetar", AMB="", SO_PEND=true, NOME="", ETQ={w:60,h:30}, STREAM=null, LOOP=null, ULT={c:"",t:0}, BUSY=false;
 try{ NOME=localStorage.getItem("lumidna_etiquetador")||""; }catch(e){}
 
 function msg(t,tipo){ $("#msg").innerHTML=t?'<div class="alert '+(tipo||"")+'">'+esc(t)+'</div>':""; if(t) window.scrollTo({top:0,behavior:"smooth"}); }
@@ -96,9 +97,9 @@ const filtradas=()=>D.pecas.filter(p=>!AMB||(p.local||"(sem ambiente)")===AMB);
 
 function render(){
   if(!NOME){ $("#content").innerHTML='<div class="card"><h1>Quem está etiquetando?</h1><div class="small" style="margin-bottom:12px">O seu nome fica registrado em cada etiqueta fixada.</div><div class="field"><input id="nm" placeholder="Seu nome" autocomplete="name" maxlength="60"></div><button type="button" class="btn p" data-ac="nome">Continuar</button></div>'; return; }
-  const f=feitas(), t=D.pecas.length, pc=t?Math.round(f*100/t):0;
+  const f=feitas(), t=D.pecas.length, pc=t?Math.round(f*100/t):0, imp=D.pecas.filter(p=>p.impressa_em).length, nfc=D.pecas.filter(p=>p.nfc_gravado_em).length;
   let h='<div class="card noprint"><h1>'+esc(D.obra)+'</h1><div class="small">'+esc(D.link_nome)+' · link válido até '+new Date(D.valido_ate).toLocaleDateString("pt-BR")+'</div>'
-   +'<div class="bar"><i style="width:'+pc+'%"></i></div><b>'+f+' de '+t+'</b> <span class="small">etiquetas fixadas</span>'+(f===t&&t?' <span class="ok-t">· obra completa ✓</span>':'')+'</div>'
+   +'<div class="bar"><i style="width:'+pc+'%"></i></div><b>'+f+' de '+t+'</b> <span class="small">fixadas · impressas '+imp+' · NFC '+nfc+' (opcional)</span>'+(f===t&&imp===t&&t?' <span class="ok-t">· obra completa ✓</span>':'')+'</div>'
    +'<div class="tabs noprint"><button type="button" class="tab '+(ABA==="etiquetar"?"on":"")+'" data-ac="aba" data-a="etiquetar">Etiquetar</button><button type="button" class="tab '+(ABA==="grupos"?"on":"")+'" data-ac="aba" data-a="grupos">Por grupo</button><button type="button" class="tab '+(ABA==="imprimir"?"on":"")+'" data-ac="aba" data-a="imprimir">Imprimir</button></div>';
   const am=ambientes();
   const selAmb='<div class="field noprint"><label>Ambiente</label><select id="amb"><option value="">Todos ('+t+')</option>'+am.map(a=>'<option value="'+esc(a.k)+'" '+(AMB===a.k?"selected":"")+'>'+esc(a.k)+' — '+(a.t-a.f)+' pendente(s) de '+a.t+'</option>').join("")+'</select></div>';
@@ -120,8 +121,8 @@ function telaEtiquetar(selAmb){
   por.forEach(g=>{
     const pend=tot.filter(p=>p.modelo===g.m&&!p.etiquetada_em).length, tt=tot.filter(p=>p.modelo===g.m).length;
     h+='<div class="grp noprint"><div class="gh">'+(g.foto?'<img src="'+esc(g.foto)+'" alt="">':'')+'<div class="t"><b>'+esc(g.m)+'</b><div class="small">'+esc(g.fab||"")+'</div></div><span class="pill '+(pend?"pe":"ok")+'">'+(pend?pend+" pendente(s)":"completo")+' · '+tt+'</span></div>'
-     +g.l.map(p=>'<div class="pc"><div class="s"><b>'+esc(p.serial)+'</b><div class="small">'+esc(p.local||"sem ambiente")+(p.etiquetada_em?' · <span class="ok-t">fixada '+dh(p.etiquetada_em)+(p.etiquetada_por?' por '+esc(p.etiquetada_por):'')+'</span>':'')+'</div></div>'
-       +(p.etiquetada_em?'<button type="button" class="und" data-ac="desfazer" data-s="'+esc(p.serial)+'">Desfazer</button>':'<button type="button" class="fix" data-ac="fixar" data-s="'+esc(p.serial)+'">Fixar</button>')+'</div>').join("")+'</div>';
+     +g.l.map(p=>'<div class="pc"><div class="s"><b>'+esc(p.serial)+'</b><div class="small">'+esc(p.local||"sem ambiente")+' · '+(p.impressa_em?'<span class="ok-t">impressa</span>':'<span style="color:var(--amber)">não impressa</span>')+(p.nfc_gravado_em?' · <span class="ok-t">NFC</span>':'')+(p.etiquetada_em?' · <span class="ok-t">fixada '+dh(p.etiquetada_em)+(p.etiquetada_por?' por '+esc(p.etiquetada_por):'')+'</span>':'')+'</div></div>'
+       +'<button type="button" class="und" data-ac="nfc" data-s="'+esc(p.serial)+'">'+(p.nfc_gravado_em?'NFC ✓':'NFC')+'</button>'+(p.etiquetada_em?'<button type="button" class="und" data-ac="desfazer" data-s="'+esc(p.serial)+'">Desfazer</button>':'<button type="button" class="fix" data-ac="fixar" data-s="'+esc(p.serial)+'">Fixar</button>')+'</div>').join("")+'</div>';
   });
   return h;
 }
@@ -129,7 +130,7 @@ function telaGrupos(selAmb){
   GR=gruposFiltrados(); let h=selAmb+'<div class="small noprint" style="margin-bottom:10px">Luminárias iguais no mesmo ambiente formam um grupo e usam a mesma etiqueta. Toque em <b>+1 fixada</b> a cada etiqueta colada.</div>';
   if(!GR.length) return h+'<div class="card noprint">Nenhuma luminária neste ambiente.</div>';
   GR.forEach((g,i)=>{ const f=g.ps.filter(p=>p.etiquetada_em).length, n=g.ps.length, pc=Math.round(f*100/n);
-    h+='<div class="grp noprint"><div class="gh">'+(g.foto?'<img src="'+esc(g.foto)+'" alt="">':'')+'<div class="t"><b>'+esc(g.modelo)+'</b><div class="small">'+esc(ambDe(g.local))+'</div></div><span class="pill '+(f===n?"ok":"pe")+'">'+f+' de '+n+'</span></div>'
+    h+='<div class="grp noprint"><div class="gh">'+(g.foto?'<img src="'+esc(g.foto)+'" alt="">':'')+'<div class="t"><b>'+esc(g.modelo)+'</b><div class="small">'+esc(ambDe(g.local))+'</div><div class="small">impressas '+g.ps.filter(p=>p.impressa_em).length+' · NFC '+g.ps.filter(p=>p.nfc_gravado_em).length+' · fixadas '+f+'</div></div><span class="pill '+(f===n?"ok":"pe")+'">'+f+' de '+n+'</span></div>'
      +'<div style="padding:10px 12px"><div class="bar" style="margin:0 0 10px"><i style="width:'+pc+'%"></i></div><div class="row2"><button type="button" class="fix" data-ac="gmais" data-i="'+i+'" '+(f===n?'disabled style="opacity:.5"':'')+'>+1 fixada</button><button type="button" class="und" data-ac="gmenos" data-i="'+i+'" '+(f===0?'disabled':'')+'>−1</button></div></div></div>'; });
   return h;
 }
@@ -141,7 +142,7 @@ function telaImprimir(selAmb){
   return selAmb+seletorModo()+'<div class="card noprint"><label class="small" style="display:flex;gap:8px;align-items:center;margin:0 0 12px"><input type="checkbox" id="sopend" '+(SO_PEND?"checked":"")+' style="width:20px;height:20px;accent-color:var(--orange)"> Imprimir só as pendentes</label>'
    +'<div class="small" style="margin-bottom:8px">Ajuste o tamanho para o da sua etiqueta. Cada uma leva o QR, a série, o modelo e o ambiente. Serão impressas <b>'+lista.length+'</b> etiqueta(s).</div>'
    +'<div class="row2"><div class="field" style="margin:0"><label>Largura (mm)</label><input id="e_w" type="number" min="20" max="200" value="'+w+'"></div><div class="field" style="margin:0"><label>Altura (mm)</label><input id="e_h" type="number" min="15" max="100" value="'+h2+'"></div></div>'
-   +'<button type="button" class="btn p" data-ac="imprimir" style="margin-top:12px">Imprimir</button></div><div class="etqs">'+etq+'</div>';
+   +'<button type="button" class="btn p" data-ac="imprimir" style="margin-top:12px">Imprimir</button><div id="impConf" class="alert noprint" style="display:none;margin-top:12px"></div></div><div class="etqs">'+etq+'</div>';
 }
 function seletorModo(){ return '<div class="field noprint"><label>Tipo de etiqueta</label><select id="modo"><option value="ind" '+(MODO==="ind"?"selected":"")+'>Individual: série de cada luminária</option><option value="grupo" '+(MODO==="grupo"?"selected":"")+'>Do grupo: igual para as luminárias iguais do ambiente</option></select></div>'; }
 function telaImprimirGrupo(selAmb){
@@ -151,7 +152,7 @@ function telaImprimirGrupo(selAmb){
   return selAmb+seletorModo()+'<div class="card noprint"><label class="small" style="display:flex;gap:8px;align-items:center;margin:0 0 12px"><input type="checkbox" id="sopend" '+(SO_PEND?"checked":"")+' style="width:20px;height:20px;accent-color:var(--orange)"> Imprimir só as que faltam fixar</label>'
    +'<div class="small" style="margin-bottom:8px">Cada grupo usa uma etiqueta igual para todas as suas luminárias. Serão impressas <b>'+total+'</b> etiqueta(s).</div>'
    +'<div class="row2"><div class="field" style="margin:0"><label>Largura (mm)</label><input id="e_w" type="number" min="20" max="200" value="'+w+'"></div><div class="field" style="margin:0"><label>Altura (mm)</label><input id="e_h" type="number" min="15" max="100" value="'+h2+'"></div></div>'
-   +'<button type="button" class="btn p" data-ac="imprimir" style="margin-top:12px">Imprimir</button></div><div class="etqs">'+etq+'</div>';
+   +'<button type="button" class="btn p" data-ac="imprimir" style="margin-top:12px">Imprimir</button><div id="impConf" class="alert noprint" style="display:none;margin-top:12px"></div></div><div class="etqs">'+etq+'</div>';
 }
 function ajusta(){ const w2=Math.max(20,parseInt($("#e_w").value)||60), h2=Math.max(15,parseInt($("#e_h").value)||30); ETQ={w:w2,h:h2}; document.querySelectorAll(".etq").forEach(e=>{e.style.width=w2+"mm";e.style.height=h2+"mm"}); document.querySelectorAll(".etq .qr").forEach(e=>{e.style.width=(h2-4)+"mm";e.style.height=(h2-4)+"mm"}); }
 
@@ -209,7 +210,13 @@ document.addEventListener("click",async e=>{
   else if(a==="scan"){ abreScanner(); }
   else if(a==="fixar"||a==="desfazer"){ el.disabled=true; const x=await marcar(el.dataset.s,a==="desfazer"); if(x.erro){ el.disabled=false; return msg(x.erro,"e"); } msg(""); const y=window.scrollY; render(); window.scrollTo(0,y); }
   else if(a==="manual"){ const s=acharSerial($("#manual").value); if(!s) return msg("Não achei essa série nesta obra.","e"); if(s==="?") return msg("Mais de uma série termina assim. Digite a série completa.","e"); const x=await marcar(s,false); if(x.erro) return msg(x.erro,"e"); msg(x.ja_estava?(x.serial+" já estava fixada."):("✓ "+x.serial+" · "+x.modelo+" fixada."),x.ja_estava?"":"s"); render(); }
-  else if(a==="imprimir"){ window.print(); }
+  else if(a==="imprimir"){
+    let ser=[]; if(MODO==="grupo"){ gruposFiltrados().forEach(g=>{ const n=SO_PEND?g.ps.filter(p=>!p.etiquetada_em).length:g.ps.length; ser=ser.concat(g.ps.filter(p=>!p.impressa_em).slice(0,n).map(p=>p.serial)); }); } else { ser=filtradas().filter(p=>!SO_PEND||!p.etiquetada_em).map(p=>p.serial); }
+    PEND_IMP=ser; window.print(); const b=$("#impConf"); if(b){ b.style.display=""; b.innerHTML='Você imprimiu estas etiquetas? Marcar <b>'+ser.length+'</b> como impressas?<div class="row2" style="margin-top:8px"><button type="button" class="btn s p" data-ac="impok">Sim, marcar</button><button type="button" class="btn s" data-ac="impno">Ainda não</button></div>'; }
+  }
+  else if(a==="impno"){ const b=$("#impConf"); if(b) b.style.display="none"; }
+  else if(a==="impok"){ if(!PEND_IMP.length){ const b=$("#impConf"); if(b) b.style.display="none"; return; } const r=await sb.rpc("v2_etiq_etapa",{p_link:LINK,p_seriais:PEND_IMP,p_etapa:"impressa",p_por:NOME,p_desfazer:false}); if(r.error) return msg(r.error.message,"e"); const agora=new Date().toISOString(); PEND_IMP.forEach(s=>{ const p=D.pecas.find(q=>q.serial===s); if(p&&!p.impressa_em){ p.impressa_em=agora; p.impressa_por=NOME; } }); PEND_IMP=[]; msg(""); const y=window.scrollY; render(); window.scrollTo(0,y); }
+  else if(a==="nfc"){ const p=D.pecas.find(q=>q.serial===el.dataset.s); if(!p) return; const des=!!p.nfc_gravado_em; el.disabled=true; const r=await sb.rpc("v2_etiq_etapa",{p_link:LINK,p_seriais:[p.serial],p_etapa:"nfc",p_por:NOME,p_desfazer:des}); if(r.error){ el.disabled=false; return msg(r.error.message,"e"); } p.nfc_gravado_em=des?null:new Date().toISOString(); p.nfc_por=des?null:NOME; msg(""); const y=window.scrollY; render(); window.scrollTo(0,y); }
   else if(a==="gmais"||a==="gmenos"){ const g=GR[Number(el.dataset.i)]; if(!g) return; const alvo=a==="gmais"?g.ps.find(p=>!p.etiquetada_em):[...g.ps].filter(p=>p.etiquetada_em).sort((x,y)=>new Date(y.etiquetada_em)-new Date(x.etiquetada_em))[0]; if(!alvo) return; el.disabled=true; const x=await marcar(alvo.serial,a==="gmenos"); if(x.erro){ el.disabled=false; return msg(x.erro,"e"); } msg(""); const y=window.scrollY; render(); window.scrollTo(0,y); }
 });
 $("#fechaScan").onclick=fechaScanner;

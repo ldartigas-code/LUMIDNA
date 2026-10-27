@@ -75,6 +75,7 @@ const NOME={led:"Barra de LED",driver:"Driver",optica:"Óptica",luminaria:"Lumin
 const MOTIVOS=["parou de funcionar","piscando","perdeu brilho","troca preventiva","outro"];
 const UFS=["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
 const FORMAS={pix:{nome:"PIX",desc:"Pagamento na hora, por QR code ou chave. A LumiDNA envia os dados depois de confirmar o pedido."},cartao:{nome:"Cartão de crédito",desc:"Pagamento por link seguro enviado pela LumiDNA depois da confirmação. Não digite o número do cartão aqui nem em mensagem."},boleto:{nome:"Boleto",desc:"Boleto enviado depois da confirmação. A peça sai quando o pagamento for compensado."}};
+const GRUPO=new URLSearchParams(location.search).get("g")==="1";
 let SERIAL="", P=null, CART=[], FORMA="", ENVIANDO=false;
 
 // ---------- utilidades ----------
@@ -167,6 +168,7 @@ function render(saiu){
    +'<div class="card"><h2 class="sec">Como prefere pagar</h2><div id="formas">'+Object.keys(FORMAS).map(k=>'<label class="pay" data-forma="'+k+'"><input type="radio" name="forma" value="'+k+'"><span><b>'+FORMAS[k].nome+'</b><span class="small">'+FORMAS[k].desc+'</span></span></label>').join("")+'</div>'
    +'<div class="field err" id="f_forma" style="margin:0"><div class="e">Escolha a forma de pagamento.</div></div>'
    +'<div class="alert" style="margin:8px 0 0"><b>Nada é cobrado agora.</b> A LumiDNA confere preço, prazo e frete e envia o pagamento pela forma escolhida. Se alguém pedir seu cartão fora do link oficial, não envie.</div></div>'
+   +(GRUPO?'<div class="card"><h2 class="sec">Qual luminária do grupo?</h2><div class="small" style="margin-bottom:8px">Esta etiqueta é de um grupo de luminárias iguais. Diga qual delas precisa da peça.</div>'+campo("c_un","Qual luminária? *","","","Informe qual luminária do grupo (posição ou referência).",'maxlength="120" placeholder="Ex.: terceira da esquerda, perto da porta"')+'</div>':'')
    +'<div class="card"><h2 class="sec">Observações</h2><div class="field"><label for="c_motivo">Por que está trocando? (opcional)</label><select id="c_motivo"><option value="">—</option>'+MOTIVOS.map(m=>'<option>'+m+'</option>').join("")+'</select></div>'
    +'<div class="field" style="margin:0"><label for="c_obs">Observação (opcional)</label><textarea id="c_obs" maxlength="1000"></textarea></div></div>'
    +'<button type="submit" class="btn p" id="enviar">Enviar pedido</button>'
@@ -174,7 +176,7 @@ function render(saiu){
   $("#f_forma").classList.remove("err");
   ligaForm();
 }
-function voltaUrl(){ return "../ativo/?c="+encodeURIComponent(SERIAL); }
+function voltaUrl(){ return "../ativo/?c="+encodeURIComponent(SERIAL)+(GRUPO?"&g=1":""); }
 function ligaForm(){
   $("#c_fone").addEventListener("input",e=>{ e.target.value=maskFone(e.target.value); });
   $("#c_doc").addEventListener("input",e=>{ e.target.value=maskDoc(e.target.value); });
@@ -190,6 +192,7 @@ function validar(){
   let ruins=[];
   const v=id=>($("#"+id).value||"").trim();
   const t=(id,ruim)=>{ if(marca(id,ruim)) ruins.push(id); };
+  if(GRUPO) t("c_un",v("c_un").length<2);
   t("c_nome",v("c_nome").length<3);
   t("c_fone",so(v("c_fone")).length<10||so(v("c_fone")).length>13);
   t("c_email",!emailValido(v("c_email")));
@@ -219,7 +222,7 @@ async function enviar(){
   try{
     r=await sb.rpc("v2_finalizar_compra",{p_serial:SERIAL,p_nome:v("c_nome"),p_fone:v("c_fone"),p_email:v("c_email"),p_documento:so(v("c_doc")),
       p_endereco:{cep:so(v("e_cep")),rua:v("e_rua"),numero:v("e_num"),complemento:v("e_comp"),bairro:v("e_bairro"),cidade:v("e_cidade"),uf:v("e_uf")},
-      p_forma:FORMA,p_obs:v("c_obs")||null,p_motivo:v("c_motivo")||null,p_token:tok,p_linhas:linhas});
+      p_forma:FORMA,p_obs:((GRUPO?"[Grupo "+SERIAL+"] Luminária: "+v("c_un")+(v("c_obs")?" — "+v("c_obs"):""):v("c_obs"))||null),p_motivo:v("c_motivo")||null,p_token:tok,p_linhas:linhas});
   }catch(e){ r={error:{message:"Failed to fetch"}}; }
   ENVIANDO=false;
   if(r.error){ b.disabled=false; b.textContent="Enviar pedido"; return msg(traduz(r.error.message),"e"); }

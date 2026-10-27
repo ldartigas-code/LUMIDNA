@@ -72,6 +72,7 @@ body:has(.homebg) header b span{color:#2c2c2a}
 @media(max-width:640px){.row{grid-template-columns:14px 40px minmax(0,1fr) 80px}.row .c4,.row .c6{display:none}}
 .orow{grid-template-columns:14px minmax(0,1.5fr) minmax(0,1fr) minmax(96px,auto) minmax(0,1.2fr)}
 .orow .np{white-space:nowrap}
+#f_codigo,#f_fabricante,#nk_codigo,#nk_fabricante,#p_local,#a_loc,#a_lum,#k_nome,[data-loc]{text-transform:uppercase}
 .gcard{display:flex;gap:12px;align-items:flex-start}.gcard .gimg{width:60px;height:60px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px;flex:none}.gcard .gimg.v{background:var(--soft)}
 .iitem{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;background:#fff}
 .ihead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:12px}
@@ -828,22 +829,42 @@ async function confirmaTroca(){
 }
 
 // ---- etiquetas (QR) e endereços para gravar no NFC ----
+// controle das etapas da etiqueta: impressa, NFC gravado (opcional) e fixada
+Object.assign(S,{etqSoNaoImp:false,etqPendImp:[]});
+const contaEtapas=ps=>({t:ps.length,imp:ps.filter(p=>p.impressa_em).length,nfc:ps.filter(p=>p.nfc_gravado_em).length,fix:ps.filter(p=>p.etiquetada_em).length});
+const textoEtapas=c=>'Impressas <b>'+c.imp+'</b> · NFC gravado <b>'+c.nfc+'</b> <span class="small">(opcional)</span> · Fixadas <b>'+c.fix+'</b> de '+c.t;
+async function marcarEtapaAdmin(ids,campoEm,campoPor,desfazer){
+  const ss=await sb.auth.getSession(), por=ss.data.session?ss.data.session.user.email:"admin", agora=new Date().toISOString();
+  const alvo=ids.filter(id=>{ const p=S.pecas.find(x=>x.id===id); return p&&(desfazer?p[campoEm]:!p[campoEm]); });
+  if(!alvo.length) return true;
+  const row={}; row[campoEm]=desfazer?null:agora; row[campoPor]=desfazer?null:por;
+  const r=await sb.from("v2_pecas").update(row).in("id",alvo);
+  if(r.error){ msg("Erro ao marcar: "+r.error.message+" (se falar de coluna inexistente, falta rodar o SQL v2_14_controle_etiquetas no Supabase)",false); return false; }
+  alvo.forEach(id=>{ const p=S.pecas.find(x=>x.id===id); p[campoEm]=row[campoEm]; p[campoPor]=row[campoPor]; });
+  return true;
+}
 function renderEtiquetas(){
-  S.view="etiq"; const o=S.obra, ps=S.pecas.filter(p=>p.obra_id===o.id), w=S.etq.w, h=S.etq.h;
+  S.view="etiq"; const o=S.obra, todas=S.pecas.filter(p=>p.obra_id===o.id), w=S.etq.w, h=S.etq.h;
+  const ps=S.etqSoNaoImp?todas.filter(p=>!p.impressa_em):todas, c=contaEtapas(todas);
   const etq=ps.map(p=>{
     const l=porId(p.luminaria_id); let qr="";
     try{ const q=qrcode(0,"M"); q.addData(urlPeca(p.serial)); q.make(); qr=q.createSvgTag({cellSize:4,margin:0,scalable:true}); }catch(e){ qr=""; }
-    return '<div class="etq" style="width:'+w+'mm;height:'+h+'mm"><div class="qr" style="width:'+(h-4)+'mm;height:'+(h-4)+'mm">'+qr+'</div><div class="et"><b>'+esc(p.serial)+'</b><br>'+esc(l?l.codigo:"")+'<br><span>'+esc(o.nome)+'</span></div></div>';
+    return '<div class="etq" style="width:'+w+'mm;height:'+h+'mm"><div class="qr" style="width:'+(h-4)+'mm;height:'+(h-4)+'mm">'+qr+'</div><div class="et"><b>'+esc(p.serial)+'</b><br>'+esc(l?l.codigo:"")+'<br>'+esc(p.local||"")+'<br><span>'+esc(o.nome)+'</span></div></div>';
   }).join("");
   $("#app").innerHTML='<div class="noprint"><button data-act="voltaObra" style="margin-bottom:12px">‹ '+esc(o.nome)+'</button>'
-   +'<div class="card"><h3 style="margin-top:0">Etiquetas da obra '+esc(o.nome)+'</h3><div class="small" style="margin-bottom:8px">Cada etiqueta tem o QR e o serial. Ajuste o tamanho para o da sua etiqueta e clique em Imprimir.</div>'
-   +'<div class="bar"><div><label>Largura (mm)</label><input id="e_w" type="number" min="20" max="200" value="'+w+'" style="width:100px"></div><div><label>Altura (mm)</label><input id="e_h" type="number" min="15" max="100" value="'+h+'" style="width:100px"></div><button class="p" data-act="imprimir" style="align-self:end">Imprimir</button></div></div></div>'
+   +'<div class="card"><h3 style="margin-top:0">Etiquetas da obra '+esc(o.nome)+'</h3><div style="margin-bottom:8px">'+textoEtapas(c)+'</div>'
+   +'<label class="small" style="display:flex;gap:8px;align-items:center;margin:0 0 10px;font-weight:400"><input type="checkbox" id="e_naoimp" '+(S.etqSoNaoImp?"checked":"")+' style="width:20px;height:20px"> Mostrar só as <b>não impressas</b> ('+(todas.length-c.imp)+')</label>'
+   +'<div class="small" style="margin-bottom:8px">Cada etiqueta tem o QR, a série, o modelo e o ambiente. Ajuste o tamanho para o da sua etiqueta, toque em Imprimir e depois confirme que imprimiu.</div>'
+   +'<div class="bar"><div><label>Largura (mm)</label><input id="e_w" type="number" min="20" max="200" value="'+w+'" style="width:100px"></div><div><label>Altura (mm)</label><input id="e_h" type="number" min="15" max="100" value="'+h+'" style="width:100px"></div><button class="p" data-act="imprimirEtq" style="align-self:end">Imprimir ('+ps.length+')</button></div>'
+   +'<div id="etqConf" class="msg s" style="display:none"></div></div></div>'
    +'<div class="etqs">'+etq+'</div>'
-   +'<div class="card noprint" style="margin-top:14px"><h3 style="margin-top:0">Endereços para gravar no NFC</h3><div class="small" style="margin-bottom:8px">No celular, abra um app de gravação de NFC (por exemplo NFC Tools), escolha gravar "URL" e cole o endereço da peça. Grave a tag e cole na luminária.</div>'
-   +'<table><tr><th>Serial</th><th>Endereço</th><th></th></tr>'+ps.map(p=>{const u=urlPeca(p.serial);return '<tr><td><b>'+esc(p.serial)+'</b></td><td style="overflow-wrap:anywhere" class="small">'+esc(u)+'</td><td><button data-act="copiarUrl" data-u="'+esc(u)+'" style="padding:2px 8px">Copiar</button></td></tr>'}).join("")+'</table></div>';
+   +'<div class="card noprint" style="margin-top:14px"><h3 style="margin-top:0">Endereços para gravar no NFC <span class="small">(opcional)</span></h3><div class="small" style="margin-bottom:8px">No celular, abra um app de gravação de NFC (por exemplo NFC Tools), escolha gravar "URL" e cole o endereço da peça. Depois toque em <b>Gravei</b> para ficar registrado.</div>'
+   +'<div class="bar"><button data-act="etqNfcTodas">Marcar NFC de todas como gravado</button></div>'
+   +'<table><tr><th>Serial</th><th>Endereço</th><th></th></tr>'+todas.map(p=>{const u=urlPeca(p.serial);return '<tr><td><b>'+esc(p.serial)+'</b></td><td style="overflow-wrap:anywhere" class="small">'+esc(u)+'</td><td style="white-space:nowrap"><button data-act="copiarUrl" data-u="'+esc(u)+'" style="padding:2px 8px">Copiar</button> '+(p.nfc_gravado_em?'<button data-act="etqNfc" data-id="'+p.id+'" style="padding:2px 8px" title="Desfazer"><span class="ok">NFC ✓</span></button>':'<button class="p" data-act="etqNfc" data-id="'+p.id+'" style="padding:2px 8px">Gravei</button>')+'</td></tr>'}).join("")+'</table></div>';
   const aj=()=>{ const w2=Math.max(20,parseInt($("#e_w").value)||60), h2=Math.max(15,parseInt($("#e_h").value)||30); S.etq={w:w2,h:h2}; document.querySelectorAll(".etq").forEach(e=>{e.style.width=w2+"mm";e.style.height=h2+"mm"}); document.querySelectorAll(".etq .qr").forEach(e=>{e.style.width=(h2-4)+"mm";e.style.height=(h2-4)+"mm"}); };
-  $("#e_w").oninput=aj; $("#e_h").oninput=aj;
+  $("#e_w").oninput=aj; $("#e_h").oninput=aj; $("#e_naoimp").onchange=e=>{ S.etqSoNaoImp=e.target.checked; renderEtiquetas(); };
 }
+function perguntaImpressao(n){ const c=$("#etqConf"); if(!c) return; c.style.display=""; c.innerHTML='Você imprimiu estas <b>'+n+'</b> etiqueta(s)? <div class="bar" style="margin:8px 0 0"><button class="p" data-act="etqMarcarImp">Sim, marcar como impressas</button><button data-act="etqNaoImp">Ainda não</button></div>'; }
 async function copiarUrl(d){ try{ await navigator.clipboard.writeText(d.u); msg("Endereço copiado."); }catch(e){ msg("Não consegui copiar. Selecione o endereço e copie à mão.",false); } }
 
 // ---- grupos: luminárias iguais no mesmo ambiente (obra + local + luminária + kit), sem tabela nova ----
@@ -851,9 +872,10 @@ const partesLocal=l=>String(l||"").split(">").map(s=>s.trim()).filter(Boolean);
 const setorDe=l=>{ const p=partesLocal(l); return p.length>1?p.slice(0,-1).join(" › "):"Geral"; };
 const ambDe=l=>{ const p=partesLocal(l); return p.length?p[p.length-1]:"(sem ambiente)"; };
 const urlGrupo=s=>new URL("../ativo/?c="+encodeURIComponent(s)+"&g=1",location.href).href;
+const chaveLocal=l=>String(l||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/\s+/g," ").trim();
 function gruposDaObra(oid){
   const m=new Map();
-  S.pecas.filter(p=>p.obra_id===oid&&p.status!=="retirada").forEach(p=>{ const k=[p.local||"",p.luminaria_id,p.kit_id||0].join("|"); if(!m.has(k)) m.set(k,{k:k,local:p.local||"",luminaria_id:p.luminaria_id,kit_id:p.kit_id||null,ps:[]}); m.get(k).ps.push(p); });
+  S.pecas.filter(p=>p.obra_id===oid&&p.status!=="retirada").forEach(p=>{ const k=[chaveLocal(p.local),p.luminaria_id,p.kit_id||0].join("|"); if(!m.has(k)) m.set(k,{k:k,local:p.local||"",luminaria_id:p.luminaria_id,kit_id:p.kit_id||null,ps:[]}); m.get(k).ps.push(p); });
   const arr=[...m.values()]; arr.forEach(g=>{ g.ps.sort((a,b)=>a.numero-b.numero); g.ancora=g.ps[0]; g.fixadas=g.ps.filter(p=>p.etiquetada_em).length; });
   const cod=g=>String((porId(g.luminaria_id)||{}).codigo||"");
   return arr.sort((a,b)=>setorDe(a.local).localeCompare(setorDe(b.local),"pt-BR")||ambDe(a.local).localeCompare(ambDe(b.local),"pt-BR",{numeric:true})||cod(a).localeCompare(cod(b),"pt-BR",{numeric:true}));
@@ -874,7 +896,7 @@ function renderGrupos(){
      +'<div class="small">'+esc(l.fabricante||"")+(kit?' · kit '+esc(kit.nome):'')+'</div>'
      +(its?'<div class="small">'+esc(its)+' <span class="small">(por unidade)</span></div>':(l.integrada?'<div class="small">lâmpada integrada</div>':'<div class="no">sem itens cadastrados</div>'))
      +(iguais?'':'<div class="no">Atenção: as unidades deste grupo têm itens diferentes entre si.</div>')
-     +'<div class="small">Séries '+esc(g.ps[0].serial)+(g.ps.length>1?' … '+esc(g.ps[g.ps.length-1].serial):'')+' · etiquetas fixadas '+g.fixadas+' de '+g.ps.length+'</div></div></div>'
+     +'<div class="small">Séries '+esc(g.ps[0].serial)+(g.ps.length>1?' … '+esc(g.ps[g.ps.length-1].serial):'')+'</div><div class="small">Impressas '+g.ps.filter(p=>p.impressa_em).length+' · NFC '+g.ps.filter(p=>p.nfc_gravado_em).length+' · Fixadas '+g.fixadas+' de '+g.ps.length+'</div></div></div>'
      +'<div class="bar" style="margin:10px 0 0"><button class="p" data-act="grpEtq" data-i="'+i+'">Etiquetas do grupo</button><a href="'+esc(urlGrupo(g.ancora.serial))+'" target="_blank" rel="noopener" style="align-self:center">Página do grupo</a><button data-act="grpUnidades" data-i="'+i+'">'+(S.grpAberto===i?"Esconder unidades":"Ver unidades")+'</button></div>'
      +(S.grpAberto===i?'<div style="margin-top:8px">'+g.ps.map(p=>'<a href="#" data-act="abrirPeca" data-id="'+p.id+'" style="display:inline-block;margin:2px 10px 2px 0">'+esc(p.serial)+(p.etiquetada_em?' ✓':'')+'</a>').join("")+'</div>':'')+'</div>';
   });
@@ -888,7 +910,7 @@ function renderEtiquetasGrupo(){
   const un='<div class="etq" style="width:'+w+'mm;height:'+h2+'mm"><div class="qr" style="width:'+(h2-4)+'mm;height:'+(h2-4)+'mm">'+qr+'</div><div class="et"><b>'+esc(ambDe(g.local))+'</b><br>'+esc(l.codigo||"")+'<br>Grupo de '+g.ps.length+'<br><span>'+esc(g.ancora.serial)+'</span></div></div>';
   $("#app").innerHTML='<div class="noprint"><button data-act="grupos" style="margin-bottom:12px">‹ Grupos</button>'
    +'<div class="card"><h3 style="margin-top:0">Etiquetas do grupo: '+esc(ambDe(g.local))+' · '+esc(l.codigo||"")+'</h3><div class="small" style="margin-bottom:8px">Todas as etiquetas são <b>iguais</b>: o QR abre a página do grupo ('+g.ps.length+' luminária(s)). O código sob o QR ('+esc(g.ancora.serial)+') serve para digitar na consulta se o QR falhar.</div>'
-   +'<div class="bar"><div><label>Quantidade de etiquetas</label><input id="g_n" type="number" min="1" max="500" value="'+n+'" style="width:110px"></div><div><label>Largura (mm)</label><input id="e_w" type="number" min="20" max="200" value="'+w+'" style="width:100px"></div><div><label>Altura (mm)</label><input id="e_h" type="number" min="15" max="100" value="'+h2+'" style="width:100px"></div><button class="p" data-act="imprimir" style="align-self:end">Imprimir</button></div></div></div>'
+   +'<div class="bar"><div><label>Quantidade de etiquetas</label><input id="g_n" type="number" min="1" max="500" value="'+n+'" style="width:110px"></div><div><label>Largura (mm)</label><input id="e_w" type="number" min="20" max="200" value="'+w+'" style="width:100px"></div><div><label>Altura (mm)</label><input id="e_h" type="number" min="15" max="100" value="'+h2+'" style="width:100px"></div><button class="p" data-act="imprimirGrp" style="align-self:end">Imprimir</button></div><div id="etqConf" class="msg s" style="display:none"></div></div></div>'
    +'<div class="etqs">'+Array.from({length:n},()=>un).join("")+'</div>';
   const aj=()=>{ const w2=Math.max(20,parseInt($("#e_w").value)||60), h3=Math.max(15,parseInt($("#e_h").value)||30); S.etq={w:w2,h:h3}; document.querySelectorAll(".etq").forEach(e=>{e.style.width=w2+"mm";e.style.height=h3+"mm"}); document.querySelectorAll(".etq .qr").forEach(e=>{e.style.width=(h3-4)+"mm";e.style.height=(h3-4)+"mm"}); };
   $("#e_w").oninput=aj; $("#e_h").oninput=aj; $("#g_n").onchange=e=>{ S.grupoQtd=parseInt(e.target.value)||g.ps.length; renderEtiquetasGrupo(); };
@@ -908,7 +930,7 @@ const trilho=(f,t)=>'<div style="height:8px;background:var(--soft);border-radius
 function renderEtiquetarHome(){
   S.view="etq";
   const rows=S.obras.map(o=>{ const g=progObra(o.id);
-    return '<div class="card"><b>'+esc(o.nome)+'</b><div class="small">'+(o.cliente?esc(o.cliente)+' · ':'')+g.f+' de '+g.t+' etiquetas fixadas'+(g.t&&g.f===g.t?' · <span class="ok">completa</span>':'')+'</div>'+trilho(g.f,g.t)
+    return '<div class="card"><b>'+esc(o.nome)+'</b><div class="small">'+(o.cliente?esc(o.cliente)+' · ':'')+textoEtapas(contaEtapas(S.pecas.filter(p=>p.obra_id===o.id)))+(g.t&&g.f===g.t?' · <span class="ok">completa</span>':'')+'</div>'+trilho(g.f,g.t)
      +'<div class="bar" style="margin:0"><button class="p" data-act="etqAbrir" data-id="'+o.id+'" '+(g.t?'':'disabled')+'>Etiquetar agora</button><button data-act="etqObra" data-id="'+o.id+'">Links e andamento</button></div></div>'; }).join("");
   $("#app").innerHTML=navArea("etq")+'<div class="small" style="margin-bottom:12px">Escolha a obra. <b>Etiquetar agora</b> abre a tela de etiquetar no celular. <b>Links e andamento</b> permite compartilhar a obra com o fabricante, sem senha.</div>'+(S.obras.length?rows:'<div class="small">Nenhuma obra ainda.</div>');
 }
@@ -916,12 +938,18 @@ function renderEtqObra(){
   S.view="etqo"; const o=S.obras.find(x=>x.id===S.etqObra), g=progObra(o.id), links=S.etqLinks.filter(l=>l.obra_id===o.id&&!l.interno);
   const st=l=>l.revogado_em?'<span class="no">cancelado</span>':(new Date(l.valido_ate)<new Date()?'<span class="no">vencido</span>':'<span class="ok">ativo</span>');
   $("#app").innerHTML='<button data-act="areaEtiquetar" style="margin-bottom:12px">‹ Etiquetar</button>'
-   +'<div class="card"><h3 style="margin:0">'+esc(o.nome)+'</h3><div class="small">'+g.f+' de '+g.t+' etiquetas fixadas</div>'+trilho(g.f,g.t)
-   +'<div class="bar" style="margin:0"><button class="p" data-act="etqAbrir" data-id="'+o.id+'" '+(g.t?'':'disabled')+'>Etiquetar agora (equipe LumiDNA)</button><button data-act="etiquetasDaObra" data-id="'+o.id+'">Etiquetas e NFC</button></div></div>'
+   +'<div class="card"><h3 style="margin:0">'+esc(o.nome)+'</h3><div class="small">'+textoEtapas(contaEtapas(S.pecas.filter(p=>p.obra_id===o.id)))+'</div>'+trilho(g.f,g.t)
+   +'<div class="bar" style="margin:0"><button class="p" data-act="etqAbrir" data-id="'+o.id+'" '+(g.t?'':'disabled')+'>Etiquetar agora (equipe LumiDNA)</button><button data-act="etiquetasDaObra" data-id="'+o.id+'">Etiquetas e NFC</button><button data-act="etqLista" data-id="'+o.id+'">Enviar lista do que falta (WhatsApp)</button></div></div>'
    +'<div class="card"><h3 style="margin-top:0">Compartilhar com o fabricante ou parceiro</h3><div class="small" style="margin-bottom:10px">Gera um link só desta obra, sem senha. Quem abrir vê apenas série, modelo e ambiente das luminárias (sem preços, pedidos, CPF ou relatórios) e só consegue marcar a etiqueta como fixada ou imprimir as etiquetas. Você cancela quando quiser.</div>'
    +'<div class="grid"><div class="field"><label>Para quem é o link *</label><input id="lk_nome" placeholder="Ex.: LDArti — bancada" maxlength="60"></div><div class="field"><label>Vale por quantos dias</label><input id="lk_dias" type="number" min="1" max="180" value="30"></div></div><button class="p" data-act="etqGerar" data-id="'+o.id+'">Gerar link</button></div>'
    +'<div class="card"><h3 style="margin-top:0">Links desta obra</h3>'+(links.length?'<table><tr><th>Para quem</th><th>Situação</th><th></th></tr>'+links.map(l=>'<tr><td><b>'+esc(l.nome)+'</b><div class="small">criado em '+dataHora(l.criado_em)+' · até '+dmy(l.valido_ate)+(l.ultimo_uso_em?' · último uso '+dataHora(l.ultimo_uso_em):' · ainda não usado')+'</div></td><td>'+st(l)+'</td><td>'
      +(linkAtivo(l)?'<button data-act="etqCopiar" data-id="'+l.id+'" style="padding:2px 8px">Copiar</button> <a href="https://wa.me/?text='+encodeURIComponent("Link para etiquetar a obra "+o.nome+": "+urlEtq(l.id))+'" target="_blank" rel="noopener">WhatsApp</a> <button class="danger" data-act="etqCancelar" data-id="'+l.id+'" style="padding:2px 8px">Cancelar</button>':'')+'</td></tr>').join("")+'</table>':'<div class="small">Nenhum link gerado ainda.</div>')+'</div>';
+}
+function textoFalta(o){
+  const ps=S.pecas.filter(p=>p.obra_id===o.id), c=contaEtapas(ps), por=new Map();
+  ps.forEach(p=>{ const a=p.local||"(sem ambiente)"; const x=por.get(a)||{imp:0,fix:0}; if(!p.impressa_em) x.imp++; if(!p.etiquetada_em) x.fix++; por.set(a,x); });
+  const linhas=[...por.entries()].filter(([a,x])=>x.imp||x.fix).map(([a,x])=>"• "+a+": "+[x.imp?"imprimir "+x.imp:"",x.fix?"fixar "+x.fix:""].filter(Boolean).join(" · "));
+  return "Obra "+o.nome+" — etiquetas\nImpressas "+c.imp+" de "+c.t+" · NFC gravado "+c.nfc+" · Fixadas "+c.fix+" de "+c.t+(linhas.length?"\n\nFaltam:\n"+linhas.join("\n"):"\n\nTudo pronto.");
 }
 async function etqAbrir(d){
   const oid=Number(d.id); if(!S.etqLinks.length&&!await carregarEtqLinks()) return;
@@ -1364,6 +1392,13 @@ function renderPend(){
 const ACT={
   nada:()=>{},
   home:()=>{msg("");renderHome(); window.scrollTo(0,0);}, grupos:()=>{msg(""); renderGrupos();}, grpEtq:d=>{S.grupoEtq=Number(d.i); S.grupoQtd=null; renderEtiquetasGrupo();}, grpUnidades:d=>{S.grpAberto=S.grpAberto===Number(d.i)?null:Number(d.i); renderGrupos();},
+  imprimirEtq:()=>{ S.etqPendImp=S.pecas.filter(p=>p.obra_id===S.obra.id&&(!S.etqSoNaoImp||!p.impressa_em)).map(p=>p.id); window.print(); perguntaImpressao(S.etqPendImp.length); },
+  etqMarcarImp:async()=>{ if(await marcarEtapaAdmin(S.etqPendImp,"impressa_em","impressa_por",false)){ if(S.view==="etiq") renderEtiquetas(); else { const c=$("#etqConf"); if(c) c.style.display="none"; } msg("Etiquetas marcadas como impressas."); } },
+  etqNaoImp:()=>{ const c=$("#etqConf"); if(c) c.style.display="none"; },
+  etqNfc:async d=>{ const p=S.pecas.find(x=>x.id===Number(d.id)); if(await marcarEtapaAdmin([p.id],"nfc_gravado_em","nfc_por",!!p.nfc_gravado_em)) renderEtiquetas(); },
+  etqNfcTodas:async()=>{ const ids=S.pecas.filter(p=>p.obra_id===S.obra.id).map(p=>p.id); if(!confirm("Marcar o NFC de todas as "+ids.length+" etiquetas como gravado?")) return; if(await marcarEtapaAdmin(ids,"nfc_gravado_em","nfc_por",false)) renderEtiquetas(); },
+  etqLista:d=>{ const o=S.obras.find(x=>x.id===Number(d.id)); window.open("https://wa.me/?text="+encodeURIComponent(textoFalta(o)),"_blank"); },
+  imprimirGrp:()=>{ const g=S.grupos[S.grupoEtq], n=Math.max(1,Math.min(500,S.grupoQtd||g.ps.length)); S.etqPendImp=g.ps.filter(p=>!p.impressa_em).slice(0,n).map(p=>p.id); window.print(); perguntaImpressao(S.etqPendImp.length); },
   areaEtiquetar:async()=>{msg(""); if(await carregarObras()&&await carregarEtqLinks()) renderEtiquetarHome();},
   etqObra:async d=>{msg(""); if(!await carregarEtqLinks()) return; S.etqObra=Number(d.id); renderEtqObra();},
   etqAbrir, etqGerar, etqCopiar, etqCancelar,
@@ -1404,6 +1439,8 @@ const ACT={
   pickItem:d=>{ const id=Number(d.id); if(S.kit.itens.some(i=>i.produto_id===id)) return msg("Esse item já está no kit.",false); S.kit.itens.push({produto_id:id,quantidade:1}); $("#k_ibusca").value=""; $("#k_ires").style.display="none"; msg(""); desenhaKit(); },
   tirarItem:d=>{S.kit.itens.splice(Number(d.i),1);desenhaKit()}
 };
+const CAMPOS_MAIUSCULOS="#f_codigo,#f_fabricante,#nk_codigo,#nk_fabricante,#p_local,#a_loc,#a_lum,#k_nome,[data-loc]";
+document.addEventListener("input",e=>{ const el=e.target; if(el&&el.matches&&el.matches(CAMPOS_MAIUSCULOS)){ const a=el.selectionStart,b=el.selectionEnd; el.value=el.value.toUpperCase(); try{ el.setSelectionRange(a,b); }catch(x){} } });
 document.addEventListener("click",e=>{ const el=e.target.closest("[data-act]"); if(!el||el.tagName==="SELECT"||el.tagName==="INPUT") return; const f=ACT[el.dataset.act]; if(f){ e.preventDefault(); f(el.dataset); }});
 document.addEventListener("change",e=>{ const el=e.target; if((el.tagName==="SELECT"||el.type==="checkbox")&&el.dataset.act){ const f=ACT[el.dataset.act]; if(f) f(el.dataset); }});
 document.addEventListener("keydown",e=>{ if(e.key==="Enter"&&e.target.id==="lg_senha") entrar(); });

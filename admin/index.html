@@ -72,6 +72,7 @@ body:has(.homebg) header b span{color:#2c2c2a}
 @media(max-width:640px){.row{grid-template-columns:14px 40px minmax(0,1fr) 80px}.row .c4,.row .c6{display:none}}
 .orow{grid-template-columns:14px minmax(0,1.5fr) minmax(0,1fr) minmax(96px,auto) minmax(0,1.2fr)}
 .orow .np{white-space:nowrap}
+.clista{border:1px solid var(--line);border-radius:10px;overflow:hidden}.crow{display:flex;gap:10px;align-items:center;padding:8px 10px;border-top:1px solid var(--line)}.crow:first-child{border-top:0}.crow .cimg{width:52px;height:52px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px;flex:none}.crow .cimg.v{background:var(--soft)}.crow .cinfo{flex:1;min-width:0}
 #f_codigo,#f_fabricante,#nk_codigo,#nk_fabricante,#p_local,#a_loc,#a_lum,#k_nome,[data-loc]{text-transform:uppercase}
 .gcard{display:flex;gap:12px;align-items:flex-start}.gcard .gimg{width:60px;height:60px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px;flex:none}.gcard .gimg.v{background:var(--soft)}
 .iitem{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;background:#fff}
@@ -246,7 +247,9 @@ function novoItem(){
 }
 function abrirItem(id){
   S.cur=JSON.parse(JSON.stringify(porId(id)));
-  S.compSel=new Set(S.compat.filter(c=>c.componente_id===id).map(c=>c.luminaria_id));
+  const _p=porId(id);
+  S.compSel=_p&&_p.tipo==="luminaria"?new Set(S.compat.filter(c=>c.luminaria_id===id).map(c=>c.componente_id)):new Set(S.compat.filter(c=>c.componente_id===id).map(c=>c.luminaria_id));
+  S.clTipo="led"; S.clBusca="";
   renderItem();
 }
 const DET=[["linha","Linha"],["fluxo_lm","Fluxo (lm)"],["ip","IP"],["ik","IK"],["tensao","Tensão"],["vida_util_h","Vida útil (h)"]];
@@ -284,11 +287,12 @@ function renderItem(){
       ${ehComp&&p.id?`<div id="sim_box"></div>`:""}
       ${ehComp&&!p.id?`<div class="small" style="margin-bottom:10px">Depois de salvar, aqui você cadastra os similares homologados deste item.</div>`:""}
       ${!ehComp&&p.integrada?`<div class="small">Luminária com lâmpada integrada: não tem Driver, LED nem kit separados.</div>`:""}
-      ${!ehComp&&!p.integrada&&p.id?`<div class="field"><label>Componentes que servem nesta luminária</label><div class="pills">${usadoEm.length?usadoEm.map(c=>`<span>${TIPO1[c.tipo]} ${esc(c.codigo)}</span>`).join(""):'<span class="small">nenhum ligado ainda — marque no cadastro de cada componente</span>'}</div></div>
+      ${!ehComp&&!p.integrada&&p.id?`<div class="field"><label>Componentes que servem nesta luminária</label><div id="comp_lum"></div></div>
         <div class="field"><label>Kits desta luminária</label><div class="pills">${kitsDe.length?kitsDe.map(k=>`<span>${esc(k.nome)}</span>`).join(""):'<span class="small">nenhum kit ainda</span>'}</div></div>`:""}
       <div class="bar" style="margin-top:8px"><button class="p" data-act="salvarItem">Salvar</button>${novo?"":`<button class="danger" data-act="apagarItem">Excluir</button>`}</div>
     </div>`;
   if(ehComp){ $("#c_busca").oninput=listaCompat; listaCompat(); desenhaSimilares(); }
+  if(!ehComp&&!p.integrada&&p.id) desenhaCompLum();
   $("#f_foto").onchange=e=>{ const f=e.target.files[0]; if(f){ const im=$("#f_prev"); im.src=URL.createObjectURL(f); im.style.display=""; } };
 }
 function listaCompat(){
@@ -297,6 +301,21 @@ function listaCompat(){
   $("#c_lista").innerHTML=lums.length?lums.map(l=>`<label><input type="checkbox" data-lum="${l.id}" ${S.compSel.has(l.id)?"checked":""}> ${esc(l.codigo)} <span class="small">${esc(l.fabricante)||""}</span></label>`).join(""):`<div class="small">Nenhuma luminária encontrada.</div>`;
   $("#c_lista").querySelectorAll("input[data-lum]").forEach(i=>i.onchange=()=>{ const id=Number(i.dataset.lum); i.checked?S.compSel.add(id):S.compSel.delete(id); resumoCompat(); });
   resumoCompat();
+}
+// componentes (LED, driver, óptica) que servem numa luminária: lista com foto, para marcar sem digitar código
+const especCompon=c=>[c.potencia_w!=null?fmt(c.potencia_w)+" W":"",c.cct_k?c.cct_k+" K":"",c.corrente_ma!=null?fmt(c.corrente_ma)+" mA":"",c.facho_graus!=null?c.facho_graus+"°":""].filter(Boolean).join(" · ");
+const linhaCompon=(c,botao)=>'<div class="crow">'+(c.foto_url?'<img class="cimg" src="'+esc(c.foto_url)+'" alt="">':'<div class="cimg v"></div>')+'<div class="cinfo"><b>'+esc(c.codigo)+'</b><div class="small">'+esc(TIPO1[c.tipo])+(c.fabricante?' · '+esc(c.fabricante):'')+(especCompon(c)?' · '+esc(especCompon(c)):'')+'</div></div>'+botao+'</div>';
+function desenhaCompLum(){
+  const box=$("#comp_lum"); if(!box) return; const tipo=S.clTipo||"led", q=norm(S.clBusca||"");
+  const sel=[...S.compSel].map(porId).filter(Boolean).sort((a,b)=>String(a.tipo).localeCompare(b.tipo)||String(a.codigo).localeCompare(String(b.codigo),"pt-BR",{numeric:true}));
+  const livres=S.produtos.filter(p=>p.tipo===tipo&&!S.compSel.has(p.id)&&(!q||norm(p.codigo).includes(q)||norm(p.fabricante).includes(q))).sort((a,b)=>String(a.codigo).localeCompare(String(b.codigo),"pt-BR",{numeric:true}));
+  box.innerHTML='<div class="small" style="margin-bottom:6px"><b>'+sel.length+'</b> componente(s) ligado(s) a esta luminária'+(sel.length?'':' — escolha abaixo')+'</div>'
+   +(sel.length?'<div class="clista">'+sel.map(c=>linhaCompon(c,'<button data-act="clRemover" data-id="'+c.id+'" style="padding:4px 10px">Tirar</button>')).join("")+'</div>':'')
+   +'<div style="margin-top:12px"><div class="tabs" style="margin:0 0 8px">'+[["led","LEDs"],["driver","Drivers"],["optica","Ópticas"]].map(([t,n])=>'<button class="tab '+(tipo===t?"on":"")+'" data-act="clTipo" data-t="'+t+'">'+n+'</button>').join("")+'</div>'
+   +'<input id="cl_busca" placeholder="Buscar por código ou fabricante" value="'+esc(S.clBusca||"")+'" style="margin-bottom:8px"><div class="clista" style="max-height:380px;overflow:auto">'
+   +(livres.length?livres.slice(0,80).map(c=>linhaCompon(c,'<button class="p" data-act="clAdd" data-id="'+c.id+'" style="padding:4px 10px">Adicionar</button>')).join("")+(livres.length>80?'<div class="small" style="padding:8px">Mostrando 80 de '+livres.length+'. Use a busca.</div>':''):'<div class="small" style="padding:8px">Nenhum item encontrado.</div>')+'</div></div>'
+   +'<div class="small" style="margin-top:8px">As mudanças só valem depois de tocar em <b>Salvar</b>.</div>';
+  const inp=$("#cl_busca"); if(inp){ inp.oninput=e=>{ S.clBusca=e.target.value; const pos=e.target.selectionStart; desenhaCompLum(); const n=$("#cl_busca"); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(x){} }; }
 }
 function resumoCompat(){ const n=S.compSel.size; $("#c_resumo").innerHTML=n?`<b>${n} luminária(s) marcada(s)</b>`:"Nenhuma marcada = serve em qualquer luminária."; }
 
@@ -388,6 +407,12 @@ async function salvarItem(){
     const tirar=[...antes].filter(x=>!S.compSel.has(x)), por=[...S.compSel].filter(x=>!antes.has(x));
     if(tirar.length){ const d=await sb.from("v2_compatibilidade").delete().eq("componente_id",id).in("luminaria_id",tirar); if(d.error) return msg("Salvou o item, mas não consegui atualizar as luminárias: "+d.error.message,false); }
     if(por.length){ const i=await sb.from("v2_compatibilidade").insert(por.map(l=>({componente_id:id,luminaria_id:l}))); if(i.error) return msg("Salvou o item, mas não consegui ligar às luminárias: "+i.error.message,false); }
+  }
+  if(t==="luminaria"&&p.id&&!integ){
+    const id=r.data.id, antes=new Set(S.compat.filter(c=>c.luminaria_id===id).map(c=>c.componente_id));
+    const tirar=[...antes].filter(x=>!S.compSel.has(x)), por=[...S.compSel].filter(x=>!antes.has(x));
+    if(tirar.length){ const d=await sb.from("v2_compatibilidade").delete().eq("luminaria_id",id).in("componente_id",tirar); if(d.error) return msg("Salvou a luminária, mas não consegui atualizar os componentes: "+d.error.message,false); }
+    if(por.length){ const i=await sb.from("v2_compatibilidade").insert(por.map(c=>({componente_id:c,luminaria_id:id}))); if(i.error) return msg("Salvou a luminária, mas não consegui ligar os componentes: "+i.error.message,false); }
   }
   await carregar(); S.tab=t; renderLista(); msg(`${TIPO1[t]} "${codigo}" salvo.`);
 }
@@ -1399,6 +1424,7 @@ const ACT={
   etqNfcTodas:async()=>{ const ids=S.pecas.filter(p=>p.obra_id===S.obra.id).map(p=>p.id); if(!confirm("Marcar o NFC de todas as "+ids.length+" etiquetas como gravado?")) return; if(await marcarEtapaAdmin(ids,"nfc_gravado_em","nfc_por",false)) renderEtiquetas(); },
   etqLista:d=>{ const o=S.obras.find(x=>x.id===Number(d.id)); window.open("https://wa.me/?text="+encodeURIComponent(textoFalta(o)),"_blank"); },
   imprimirGrp:()=>{ const g=S.grupos[S.grupoEtq], n=Math.max(1,Math.min(500,S.grupoQtd||g.ps.length)); S.etqPendImp=g.ps.filter(p=>!p.impressa_em).slice(0,n).map(p=>p.id); window.print(); perguntaImpressao(S.etqPendImp.length); },
+  clTipo:d=>{S.clTipo=d.t; desenhaCompLum();}, clAdd:d=>{S.compSel.add(Number(d.id)); desenhaCompLum();}, clRemover:d=>{S.compSel.delete(Number(d.id)); desenhaCompLum();},
   areaEtiquetar:async()=>{msg(""); if(await carregarObras()&&await carregarEtqLinks()) renderEtiquetarHome();},
   etqObra:async d=>{msg(""); if(!await carregarEtqLinks()) return; S.etqObra=Number(d.id); renderEtqObra();},
   etqAbrir, etqGerar, etqCopiar, etqCancelar,

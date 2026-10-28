@@ -661,8 +661,8 @@ function renderObra(){
    +'<div class="bar"><button class="p" data-act="salvarObra">Salvar obra</button>'+(!novo&&!ps.length?'<button class="danger" data-act="apagarObra">Excluir obra</button>':'')+'</div></div>':'';
   $("#app").innerHTML='<button data-act="voltaObras" style="margin-bottom:12px">‹ Obras</button>'
    +'<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h3 style="margin:0">'+(novo?"Nova obra":esc(o.nome))+'</h3>'+resumo+'</div>'
-   +(novo?'':'<div class="bar" style="margin:0"><button data-act="editObra">'+(S.editObra?"Fechar edição":"Editar dados da obra")+'</button>'+(ps.length?'<button data-act="etiquetas">Etiquetas e NFC</button><button data-act="grupos">Grupos</button><button class="p" data-act="etqObra" data-id="'+o.id+'">Etiquetar</button>':'')+'</div>')+'</div>'+form+'</div>'
-   +(novo?'<div class="small">Salve a obra para começar a adicionar as luminárias.</div>':blocoLuminarias(o,ps));
+   +(novo?'':'<div class="bar" style="margin:0"><button data-act="editObra">'+(S.editObra?"Fechar edição":"Editar dados da obra")+'</button>'+(ps.length?'<button data-act="etiquetas">Etiquetas e NFC</button><button class="p" data-act="etqObra" data-id="'+o.id+'">Etiquetar</button>':'')+'</div>')+'</div>'+form+'</div>'
+   +(novo?'<div class="small">Salve a obra para começar a adicionar as luminárias.</div>':vistaObra(o,ps));
   if($("#o_nome")){ const upd=()=>{ const c=codigoObra($("#o_nome").value); $("#o_cod").innerHTML=novo?'Código do serial: <b>'+esc(c)+'</b> (fica fixo depois de salvar). Exemplo: '+esc(c)+'-NNN-001':'Código do serial: <b>'+esc(o.codigo)+'</b> · número da obra '+String(o.id).padStart(3,"0"); }; upd(); $("#o_nome").oninput=upd; }
   if($("#a_lum")){ $("#a_lum").oninput=atualizaKitAdd; atualizaKitAdd(); }
   document.querySelectorAll("input[data-loc]").forEach(i=>i.onchange=async()=>{
@@ -907,9 +907,14 @@ function gruposDaObra(oid){
 }
 const assinaItens=p=>S.pitens.filter(x=>x.peca_id===p.id&&!x.removido_em).map(x=>x.produto_id+":"+x.quantidade).sort().join(",");
 const textoItens=p=>{ const m=new Map(); S.pitens.filter(x=>x.peca_id===p.id&&!x.removido_em).forEach(x=>m.set(x.produto_id,(m.get(x.produto_id)||0)+x.quantidade)); return [...m.entries()].map(([id,q])=>q+"x "+((porId(id)||{}).codigo||"?")).join(" + "); };
-Object.assign(S,{grupos:[],grpAberto:null,grupoEtq:null,grupoQtd:null});
-function renderGrupos(){
-  S.view="grupos"; const o=S.obra; S.grupos=gruposDaObra(o.id);
+Object.assign(S,{grupos:[],grpAberto:null,grupoEtq:null,grupoQtd:null,obraVista:"grupos"});
+function renderGrupos(){ S.obraVista="grupos"; renderObra(); }
+function vistaObra(o,ps){
+  const g=S.obraVista!=="pecas";
+  return '<div class="tabs noprint" style="margin:14px 0 10px"><button class="tab '+(g?"on":"")+'" data-act="obraVista" data-v="grupos">Grupos (luminárias iguais por ambiente)</button><button class="tab '+(g?"":"on")+'" data-act="obraVista" data-v="pecas">Peças, uma a uma</button></div>'+(g?htmlGrupos():blocoLuminarias(o,ps))+"";
+}
+function htmlGrupos(){
+  const o=S.obra; S.grupos=gruposDaObra(o.id);
   const total=S.grupos.reduce((s,g)=>s+g.ps.length,0), fix=S.grupos.reduce((s,g)=>s+g.fixadas,0);
   let atual="", corpo="";
   S.grupos.forEach((g,i)=>{
@@ -925,8 +930,7 @@ function renderGrupos(){
      +'<div class="bar" style="margin:10px 0 0"><button class="p" data-act="grpEtq" data-i="'+i+'">Etiquetas do grupo</button><a href="'+esc(urlGrupo(g.ancora.serial))+'" target="_blank" rel="noopener" style="align-self:center">Página do grupo</a><button data-act="grpUnidades" data-i="'+i+'">'+(S.grpAberto===i?"Esconder unidades":"Ver unidades")+'</button></div>'
      +(S.grpAberto===i?'<div style="margin-top:8px">'+g.ps.map(p=>'<a href="#" data-act="abrirPeca" data-id="'+p.id+'" style="display:inline-block;margin:2px 10px 2px 0">'+esc(p.serial)+(p.etiquetada_em?' ✓':'')+'</a>').join("")+'</div>':'')+'</div>';
   });
-  $("#app").innerHTML='<button data-act="voltaObra" style="margin-bottom:12px">‹ '+esc(o.nome)+'</button>'
-   +'<div class="card"><h3 style="margin:0">Grupos da obra '+esc(o.nome)+'</h3><div class="small"><b>'+total+'</b> luminária(s) em <b>'+S.grupos.length+'</b> grupo(s) · etiquetas fixadas '+fix+' de '+total+'</div>'
+  return '<div class="card"><h3 style="margin:0">Grupos da obra '+esc(o.nome)+'</h3><div class="small"><b>'+total+'</b> luminária(s) em <b>'+S.grupos.length+'</b> grupo(s) · etiquetas fixadas '+fix+' de '+total+'</div>'
    +'<div class="small" style="margin-top:6px">Grupo = luminárias iguais (mesmo modelo e kit) no mesmo ambiente. Elas podem receber a <b>mesma etiqueta</b>; a série individual só é usada quando uma delas precisa de histórico próprio. Para separar por setor, escreva o local assim: <b>Torre A &gt; 4º andar &gt; Corredor Norte</b>.</div></div>'+(corpo||'<div class="small">Esta obra ainda não tem peças.</div>');
 }
 function renderEtiquetasGrupo(){
@@ -1416,7 +1420,7 @@ function renderPend(){
 // ---- cliques ----
 const ACT={
   nada:()=>{},
-  home:()=>{msg("");renderHome(); window.scrollTo(0,0);}, grupos:()=>{msg(""); renderGrupos();}, grpEtq:d=>{S.grupoEtq=Number(d.i); S.grupoQtd=null; renderEtiquetasGrupo();}, grpUnidades:d=>{S.grpAberto=S.grpAberto===Number(d.i)?null:Number(d.i); renderGrupos();},
+  home:()=>{msg("");renderHome(); window.scrollTo(0,0);}, grupos:()=>{msg(""); renderGrupos();}, obraVista:d=>{S.obraVista=d.v; renderObra();}, grpEtq:d=>{S.grupoEtq=Number(d.i); S.grupoQtd=null; renderEtiquetasGrupo();}, grpUnidades:d=>{S.grpAberto=S.grpAberto===Number(d.i)?null:Number(d.i); renderObra();},
   imprimirEtq:()=>{ S.etqPendImp=S.pecas.filter(p=>p.obra_id===S.obra.id&&(!S.etqSoNaoImp||!p.impressa_em)).map(p=>p.id); window.print(); perguntaImpressao(S.etqPendImp.length); },
   etqMarcarImp:async()=>{ if(await marcarEtapaAdmin(S.etqPendImp,"impressa_em","impressa_por",false)){ if(S.view==="etiq") renderEtiquetas(); else { const c=$("#etqConf"); if(c) c.style.display="none"; } msg("Etiquetas marcadas como impressas."); } },
   etqNaoImp:()=>{ const c=$("#etqConf"); if(c) c.style.display="none"; },

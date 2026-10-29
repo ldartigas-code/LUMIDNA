@@ -510,12 +510,17 @@ async function paginaAmbiente(){
   if(r.error){ $("#content").innerHTML='<div class="card" style="color:var(--red)">Não foi possível carregar agora. Tente de novo em instantes.</div>'; return; }
   const A=r.data; if(!A){ $("#content").innerHTML='<div class="card"><b>Ambiente não encontrado.</b><div class="small" style="margin-top:4px">Confira o código da etiqueta: '+esc(SERIAL)+'</div></div>'; return; }
   const gr=A.grupos||[];
+  // luminária sem foto: usa as fotos dos itens instalados (LED, driver...) divididas no mesmo espaço
+  await Promise.all(gr.filter(g=>!g.foto_url).map(async g=>{ try{ const r=await sb.rpc("v2_peca_publica",{p_serial:g.ancora}); if(!r.error&&r.data) g.fotos=[...new Set((r.data.itens||[]).map(i=>i.foto_url).filter(Boolean))].slice(0,2); }catch(e){} }));
+  const miniFoto=g=>g.foto_url?'<img src="'+esc(g.foto_url)+'" alt="" style="width:64px;height:64px;object-fit:contain;background:#fff;border-radius:10px;flex:none">'
+    :((g.fotos&&g.fotos.length)?'<div style="width:64px;height:64px;border-radius:10px;background:#fff;flex:none;display:flex;gap:2px;overflow:hidden">'+g.fotos.map(u=>'<img src="'+esc(u)+'" alt="" style="flex:1;min-width:0;width:100%;object-fit:contain">').join("")+'</div>'
+    :'<div style="width:64px;height:64px;border-radius:10px;background:var(--s2);flex:none"></div>');
   $("#content").innerHTML='<div class="hero"><div class="small" style="text-transform:uppercase;letter-spacing:.08em">Ambiente</div><div class="id">'+esc(A.local||"SEM NOME")+'</div>'
    +'<div class="small" style="margin-top:4px"><b>'+A.total+'</b> luminária(s) em <b>'+gr.length+'</b> grupo(s)</div>'
    +(A.imagem_url?'<div style="background:#fff;border-radius:14px;padding:10px;margin-top:14px;text-align:center"><img src="'+esc(A.imagem_url)+'" alt="Desenho do ambiente" style="max-width:100%;max-height:70vh;object-fit:contain"></div>':'')+'</div>'
    +'<h2 class="sec">Luminárias deste ambiente</h2>'
    +gr.map(g=>'<a class="card" href="?c='+encodeURIComponent(g.ancora)+'&g=1" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;text-decoration:none;color:inherit">'
-     +(g.foto_url?'<img src="'+esc(g.foto_url)+'" alt="" style="width:64px;height:64px;object-fit:contain;background:#fff;border-radius:10px;flex:none">':'<div style="width:64px;height:64px;border-radius:10px;background:var(--s2);flex:none"></div>')
+     +miniFoto(g)
      +'<div style="flex:1;min-width:0"><b>'+esc(g.modelo)+'</b><div class="small">'+esc(g.fabricante||"")+'</div>'+(g.com_manutencao?'<div class="small"><i class="pt"></i>'+g.com_manutencao+' com manutenção</div>':'')+'</div><b style="color:var(--orange);white-space:nowrap">'+g.quantidade+'x ›</b></a>').join("");
 }
 async function iniciar(){

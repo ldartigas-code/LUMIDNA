@@ -95,6 +95,10 @@ select.vsel{width:100%;border:1px solid var(--line);border-radius:10px;padding:7
 .rd{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line);cursor:pointer}
 .rd:first-of-type{border-top:0}
 .rd input{width:22px;height:22px;margin-top:2px;flex:none;accent-color:var(--orange)}
+.pt{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:5px;vertical-align:middle}
+.und{margin:10px 0;border:1px solid var(--line);border-radius:12px;background:var(--s1)}.und summary{cursor:pointer;padding:12px 14px;font-size:14px;list-style:none}.und summary::-webkit-details-marker{display:none}
+.und .chips{display:flex;flex-wrap:wrap;gap:8px;padding:0 14px 14px}.und .chips a{font-size:13px;color:var(--ink);text-decoration:none;border:1px solid var(--line);background:var(--s2);border-radius:999px;padding:5px 12px}
+.und .leg{font-size:12px;color:var(--muted);padding:0 14px 12px}
 .alert{padding:12px 14px;border-left:3px solid var(--orange);background:rgba(255,122,47,.09);border-radius:10px;margin:12px 0;font-size:14px}
 .alert.e{border-left-color:var(--red);background:rgba(248,113,113,.1);color:#fecaca}
 .alert.s{border-left-color:var(--green);background:rgba(52,211,153,.1);color:#bbf7d0}
@@ -219,7 +223,15 @@ function compFotos(){
   return '<div class="comp">'+(lum?'<div class="main"><img src="'+esc(lum)+'" alt=""></div>':'')
    +(kit.length&&!lum?'<div class="kitrow solo" style="grid-template-columns:repeat('+Math.min(kit.length,2)+',1fr)">'+kit.map(u=>'<div class="kb"><img src="'+esc(u)+'" alt=""></div>').join("")+'</div>':'')+'</div>';
 }
-function grupoBanner(){ return (GRUPO&&GI)?'<div class="alert"><b>Etiqueta de grupo.</b> Esta luminária é uma das <b>'+GI.quantidade+'</b> iguais em <b>'+esc(GI.local||"este ambiente")+'</b>. Os dados, as peças e a garantia valem para todas. Ao pedir ou reportar, diga qual luminária é.</div>':""; }
+function grupoBanner(){ return (GRUPO&&GI)?'<div class="alert"><b>Etiqueta de grupo.</b> Esta luminária é uma das <b>'+GI.quantidade+'</b> iguais em <b>'+esc(GI.local||"este ambiente")+'</b>. Os dados, as peças e a garantia valem para todas. Ao pedir ou reportar, diga qual luminária é.</div>'+grupoUnidades():""; }
+// unidades do grupo: recolhidas; ponto vermelho = já teve manutenção (tem histórico próprio)
+function grupoUnidades(){
+  const u=(GI&&GI.unidades)||[]; if(u.length<2) return "";
+  const m=u.filter(x=>x.manutencao).length;
+  return '<details class="und"'+(m?' open':'')+'><summary><b>Escolher uma unidade</b> <span class="small">('+u.length+')</span>'+(m?' <span class="small"><i class="pt"></i>'+m+' com manutenção</span>':'')+'</summary>'
+   +'<div class="chips">'+u.map(x=>'<a href="?c='+encodeURIComponent(x.serial)+'">'+(x.manutencao?'<i class="pt"></i>':'')+esc(x.serial)+(x.retirada?' · retirada':'')+'</a>').join("")+'</div>'
+   +(m?'<div class="leg"><i class="pt"></i> tem etiqueta e histórico próprios (já passou por manutenção)</div>':'')+'</details>';
+}
 function render(){
   const l=P.luminaria, itens=P.itens||[], g=P.garantia_ate;
   const gOk=g&&g>=hoje();
@@ -492,9 +504,24 @@ document.addEventListener("change",e=>{
   const el=e.target;
   if(el.dataset&&el.dataset.ch==="variante"){ VAR[el.dataset.base]=Number(el.value)||0; renderLoja(); }
 });
+// página do ambiente (etiqueta de forro/ambiente): imagem do ambiente + grupos de luminárias iguais
+async function paginaAmbiente(){
+  const r=await sb.rpc("v2_local_info",{p_serial:SERIAL});
+  if(r.error){ $("#content").innerHTML='<div class="card" style="color:var(--red)">Não foi possível carregar agora. Tente de novo em instantes.</div>'; return; }
+  const A=r.data; if(!A){ $("#content").innerHTML='<div class="card"><b>Ambiente não encontrado.</b><div class="small" style="margin-top:4px">Confira o código da etiqueta: '+esc(SERIAL)+'</div></div>'; return; }
+  const gr=A.grupos||[];
+  $("#content").innerHTML='<div class="hero"><div class="small" style="text-transform:uppercase;letter-spacing:.08em">Ambiente</div><div class="id">'+esc(A.local||"SEM NOME")+'</div>'
+   +'<div class="small" style="margin-top:4px"><b>'+A.total+'</b> luminária(s) em <b>'+gr.length+'</b> grupo(s)</div>'
+   +(A.imagem_url?'<div style="background:#fff;border-radius:14px;padding:10px;margin-top:14px;text-align:center"><img src="'+esc(A.imagem_url)+'" alt="Desenho do ambiente" style="max-width:100%;max-height:70vh;object-fit:contain"></div>':'')+'</div>'
+   +'<h2 class="sec">Luminárias deste ambiente</h2>'
+   +gr.map(g=>'<a class="card" href="?c='+encodeURIComponent(g.ancora)+'&g=1" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;text-decoration:none;color:inherit">'
+     +(g.foto_url?'<img src="'+esc(g.foto_url)+'" alt="" style="width:64px;height:64px;object-fit:contain;background:#fff;border-radius:10px;flex:none">':'<div style="width:64px;height:64px;border-radius:10px;background:var(--s2);flex:none"></div>')
+     +'<div style="flex:1;min-width:0"><b>'+esc(g.modelo)+'</b><div class="small">'+esc(g.fabricante||"")+'</div>'+(g.com_manutencao?'<div class="small"><i class="pt"></i>'+g.com_manutencao+' com manutenção</div>':'')+'</div><b style="color:var(--orange);white-space:nowrap">'+g.quantidade+'x ›</b></a>').join("");
+}
 async function iniciar(){
   const qs=new URLSearchParams(location.search); SERIAL=qs.get("c")||qs.get("s")||"";
   if(!SERIAL){ $("#content").innerHTML='<div class="card">Aponte o celular para a etiqueta da luminária, ou leia o QR.</div>'; return; }
+  if(qs.get("l")==="1"){ await paginaAmbiente(); return; }
   if(await carregar()){ lerCart(); render(); }
 }
 iniciar();

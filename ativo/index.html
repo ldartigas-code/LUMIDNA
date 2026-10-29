@@ -517,11 +517,12 @@ async function paginaAmbiente(){
     :'<div style="width:64px;height:64px;border-radius:10px;background:var(--s2);flex:none"></div>');
   $("#content").innerHTML='<div class="hero"><div class="small" style="text-transform:uppercase;letter-spacing:.08em">Ambiente</div><div class="id">'+esc(A.local||"SEM NOME")+'</div>'
    +'<div class="small" style="margin-top:4px"><b>'+A.total+'</b> luminária(s) em <b>'+gr.length+'</b> grupo(s)</div>'
-   +(A.imagem_url?'<div style="background:#fff;border-radius:14px;padding:10px;margin-top:14px;text-align:center"><img src="'+esc(A.imagem_url)+'" alt="Desenho do ambiente" style="max-width:100%;max-height:70vh;object-fit:contain"></div>':'')+'</div>'
+   +'</div>'
    +'<h2 class="sec">Luminárias deste ambiente</h2>'
    +gr.map(g=>'<a class="card" href="?c='+encodeURIComponent(g.ancora)+'&g=1" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;text-decoration:none;color:inherit">'
      +miniFoto(g)
-     +'<div style="flex:1;min-width:0"><b>'+esc(g.modelo)+'</b><div class="small">'+esc(g.fabricante||"")+'</div>'+(g.com_manutencao?'<div class="small"><i class="pt"></i>'+g.com_manutencao+' com manutenção</div>':'')+'</div><b style="color:var(--orange);white-space:nowrap">'+g.quantidade+'x ›</b></a>').join("");
+     +'<div style="flex:1;min-width:0"><b>'+esc(g.modelo)+'</b><div class="small">'+esc(g.fabricante||"")+'</div>'+(g.com_manutencao?'<div class="small"><i class="pt"></i>'+g.com_manutencao+' com manutenção</div>':'')+'</div><b style="color:var(--orange);white-space:nowrap">'+g.quantidade+'x ›</b></a>').join("")
+   +(A.imagem_url?'<h2 class="sec">Desenho do ambiente</h2><div style="background:#fff;border-radius:14px;padding:10px;text-align:center"><img src="'+esc(A.imagem_url)+'" alt="Desenho do ambiente" style="max-width:100%;max-height:80vh;object-fit:contain"></div>':'');
 }
 async function iniciar(){
   const qs=new URLSearchParams(location.search); SERIAL=qs.get("c")||qs.get("s")||"";

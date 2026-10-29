@@ -55,6 +55,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;p
 .grp{padding:14px}.prow{border-top:1px solid var(--line);padding:10px 0}.prow:first-child{border-top:0}
 .etqs{display:flex;flex-wrap:wrap;gap:8px}
 .etq{display:flex;gap:2mm;align-items:center;border:1px dashed #b4b2a9;padding:2mm;overflow:hidden;font-size:9pt;line-height:1.25;background:#fff;break-inside:avoid}
+.etqL .eimg{object-fit:contain;flex:none}.etqL .ecol{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1mm;min-width:0;flex:1;text-align:center}.etqL .et{font-size:7pt}.etqL .et b{font-size:10pt}.locimg{width:56px;height:76px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px;flex:none}
 .etq .qr svg{width:100%;height:100%;display:block}.etq .qr{flex:none}.etq .et{min-width:0;overflow-wrap:anywhere}.etq .et b{font-size:11pt}
 .homebg{position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg,#ff7a2f 0%,#e8641c 45%,#b8420a 100%)}
 body:has(.homebg) header b,body:has(.homebg) header .small,body:has(.homebg) header a{color:#fff}
@@ -601,6 +602,10 @@ Object.assign(S,{obras:[],pecas:[],pitens:[],obra:null,peca:null,hist:[],imp:[],
 const MOTIVOS=["parou de funcionar","piscando","perdeu brilho","troca preventiva","outro"];
 const hoje=()=>{ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
 const dmy=d=>{ if(!d) return "—"; const a=String(d).slice(0,10).split("-"); return a[2]+"/"+a[1]+"/"+a[0]; };
+// padrão: dia da instalação da obra + meses de garantia da obra (12 por padrão); a empresa pode ajustar peça a peça
+function somaMeses(iso,m){ const a=String(iso||"").slice(0,10).split("-").map(Number); if(a.length<3||!a[0]) return null; const d=new Date(Date.UTC(a[0],a[1]-1+m,1)), ult=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).getUTCDate(); d.setUTCDate(Math.min(a[2],ult)); return d.toISOString().slice(0,10); }
+const dataInstPadrao=(o,p)=>(p&&p.data_instalacao)||(o&&o.inicio_instalacao)||null;
+const garantiaPadrao=(o,p)=>{ const d=dataInstPadrao(o,p); return d&&o?somaMeses(d,o.garantia_meses):null; };
 const garantiaTxt=p=>!p.garantia_ate?{t:"sem data",c:"small"}:(p.garantia_ate>=hoje()?{t:"em garantia até "+dmy(p.garantia_ate),c:"ok"}:{t:"garantia vencida em "+dmy(p.garantia_ate),c:"no"});
 const precisaKit=p=>{ const l=porId(p.luminaria_id); return !!l&&!l.integrada; };
 const urlPeca=s=>new URL("../ativo/?c="+encodeURIComponent(s),location.href).href;
@@ -623,11 +628,13 @@ function renderHome(){
 
 async function carregarObras(){
   try{
-    [S.obras,S.pecas,S.pitens]=await Promise.all([
+    [S.obras,S.pecas,S.pitens,S.locais]=await Promise.all([
       pagina(()=>sb.from("v2_obras").select("*").order("id")),
       pagina(()=>sb.from("v2_pecas").select("*").order("id")),
-      pagina(()=>sb.from("v2_peca_itens").select("*").order("id"))
+      pagina(()=>sb.from("v2_peca_itens").select("*").order("id")),
+      pagina(()=>sb.from("v2_locais").select("*").order("id")).catch(()=>null)
     ]);
+    S.locaisOk=S.locais!==null; if(!S.locais) S.locais=[];
   }catch(e){ $("#app").innerHTML='<div class="msg e">Não consegui carregar as obras: '+esc(e.message||e)+'<br>Se for "relation does not exist", falta rodar o SQL v2_02_obras_pecas no Supabase.</div>'; return false; }
   return true;
 }
@@ -656,7 +663,7 @@ function renderObra(){
    +'<div class="field"><label>Início da instalação</label><input id="o_inicio" type="date" value="'+esc(o.inicio_instalacao||"")+'"></div>'
    +'<div class="field"><label>Garantia (meses)</label><input id="o_gar" type="number" min="0" value="'+o.garantia_meses+'"></div></div>'
    +'<div class="small" id="o_cod" style="margin-bottom:6px"></div>'
-   +(novo?"":'<div class="small" style="margin-bottom:10px">Início e garantia valem para as peças criadas daqui para frente; as que já existem mantêm a garantia delas.</div>')
+   +(novo?"":'<div class="small" style="margin-bottom:10px">Início e garantia valem para as peças criadas daqui para frente. As peças que ainda estão sem data recebem: dia de instalação + meses de garantia. As que já têm garantia mantêm a delas (ajuste na ficha da peça).</div>')
    +'<div class="field"><label>Observação da obra (só desta obra)</label><textarea id="o_obs" style="min-height:70px">'+esc(o.observacao||"")+'</textarea></div>'
    +'<div class="bar"><button class="p" data-act="salvarObra">Salvar obra</button>'+(!novo&&!ps.length?'<button class="danger" data-act="apagarObra">Excluir obra</button>':'')+'</div></div>':'';
   $("#app").innerHTML='<button data-act="voltaObras" style="margin-bottom:12px">‹ Obras</button>'
@@ -741,8 +748,14 @@ async function salvarObra(){
   const row={nome:nome,cliente:nv($("#o_cliente").value.trim()),inicio_instalacao:nv($("#o_inicio").value),garantia_meses:gar,observacao:nv($("#o_obs").value.trim())};
   const r=o.id?await sb.from("v2_obras").update(row).eq("id",o.id).select().single():await sb.from("v2_obras").insert(row).select().single();
   if(r.error) return msg(r.error.code==="23505"?"Já existe uma obra com esse nome.":"Erro ao salvar a obra: "+r.error.message,false);
-  const id=r.data.id, era=!!o.id; S.editObra=false; if(!await carregarObras()) return; abrirObra(id);
+  const id=r.data.id, era=!!o.id; await completarGarantias(r.data); S.editObra=false; if(!await carregarObras()) return; abrirObra(id);
   msg(era?"Obra salva.":'Obra "'+nome+'" criada. Agora cole a lista de luminárias.');
+}
+async function completarGarantias(ob){
+  if(!ob||!ob.inicio_instalacao||!ob.id) return 0; if(!await carregarObras()) return 0;
+  const alvo=S.pecas.filter(p=>p.obra_id===ob.id&&(!p.data_instalacao||!p.garantia_ate)); let n=0;
+  for(const p of alvo){ const d=p.data_instalacao||ob.inicio_instalacao, upd={data_instalacao:d}; if(!p.garantia_ate) upd.garantia_ate=somaMeses(d,ob.garantia_meses); const x=await sb.from("v2_pecas").update(upd).eq("id",p.id); if(!x.error) n++; }
+  return n;
 }
 async function apagarObra(){
   if(!confirm('Excluir a obra "'+S.obra.nome+'"?')) return;
@@ -823,7 +836,7 @@ function renderPeca(){
    +blocoNotas()
    +'<div class="card"><div class="field"><label>Local</label><input id="p_local" value="'+esc(p.local||"")+'"></div>'
    +(precisaKit(p)?'<div class="field"><label>Kit desta peça</label><select data-act="trocaKitPeca" data-id="'+p.id+'"><option value="">— escolher kit —</option>'+S.kits.filter(k=>k.luminaria_id===p.luminaria_id).map(k=>'<option value="'+k.id+'" '+(p.kit_id===k.id?"selected":"")+'>'+esc(k.nome)+'</option>').join("")+'</select></div>':'')
-   +'<div class="field"><label>Garantia até (a empresa pode ajustar)</label><input id="p_gar" type="date" value="'+esc(p.garantia_ate||"")+'"></div>'
+   +'<div class="field"><label>Garantia até (a empresa pode ajustar)</label><input id="p_gar" type="date" value="'+esc(p.garantia_ate||garantiaPadrao(o,p)||"")+'">'+(garantiaPadrao(o,p)?'<div class="small" style="margin-top:4px">Padrão da obra: instalação '+dmy(dataInstPadrao(o,p))+' + '+o.garantia_meses+' meses = <b>'+dmy(garantiaPadrao(o,p))+'</b>'+(p.garantia_ate?(p.garantia_ate===garantiaPadrao(o,p)?'':' · esta peça foi ajustada'):' · toque em Salvar peça para gravar')+'</div>':'<div class="small" style="margin-top:4px">A obra ainda não tem dia de instalação.</div>')+'</div>'
    +'<div class="field"><label>Observação desta peça (só desta peça)</label><textarea id="p_obs" style="min-height:70px">'+esc(p.observacao||"")+'</textarea></div>'
    +'<div class="bar"><button class="p" data-act="salvarPeca">Salvar peça</button><button class="danger" data-act="apagarPeca">Excluir peça (cadastrada por engano)</button></div></div>'
    +'<div class="card"><h3 style="margin-top:0">Itens instalados agora</h3>'+(atuais.length?atuais.map(linhaAtual).join(""):'<div class="small">'+(precisaKit(p)?'Nenhum item. Escolha o kit na lista da obra.':'Lâmpada integrada: não tem itens separados.')+'</div>')+formTroca
@@ -833,7 +846,9 @@ function renderPeca(){
 }
 async function salvarPeca(){
   const p=S.pecas.find(x=>x.id===S.peca);
-  const gar=nv($("#p_gar").value), r=await sb.from("v2_pecas").update({local:nv($("#p_local").value.trim()),observacao:nv($("#p_obs").value.trim()),garantia_ate:gar}).eq("id",p.id);
+  const gar=nv($("#p_gar").value), ob=S.obras.find(x=>x.id===p.obra_id), upd={local:nv($("#p_local").value.trim()),observacao:nv($("#p_obs").value.trim()),garantia_ate:gar};
+  if(!p.data_instalacao&&ob&&ob.inicio_instalacao) upd.data_instalacao=ob.inicio_instalacao;
+  const r=await sb.from("v2_pecas").update(upd).eq("id",p.id);
   if(r.error) return msg("Erro ao salvar a peça: "+r.error.message,false);
   if((p.garantia_ate||null)!==gar) await registraHist(p.id,null,"Garantia alterada de "+dmy(p.garantia_ate)+" para "+dmy(gar));
   await carregarObras(); await abrirPeca(p.id); msg("Peça salva.");
@@ -905,21 +920,68 @@ function gruposDaObra(oid){
   const cod=g=>String((porId(g.luminaria_id)||{}).codigo||"");
   return arr.sort((a,b)=>setorDe(a.local).localeCompare(setorDe(b.local),"pt-BR")||ambDe(a.local).localeCompare(ambDe(b.local),"pt-BR",{numeric:true})||cod(a).localeCompare(cod(b),"pt-BR",{numeric:true}));
 }
+// ---- ambientes (ex.: um FORRO inteiro): etiqueta própria com a imagem do módulo, separada das etiquetas das peças e dos grupos ----
+const urlLocal=s=>new URL("../ativo/?c="+encodeURIComponent(s)+"&l=1",location.href).href;
+function ambientesDaObra(oid){
+  const m=new Map();
+  S.pecas.filter(p=>p.obra_id===oid&&p.status!=="retirada").forEach(p=>{ const k=chaveLocal(p.local); if(!m.has(k)) m.set(k,{k:k,local:p.local||"",ps:[]}); m.get(k).ps.push(p); });
+  const arr=[...m.values()]; arr.forEach(a=>{ a.ps.sort((x,y)=>x.numero-y.numero); a.ancora=a.ps[0]; });
+  return arr;
+}
+const linhaLocal=(oid,loc)=>(S.locais||[]).find(x=>x.obra_id===oid&&chaveLocal(x.local)===chaveLocal(loc));
+const imgLocal=(oid,loc)=>{ const r=linhaLocal(oid,loc); return r&&r.imagem_url?r.imagem_url:null; };
+async function enviarImgLocal(a,file){
+  if(!file) return; if(!file.type.startsWith("image/")) return msg("Escolha uma imagem (PNG ou JPG). Se o desenho está em PDF, salve uma página como imagem.",false);
+  if(file.size>8*1024*1024) return msg("Imagem grande demais (máximo 8 MB).",false);
+  const o=S.obra, path="v2/ambiente_"+o.id+"_"+Date.now()+"_"+file.name.replace(/[^\w.-]+/g,"_");
+  const up=await sb.storage.from("fotos").upload(path,file,{upsert:true}); if(up.error) return msg("Erro ao enviar a imagem: "+up.error.message,false);
+  const url=sb.storage.from("fotos").getPublicUrl(path).data.publicUrl;
+  let alvos=[a];
+  const pal=ambDe(a.local).split(" ")[0], outros=S.ambs.filter(x=>x!==a&&ambDe(x.local).split(" ")[0]===pal&&pal.length>2);
+  if(outros.length&&confirm("Usar esta mesma imagem nos outros "+outros.length+" ambientes que começam com \""+pal+"\" ("+outros.map(x=>ambDe(x.local)).join(", ")+")?\n\nOK = usar em todos. Cancelar = só neste ambiente.")) alvos=alvos.concat(outros);
+  const rows=alvos.map(x=>{ const ex=linhaLocal(o.id,x.local); return {obra_id:o.id,local:ex?ex.local:x.local,imagem_url:url}; });
+  const r=await sb.from("v2_locais").upsert(rows,{onConflict:"obra_id,local"});
+  if(r.error) return msg("Enviei a imagem, mas não consegui guardar: "+r.error.message+(/does not exist|permission/.test(r.error.message)?" — falta rodar o SQL v2_15 no Supabase.":""),false);
+  await carregarObras(); renderObra(); msg("Imagem guardada em "+alvos.length+" ambiente(s).");
+}
+function renderEtiquetasLocal(){
+  const o=S.obra, w=S.etqL.w, h2=S.etqL.h, n=Math.max(1,Math.min(50,S.locQtd||1)), lista=S.locSel.map(i=>S.ambs[i]).filter(Boolean);
+  const qrs=Math.max(12,Math.min(30,Math.round(h2*0.5)));
+  const un=a=>{
+    let qr=""; try{ const q=qrcode(0,"M"); q.addData(urlLocal(a.ancora.serial)); q.make(); qr=q.createSvgTag({cellSize:4,margin:0,scalable:true}); }catch(e){}
+    const img=imgLocal(o.id,a.local), cont=new Map(); a.ps.forEach(p=>{ const c=(porId(p.luminaria_id)||{}).codigo||"?"; cont.set(c,(cont.get(c)||0)+1); });
+    const lst=[...cont.entries()].sort((x,y)=>x[0].localeCompare(y[0],"pt-BR",{numeric:true})).map(([c,q])=>esc(c)+" ×"+q).join(" · ");
+    const txt='<div class="et"><b>'+esc(ambDe(a.local))+'</b><br>'+a.ps.length+' luminária(s)<br><span>'+lst+'</span><br><span>'+esc(a.ancora.serial)+'</span></div>';
+    return '<div class="etq etqL" style="width:'+w+'mm;height:'+h2+'mm">'+(img?'<img class="eimg" src="'+esc(img)+'" alt="" style="height:'+(h2-4)+'mm;max-width:'+Math.round(w*0.5)+'mm"><div class="ecol"><div class="qr" style="width:'+qrs+'mm;height:'+qrs+'mm">'+qr+'</div>'+txt+'</div>'
+      :'<div class="qr" style="width:'+(h2-4)+'mm;height:'+(h2-4)+'mm">'+qr+'</div>'+txt)+'</div>';
+  };
+  $("#app").innerHTML='<div class="noprint"><button data-act="grupos" style="margin-bottom:12px">‹ Grupos</button>'
+   +'<div class="card"><h3 style="margin-top:0">Etiqueta do ambiente: '+(lista.length===1?esc(ambDe(lista[0].local)):lista.length+' ambientes')+'</h3><div class="small" style="margin-bottom:8px">Uma etiqueta <b>por ambiente</b>, separada das etiquetas das peças e dos grupos (elas não são alteradas nem misturadas). Mostra a imagem do ambiente, o QR da página do ambiente e a lista das luminárias. Cada ambiente usa a série <b>'+esc(lista.map(a=>a.ancora.serial).join(", "))+'</b> só para o QR.</div>'
+   +'<div class="bar"><div><label>Cópias de cada</label><input id="l_n" type="number" min="1" max="50" value="'+n+'" style="width:90px"></div><div><label>Largura (mm)</label><input id="l_w" type="number" min="40" max="210" value="'+w+'" style="width:100px"></div><div><label>Altura (mm)</label><input id="l_h" type="number" min="25" max="150" value="'+h2+'" style="width:100px"></div><button class="p" data-act="imprimirLoc" style="align-self:end">Imprimir</button></div></div></div>'
+   +'<div class="etqs">'+lista.map(a=>Array.from({length:n},()=>un(a)).join("")).join("")+'</div>';
+  const aj=()=>{ S.etqL={w:Math.max(40,parseInt($("#l_w").value)||90),h:Math.max(25,parseInt($("#l_h").value)||60)}; renderEtiquetasLocal(); };
+  $("#l_w").onchange=aj; $("#l_h").onchange=aj; $("#l_n").onchange=e=>{ S.locQtd=parseInt(e.target.value)||1; renderEtiquetasLocal(); };
+}
 const assinaItens=p=>S.pitens.filter(x=>x.peca_id===p.id&&!x.removido_em).map(x=>x.produto_id+":"+x.quantidade).sort().join(",");
 const textoItens=p=>{ const m=new Map(); S.pitens.filter(x=>x.peca_id===p.id&&!x.removido_em).forEach(x=>m.set(x.produto_id,(m.get(x.produto_id)||0)+x.quantidade)); return [...m.entries()].map(([id,q])=>q+"x "+((porId(id)||{}).codigo||"?")).join(" + "); };
-Object.assign(S,{grupos:[],grpAberto:null,grupoEtq:null,grupoQtd:null,obraVista:"grupos"});
+Object.assign(S,{grupos:[],grpAberto:null,grupoEtq:null,grupoQtd:null,obraVista:"grupos",ambs:[],locSel:[],locQtd:1,etqL:{w:90,h:60},locais:[],locaisOk:true});
 function renderGrupos(){ S.obraVista="grupos"; renderObra(); }
 function vistaObra(o,ps){
   const g=S.obraVista!=="pecas";
   return '<div class="tabs noprint" style="margin:14px 0 10px"><button class="tab '+(g?"on":"")+'" data-act="obraVista" data-v="grupos">Grupos (luminárias iguais por ambiente)</button><button class="tab '+(g?"":"on")+'" data-act="obraVista" data-v="pecas">Peças, uma a uma</button></div>'+(g?htmlGrupos():blocoLuminarias(o,ps))+"";
 }
 function htmlGrupos(){
-  const o=S.obra; S.grupos=gruposDaObra(o.id);
+  const o=S.obra; S.grupos=gruposDaObra(o.id); S.ambs=ambientesDaObra(o.id);
+  const nImg=S.ambs.filter(a=>imgLocal(o.id,a.local)).length;
   const total=S.grupos.reduce((s,g)=>s+g.ps.length,0), fix=S.grupos.reduce((s,g)=>s+g.fixadas,0);
   let atual="", corpo="";
   S.grupos.forEach((g,i)=>{
     const cab=(setorDe(g.local)!=="Geral"?setorDe(g.local)+" › ":"")+ambDe(g.local);
-    if(cab!==atual){ atual=cab; corpo+='<h3 style="margin:18px 0 8px">'+esc(cab)+'</h3>'; }
+    if(cab!==atual){ atual=cab; corpo+='<h3 style="margin:18px 0 8px">'+esc(cab)+'</h3>';
+      const ai=S.ambs.findIndex(a=>a.k===chaveLocal(g.local)), im=imgLocal(o.id,g.local);
+      if(S.locaisOk&&ai>=0) corpo+='<div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-style:dashed">'+(im?'<img class="locimg" src="'+esc(im)+'" alt="">':'')
+       +'<div style="flex:1;min-width:150px"><b>Etiqueta do ambiente</b><div class="small">'+(im?'Com a imagem do ambiente.':'Sem imagem ainda (só QR e lista).')+'</div></div>'
+       +'<div class="bar" style="margin:0"><button data-act="locImg" data-a="'+ai+'">'+(im?'Trocar imagem':'Enviar imagem')+'</button><button class="p" data-act="locEtq" data-a="'+ai+'">Etiqueta do ambiente</button><a href="'+esc(urlLocal(S.ambs[ai].ancora.serial))+'" target="_blank" rel="noopener" style="align-self:center">Página do ambiente</a></div></div>'; }
     const l=porId(g.luminaria_id)||{}, kit=S.kits.find(k=>k.id===g.kit_id), iguais=g.ps.every(p=>assinaItens(p)===assinaItens(g.ancora)), its=textoItens(g.ancora);
     corpo+='<div class="card"><div class="gcard">'+(l.foto_url?'<img class="gimg" src="'+esc(l.foto_url)+'" alt="">':'<div class="gimg v"></div>')
      +'<div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b style="font-size:16px">'+esc(l.codigo||"?")+'</b><b>'+g.ps.length+' unidade(s)</b></div>'
@@ -928,10 +990,11 @@ function htmlGrupos(){
      +(iguais?'':'<div class="no">Atenção: as unidades deste grupo têm itens diferentes entre si.</div>')
      +'<div class="small">Séries '+esc(g.ps[0].serial)+(g.ps.length>1?' … '+esc(g.ps[g.ps.length-1].serial):'')+'</div><div class="small">Impressas '+g.ps.filter(p=>p.impressa_em).length+' · NFC '+g.ps.filter(p=>p.nfc_gravado_em).length+' · Fixadas '+g.fixadas+' de '+g.ps.length+'</div></div></div>'
      +'<div class="bar" style="margin:10px 0 0"><button class="p" data-act="grpEtq" data-i="'+i+'">Etiquetas do grupo</button><a href="'+esc(urlGrupo(g.ancora.serial))+'" target="_blank" rel="noopener" style="align-self:center">Página do grupo</a><button data-act="grpUnidades" data-i="'+i+'">'+(S.grpAberto===i?"Esconder unidades":"Ver unidades")+'</button></div>'
-     +(S.grpAberto===i?'<div style="margin-top:8px">'+g.ps.map(p=>'<a href="#" data-act="abrirPeca" data-id="'+p.id+'" style="display:inline-block;margin:2px 10px 2px 0">'+esc(p.serial)+(p.etiquetada_em?' ✓':'')+'</a>').join("")+'</div>':'')+'</div>';
+     +(S.grpAberto===i?'<div style="margin-top:8px">'+g.ps.map(p=>'<a href="#" data-act="abrirPeca" data-id="'+p.id+'" style="display:inline-block;margin:2px 10px 2px 0">'+(S.pitens.some(x=>x.peca_id===p.id&&x.removido_em)?'<span title="já teve manutenção" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#c0392b;margin-right:4px"></span>':'')+esc(p.serial)+(p.etiquetada_em?' ✓':'')+'</a>').join("")+'</div>':'')+'</div>';
   });
   return '<div class="card"><h3 style="margin:0">Grupos da obra '+esc(o.nome)+'</h3><div class="small"><b>'+total+'</b> luminária(s) em <b>'+S.grupos.length+'</b> grupo(s) · etiquetas fixadas '+fix+' de '+total+'</div>'
-   +'<div class="small" style="margin-top:6px">Grupo = luminárias iguais (mesmo modelo e kit) no mesmo ambiente. Elas podem receber a <b>mesma etiqueta</b>; a série individual só é usada quando uma delas precisa de histórico próprio. Para separar por setor, escreva o local assim: <b>Torre A &gt; 4º andar &gt; Corredor Norte</b>.</div></div>'+(corpo||'<div class="small">Esta obra ainda não tem peças.</div>');
+   +'<div class="small" style="margin-top:6px">Grupo = luminárias iguais (mesmo modelo e kit) no mesmo ambiente. Elas podem receber a <b>mesma etiqueta</b>; a série individual só é usada quando uma delas precisa de histórico próprio. Para separar por setor, escreva o local assim: <b>Torre A &gt; 4º andar &gt; Corredor Norte</b>.</div>'
+   +(S.locaisOk?'<div class="bar noprint" style="margin:10px 0 0">'+(nImg?'<button class="p" data-act="locEtqTodos">Etiquetas de todos os ambientes com imagem ('+nImg+')</button>':'')+'</div><div class="small">Cada ambiente também tem a sua <b>etiqueta de ambiente</b> (ex.: um forro inteiro com o desenho do módulo), separada das etiquetas das peças.</div>':'<div class="no" style="margin-top:8px">Para usar a etiqueta de ambiente com imagem falta rodar o SQL <b>v2_15_locais_com_imagem</b> no Supabase.</div>')+'</div>'+(corpo||'<div class="small">Esta obra ainda não tem peças.</div>');
 }
 function renderEtiquetasGrupo(){
   const g=S.grupos[S.grupoEtq], o=S.obra, l=porId(g.luminaria_id)||{}, w=S.etq.w, h2=S.etq.h, n=Math.max(1,Math.min(500,S.grupoQtd||g.ps.length));
@@ -1406,10 +1469,11 @@ async function atualizaContPend(){
 function renderPend(){
   S.view="pend";
   const pc=pcMap(), serial=p=>{ const x=pc.get(p.peca_id); return x?x.serial:"?"; };
+  const obraNome=p=>{ const x=pc.get(p.peca_id), o=x&&S.obras.find(b=>b.id===x.obra_id); return o?o.nome:""; };
   const prob=S.pedidos.filter(p=>p.tipo==="problema"&&(p.status==="novo"||p.status==="em_atendimento"));
   const man=S.pedidos.filter(p=>p.tipo==="manutencao"&&p.status==="aguardando_aprovacao");
   const apr=S.pedidos.filter(p=>p.tipo==="manutencao"&&p.status==="aprovada");
-  const linha=p=>'<div class="row pnrow" data-act="abrirPendente" data-id="'+p.id+'"><div><b>'+esc(serial(p))+'</b><div class="small">'+dataHora(p.criado_em)+'</div></div><div class="small">'+esc(p.contato_nome)+(p.motivo?' · '+esc(p.motivo):'')+'</div><div class="'+(urgente(p)?"no":"small")+'">'+ST[p.status]+'</div></div>';
+  const linha=p=>'<div class="row pnrow" data-act="abrirPendente" data-id="'+p.id+'"><div><b>'+esc(serial(p))+'</b>'+(obraNome(p)?'<div style="font-size:13px;font-weight:600">'+esc(obraNome(p))+'</div>':'')+'<div class="small">'+dataHora(p.criado_em)+'</div></div><div class="small">'+esc(p.contato_nome)+(p.motivo?' · '+esc(p.motivo):'')+'</div><div class="'+(urgente(p)?"no":"small")+'">'+ST[p.status]+'</div></div>';
   const bloco=(tit,n,lista,vazio,extra)=>'<div class="card"><div style="display:flex;align-items:center;gap:14px"><div style="font-size:36px;font-weight:700;line-height:1;color:'+(n?"var(--redt)":"var(--ink)")+'">'+n+'</div><div><b>'+tit+'</b>'+(extra||"")+'</div></div>'
     +(lista.length?'<div class="list" style="margin-top:12px">'+lista.map(linha).join("")+'</div>':'<div class="small" style="margin-top:8px">'+vazio+'</div>')+'</div>';
   $("#app").innerHTML=navArea("pend")
@@ -1420,7 +1484,11 @@ function renderPend(){
 // ---- cliques ----
 const ACT={
   nada:()=>{},
-  home:()=>{msg("");renderHome(); window.scrollTo(0,0);}, grupos:()=>{msg(""); renderGrupos();}, obraVista:d=>{S.obraVista=d.v; renderObra();}, grpEtq:d=>{S.grupoEtq=Number(d.i); S.grupoQtd=null; renderEtiquetasGrupo();}, grpUnidades:d=>{S.grpAberto=S.grpAberto===Number(d.i)?null:Number(d.i); renderObra();},
+  home:()=>{msg("");renderHome(); window.scrollTo(0,0);}, grupos:()=>{msg(""); renderGrupos();}, obraVista:d=>{S.obraVista=d.v; renderObra();}, grpEtq:d=>{S.grupoEtq=Number(d.i); S.grupoQtd=null; renderEtiquetasGrupo();}, locImg:d=>{ const a=S.ambs[Number(d.a)]; if(!a) return; const f=document.createElement("input"); f.type="file"; f.accept="image/*"; f.onchange=()=>enviarImgLocal(a,f.files[0]); f.click(); },
+  locEtq:d=>{ S.locSel=[Number(d.a)]; S.locQtd=1; renderEtiquetasLocal(); window.scrollTo(0,0); },
+  locEtqTodos:()=>{ S.locSel=S.ambs.map((a,i)=>i).filter(i=>imgLocal(S.obra.id,S.ambs[i].local)); S.locQtd=1; renderEtiquetasLocal(); window.scrollTo(0,0); },
+  imprimirLoc:()=>window.print(),
+  grpUnidades:d=>{S.grpAberto=S.grpAberto===Number(d.i)?null:Number(d.i); renderObra();},
   imprimirEtq:()=>{ S.etqPendImp=S.pecas.filter(p=>p.obra_id===S.obra.id&&(!S.etqSoNaoImp||!p.impressa_em)).map(p=>p.id); window.print(); perguntaImpressao(S.etqPendImp.length); },
   etqMarcarImp:async()=>{ if(await marcarEtapaAdmin(S.etqPendImp,"impressa_em","impressa_por",false)){ if(S.view==="etiq") renderEtiquetas(); else { const c=$("#etqConf"); if(c) c.style.display="none"; } msg("Etiquetas marcadas como impressas."); } },
   etqNaoImp:()=>{ const c=$("#etqConf"); if(c) c.style.display="none"; },

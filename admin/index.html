@@ -55,7 +55,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;p
 .grp{padding:14px}.prow{border-top:1px solid var(--line);padding:10px 0}.prow:first-child{border-top:0}
 .etqs{display:flex;flex-wrap:wrap;gap:8px}
 .etq{display:flex;gap:2mm;align-items:center;border:1px dashed #b4b2a9;padding:2mm;overflow:hidden;font-size:9pt;line-height:1.25;background:#fff;break-inside:avoid}
-.etqL .eimg{object-fit:contain;flex:none}.etqL .ecol{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1mm;min-width:0;flex:1;text-align:center}.etqL .et{font-size:7pt}.etqL .et b{font-size:10pt}.locimg{width:56px;height:76px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px;flex:none}
+.etqL .eimg{object-fit:contain;flex:none}.etqL .ecol{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1mm;min-width:0;flex:1;text-align:center}.etqL .et{font-size:7pt}.etqL .et b{font-size:10pt}.etqL>.qr+.et{font-size:8.5pt}.etqL>.qr+.et b{font-size:13pt}.locimg{width:56px;height:76px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px;flex:none}
 .etq .qr svg{width:100%;height:100%;display:block}.etq .qr{flex:none}.etq .et{min-width:0;overflow-wrap:anywhere}.etq .et b{font-size:11pt}
 .homebg{position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg,#ff7a2f 0%,#e8641c 45%,#b8420a 100%)}
 body:has(.homebg) header b,body:has(.homebg) header .small,body:has(.homebg) header a{color:#fff}
@@ -946,14 +946,14 @@ async function enviarImgLocal(a,file){
 }
 function renderEtiquetasLocal(){
   const o=S.obra, w=S.etqL.w, h2=S.etqL.h, n=Math.max(1,Math.min(50,S.locQtd||1)), lista=S.locSel.map(i=>S.ambs[i]).filter(Boolean);
-  const qrs=Math.max(12,Math.min(30,Math.round(h2*0.5)));
+  const qrs=Math.max(12,Math.min(30,Math.round(h2*0.5))), qrNo=Math.max(14,Math.min(h2-4,Math.round(w*0.38),34));
   const un=a=>{
     let qr=""; try{ const q=qrcode(0,"M"); q.addData(urlLocal(a.ancora.serial)); q.make(); qr=q.createSvgTag({cellSize:4,margin:0,scalable:true}); }catch(e){}
     const img=imgLocal(o.id,a.local), cont=new Map(); a.ps.forEach(p=>{ const c=(porId(p.luminaria_id)||{}).codigo||"?"; cont.set(c,(cont.get(c)||0)+1); });
     const lst=[...cont.entries()].sort((x,y)=>x[0].localeCompare(y[0],"pt-BR",{numeric:true})).map(([c,q])=>esc(c)+" ×"+q).join(" · ");
     const txt='<div class="et"><b>'+esc(ambDe(a.local))+'</b><br>'+a.ps.length+' luminária(s)<br><span>'+lst+'</span><br><span>'+esc(a.ancora.serial)+'</span></div>';
     return '<div class="etq etqL" style="width:'+w+'mm;height:'+h2+'mm">'+(img?'<img class="eimg" src="'+esc(img)+'" alt="" style="height:'+(h2-4)+'mm;max-width:'+Math.round(w*0.5)+'mm"><div class="ecol"><div class="qr" style="width:'+qrs+'mm;height:'+qrs+'mm">'+qr+'</div>'+txt+'</div>'
-      :'<div class="qr" style="width:'+(h2-4)+'mm;height:'+(h2-4)+'mm">'+qr+'</div>'+txt)+'</div>';
+      :'<div class="qr" style="width:'+qrNo+'mm;height:'+qrNo+'mm">'+qr+'</div>'+txt)+'</div>';
   };
   $("#app").innerHTML='<div class="noprint"><button data-act="grupos" style="margin-bottom:12px">‹ Grupos</button>'
    +'<div class="card"><h3 style="margin-top:0">Etiqueta do ambiente: '+(lista.length===1?esc(ambDe(lista[0].local)):lista.length+' ambientes')+'</h3><div class="small" style="margin-bottom:8px">Uma etiqueta <b>por ambiente</b>, separada das etiquetas das peças e dos grupos (elas não são alteradas nem misturadas). Mostra a imagem do ambiente, o QR da página do ambiente e a lista das luminárias. Cada ambiente usa a série <b>'+esc(lista.map(a=>a.ancora.serial).join(", "))+'</b> só para o QR.</div>'
@@ -983,7 +983,8 @@ function htmlGrupos(){
        +'<div style="flex:1;min-width:150px"><b>Etiqueta do ambiente</b><div class="small">'+(im?'Com a imagem do ambiente.':'Sem imagem ainda (só QR e lista).')+'</div></div>'
        +'<div class="bar" style="margin:0"><button data-act="locImg" data-a="'+ai+'">'+(im?'Trocar imagem':'Enviar imagem')+'</button><button class="p" data-act="locEtq" data-a="'+ai+'">Etiqueta do ambiente</button><a href="'+esc(urlLocal(S.ambs[ai].ancora.serial))+'" target="_blank" rel="noopener" style="align-self:center">Página do ambiente</a></div></div>'; }
     const l=porId(g.luminaria_id)||{}, kit=S.kits.find(k=>k.id===g.kit_id), iguais=g.ps.every(p=>assinaItens(p)===assinaItens(g.ancora)), its=textoItens(g.ancora);
-    corpo+='<div class="card"><div class="gcard">'+(l.foto_url?'<img class="gimg" src="'+esc(l.foto_url)+'" alt="">':'<div class="gimg v"></div>')
+    const fk=l.foto_url?[]:[...new Set(S.pitens.filter(x=>x.peca_id===g.ancora.id&&!x.removido_em).map(x=>(porId(x.produto_id)||{}).foto_url).filter(Boolean))].slice(0,2);
+    corpo+='<div class="card"><div class="gcard">'+(l.foto_url?'<img class="gimg" src="'+esc(l.foto_url)+'" alt="">':(fk.length?'<div class="gimg" style="display:flex;gap:2px;overflow:hidden;padding:0">'+fk.map(u=>'<img src="'+esc(u)+'" alt="" style="flex:1;min-width:0;width:100%;object-fit:contain">').join("")+'</div>':'<div class="gimg v"></div>'))
      +'<div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b style="font-size:16px">'+esc(l.codigo||"?")+'</b><b>'+g.ps.length+' unidade(s)</b></div>'
      +'<div class="small">'+esc(l.fabricante||"")+(kit?' · kit '+esc(kit.nome):'')+'</div>'
      +(its?'<div class="small">'+esc(its)+' <span class="small">(por unidade)</span></div>':(l.integrada?'<div class="small">lâmpada integrada</div>':'<div class="no">sem itens cadastrados</div>'))

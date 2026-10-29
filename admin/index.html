@@ -628,12 +628,14 @@ function renderHome(){
 
 async function carregarObras(){
   try{
-    [S.obras,S.pecas,S.pitens,S.locais]=await Promise.all([
+    [S.obras,S.pecas,S.pitens,S.locais,S.nfcm]=await Promise.all([
       pagina(()=>sb.from("v2_obras").select("*").order("id")),
       pagina(()=>sb.from("v2_pecas").select("*").order("id")),
       pagina(()=>sb.from("v2_peca_itens").select("*").order("id")),
-      pagina(()=>sb.from("v2_locais").select("*").order("id")).catch(()=>null)
+      pagina(()=>sb.from("v2_locais").select("*").order("id")).catch(()=>null),
+      pagina(()=>sb.from("v2_nfc_marcas").select("*").order("gravado_em")).catch(()=>null)
     ]);
+    S.nfcmOk=S.nfcm!==null; if(!S.nfcm) S.nfcm=[];
     S.locaisOk=S.locais!==null; if(!S.locais) S.locais=[];
   }catch(e){ $("#app").innerHTML='<div class="msg e">Não consegui carregar as obras: '+esc(e.message||e)+'<br>Se for "relation does not exist", falta rodar o SQL v2_02_obras_pecas no Supabase.</div>'; return false; }
   return true;
@@ -884,7 +886,7 @@ async function marcarEtapaAdmin(ids,campoEm,campoPor,desfazer){
   return true;
 }
 function renderEtiquetas(){
-  S.view="etiq"; const o=S.obra, todas=S.pecas.filter(p=>p.obra_id===o.id), w=S.etq.w, h=S.etq.h;
+  S.view="etiq"; S.nfcVolta="etiq"; const o=S.obra, todas=S.pecas.filter(p=>p.obra_id===o.id), w=S.etq.w, h=S.etq.h;
   const ps=S.etqSoNaoImp?todas.filter(p=>!p.impressa_em):todas, c=contaEtapas(todas);
   const etq=ps.map(p=>{
     const l=porId(p.luminaria_id); let qr="";
@@ -900,7 +902,7 @@ function renderEtiquetas(){
    +'<div class="etqs">'+etq+'</div>'
    +'<div class="card noprint" style="margin-top:14px"><h3 style="margin-top:0">Endereços para gravar no NFC <span class="small">(opcional)</span></h3><div class="small" style="margin-bottom:8px">No celular, abra um app de gravação de NFC (por exemplo NFC Tools), escolha gravar "URL" e cole o endereço da peça. Depois toque em <b>Gravei</b> para ficar registrado.</div>'
    +'<div class="bar"><button data-act="etqNfcTodas">Marcar NFC de todas como gravado</button></div>'
-   +'<table><tr><th>Serial</th><th>Endereço</th><th></th></tr>'+todas.map(p=>{const u=urlPeca(p.serial);return '<tr><td><b>'+esc(p.serial)+'</b></td><td style="overflow-wrap:anywhere" class="small">'+esc(u)+'</td><td style="white-space:nowrap"><button data-act="copiarUrl" data-u="'+esc(u)+'" style="padding:2px 8px">Copiar</button> '+(p.nfc_gravado_em?'<button data-act="etqNfc" data-id="'+p.id+'" style="padding:2px 8px" title="Desfazer"><span class="ok">NFC ✓</span></button>':'<button class="p" data-act="etqNfc" data-id="'+p.id+'" style="padding:2px 8px">Gravei</button>')+'</td></tr>'}).join("")+'</table></div>';
+   +'<table><tr><th>Serial</th><th>Endereço</th><th></th></tr>'+todas.map(p=>{const u=urlPeca(p.serial);return '<tr><td><b>'+esc(p.serial)+'</b></td><td style="overflow-wrap:anywhere" class="small">'+esc(u)+'</td><td style="white-space:nowrap"><button data-act="copiarUrl" data-u="'+esc(u)+'" style="padding:2px 8px">Copiar</button> '+(p.nfc_gravado_em?'<button data-act="etqNfc" data-id="'+p.id+'" style="padding:2px 8px" title="Desfazer"><span class="ok">NFC ✓</span></button>':'<button class="p" data-act="etqNfc" data-id="'+p.id+'" style="padding:2px 8px">Gravei</button>')+'</td></tr>'}).join("")+'</table></div>'+nfcAmbGrp();
   const aj=()=>{ const w2=Math.max(20,parseInt($("#e_w").value)||60), h2=Math.max(15,parseInt($("#e_h").value)||30); S.etq={w:w2,h:h2}; document.querySelectorAll(".etq").forEach(e=>{e.style.width=w2+"mm";e.style.height=h2+"mm"}); document.querySelectorAll(".etq .qr").forEach(e=>{e.style.width=(h2-4)+"mm";e.style.height=(h2-4)+"mm"}); };
   $("#e_w").oninput=aj; $("#e_h").oninput=aj; $("#e_naoimp").onchange=e=>{ S.etqSoNaoImp=e.target.checked; renderEtiquetas(); };
 }
@@ -945,6 +947,7 @@ async function enviarImgLocal(a,file){
   await carregarObras(); renderObra(); msg("Imagem guardada em "+alvos.length+" ambiente(s).");
 }
 function renderEtiquetasLocal(){
+  S.nfcVolta="loc";
   const o=S.obra, w=S.etqL.w, h2=S.etqL.h, n=Math.max(1,Math.min(50,S.locQtd||1)), lista=S.locSel.map(i=>S.ambs[i]).filter(Boolean);
   const qrs=Math.max(12,Math.min(30,Math.round(h2*0.5))), qrNo=Math.max(14,Math.min(h2-4,Math.round(w*0.38),34));
   const un=a=>{
@@ -957,10 +960,33 @@ function renderEtiquetasLocal(){
   };
   $("#app").innerHTML='<div class="noprint"><button data-act="grupos" style="margin-bottom:12px">‹ Grupos</button>'
    +'<div class="card"><h3 style="margin-top:0">Etiqueta do ambiente: '+(lista.length===1?esc(ambDe(lista[0].local)):lista.length+' ambientes')+'</h3><div class="small" style="margin-bottom:8px">Uma etiqueta <b>por ambiente</b>, separada das etiquetas das peças e dos grupos (elas não são alteradas nem misturadas). Mostra a imagem do ambiente, o QR da página do ambiente e a lista das luminárias. Cada ambiente usa a série <b>'+esc(lista.map(a=>a.ancora.serial).join(", "))+'</b> só para o QR.</div>'
-   +'<div class="bar"><div><label>Cópias de cada</label><input id="l_n" type="number" min="1" max="50" value="'+n+'" style="width:90px"></div><div><label>Largura (mm)</label><input id="l_w" type="number" min="40" max="210" value="'+w+'" style="width:100px"></div><div><label>Altura (mm)</label><input id="l_h" type="number" min="25" max="150" value="'+h2+'" style="width:100px"></div><button class="p" data-act="imprimirLoc" style="align-self:end">Imprimir</button></div></div></div>'
+   +'<div class="bar"><div><label>Cópias de cada</label><input id="l_n" type="number" min="1" max="50" value="'+n+'" style="width:90px"></div><div><label>Largura (mm)</label><input id="l_w" type="number" min="40" max="210" value="'+w+'" style="width:100px"></div><div><label>Altura (mm)</label><input id="l_h" type="number" min="25" max="150" value="'+h2+'" style="width:100px"></div><button class="p" data-act="imprimirLoc" style="align-self:end">Imprimir</button></div></div>'+tabelaNfc(lista.map(a=>({tipo:"ambiente",chave:a.k,rotulo:ambDe(a.local),url:urlLocal(a.ancora.serial)})),"NFC desta etiqueta")+'</div>'
    +'<div class="etqs">'+lista.map(a=>Array.from({length:n},()=>un(a)).join("")).join("")+'</div>';
   const aj=()=>{ S.etqL={w:Math.max(40,parseInt($("#l_w").value)||90),h:Math.max(25,parseInt($("#l_h").value)||60)}; renderEtiquetasLocal(); };
   $("#l_w").onchange=aj; $("#l_h").onchange=aj; $("#l_n").onchange=e=>{ S.locQtd=parseInt(e.target.value)||1; renderEtiquetasLocal(); };
+}
+// ---- NFC também nas etiquetas de grupo e de ambiente: o endereço gravado é o mesmo do QR da etiqueta ----
+const nfcMarca=(tipo,chave)=>(S.nfcm||[]).find(x=>x.obra_id===S.obra.id&&x.tipo===tipo&&x.chave===chave);
+function tabelaNfc(itens,titulo){
+  if(!S.nfcmOk) return '<div class="card noprint" style="margin-top:14px"><h3 style="margin-top:0">NFC</h3><div class="no">Para controlar o NFC de grupos e ambientes falta rodar o SQL <b>v2_18_nfc_grupo_ambiente</b> no Supabase.</div></div>';
+  if(!itens.length) return "";
+  return '<div class="card noprint" style="margin-top:14px"><h3 style="margin-top:0">'+titulo+' <span class="small">(o mesmo endereço do QR da etiqueta)</span></h3>'
+   +'<div class="small" style="margin-bottom:8px">No celular, abra um app de gravação de NFC (por exemplo NFC Tools), escolha gravar "URL" e cole o endereço. Depois toque em <b>Gravei</b> para ficar registrado.</div>'
+   +'<table><tr><th>Etiqueta</th><th>Endereço</th><th></th></tr>'+itens.map(i=>{ const m=nfcMarca(i.tipo,i.chave);
+     return '<tr><td><b>'+esc(i.rotulo)+'</b></td><td style="overflow-wrap:anywhere" class="small">'+esc(i.url)+'</td><td style="white-space:nowrap"><button data-act="copiarUrl" data-u="'+esc(i.url)+'" style="padding:2px 8px">Copiar</button> '
+      +(m?'<button data-act="nfcMarca" data-t="'+i.tipo+'" data-k="'+esc(i.chave)+'" style="padding:2px 8px" title="Desfazer"><span class="ok">NFC ✓</span></button>':'<button class="p" data-act="nfcMarca" data-t="'+i.tipo+'" data-k="'+esc(i.chave)+'" style="padding:2px 8px">Gravei</button>')+'</td></tr>'; }).join("")+'</table></div>';
+}
+function nfcAmbGrp(){
+  const o=S.obra, amb=ambientesDaObra(o.id), grp=gruposDaObra(o.id);
+  return tabelaNfc(amb.map(a=>({tipo:"ambiente",chave:a.k,rotulo:ambDe(a.local),url:urlLocal(a.ancora.serial)})),"NFC dos ambientes")
+   +tabelaNfc(grp.map(g=>({tipo:"grupo",chave:g.k,rotulo:ambDe(g.local)+" · "+((porId(g.luminaria_id)||{}).codigo||"?"),url:urlGrupo(g.ancora.serial)})),"NFC dos grupos");
+}
+async function nfcAlterna(tipo,chave){
+  const m=nfcMarca(tipo,chave); let r;
+  if(m) r=await sb.from("v2_nfc_marcas").delete().eq("id",m.id);
+  else { const ss=await sb.auth.getSession(); r=await sb.from("v2_nfc_marcas").insert({obra_id:S.obra.id,tipo:tipo,chave:chave,gravado_por:ss.data.session?ss.data.session.user.email:"admin"}); }
+  if(r.error) return msg("Erro ao marcar o NFC: "+r.error.message,false);
+  await carregarObras();
 }
 const assinaItens=p=>S.pitens.filter(x=>x.peca_id===p.id&&!x.removido_em).map(x=>x.produto_id+":"+x.quantidade).sort().join(",");
 const textoItens=p=>{ const m=new Map(); S.pitens.filter(x=>x.peca_id===p.id&&!x.removido_em).forEach(x=>m.set(x.produto_id,(m.get(x.produto_id)||0)+x.quantidade)); return [...m.entries()].map(([id,q])=>q+"x "+((porId(id)||{}).codigo||"?")).join(" + "); };
@@ -998,12 +1024,13 @@ function htmlGrupos(){
    +(S.locaisOk?'<div class="bar noprint" style="margin:10px 0 0">'+(nImg?'<button class="p" data-act="locEtqTodos">Etiquetas de todos os ambientes com imagem ('+nImg+')</button>':'')+'</div><div class="small">Cada ambiente também tem a sua <b>etiqueta de ambiente</b> (ex.: um forro inteiro com o desenho do módulo), separada das etiquetas das peças.</div>':'<div class="no" style="margin-top:8px">Para usar a etiqueta de ambiente com imagem falta rodar o SQL <b>v2_15_locais_com_imagem</b> no Supabase.</div>')+'</div>'+(corpo||'<div class="small">Esta obra ainda não tem peças.</div>');
 }
 function renderEtiquetasGrupo(){
+  S.nfcVolta="grp";
   const g=S.grupos[S.grupoEtq], o=S.obra, l=porId(g.luminaria_id)||{}, w=S.etq.w, h2=S.etq.h, n=Math.max(1,Math.min(500,S.grupoQtd||g.ps.length));
   let qr=""; try{ const q=qrcode(0,"M"); q.addData(urlGrupo(g.ancora.serial)); q.make(); qr=q.createSvgTag({cellSize:4,margin:0,scalable:true}); }catch(e){}
   const un='<div class="etq" style="width:'+w+'mm;height:'+h2+'mm"><div class="qr" style="width:'+(h2-4)+'mm;height:'+(h2-4)+'mm">'+qr+'</div><div class="et"><b>'+esc(ambDe(g.local))+'</b><br>'+esc(l.codigo||"")+'<br>Grupo de '+g.ps.length+'<br><span>'+esc(g.ancora.serial)+'</span></div></div>';
   $("#app").innerHTML='<div class="noprint"><button data-act="grupos" style="margin-bottom:12px">‹ Grupos</button>'
    +'<div class="card"><h3 style="margin-top:0">Etiquetas do grupo: '+esc(ambDe(g.local))+' · '+esc(l.codigo||"")+'</h3><div class="small" style="margin-bottom:8px">Todas as etiquetas são <b>iguais</b>: o QR abre a página do grupo ('+g.ps.length+' luminária(s)). O código sob o QR ('+esc(g.ancora.serial)+') serve para digitar na consulta se o QR falhar.</div>'
-   +'<div class="bar"><div><label>Quantidade de etiquetas</label><input id="g_n" type="number" min="1" max="500" value="'+n+'" style="width:110px"></div><div><label>Largura (mm)</label><input id="e_w" type="number" min="20" max="200" value="'+w+'" style="width:100px"></div><div><label>Altura (mm)</label><input id="e_h" type="number" min="15" max="100" value="'+h2+'" style="width:100px"></div><button class="p" data-act="imprimirGrp" style="align-self:end">Imprimir</button></div><div id="etqConf" class="msg s" style="display:none"></div></div></div>'
+   +'<div class="bar"><div><label>Quantidade de etiquetas</label><input id="g_n" type="number" min="1" max="500" value="'+n+'" style="width:110px"></div><div><label>Largura (mm)</label><input id="e_w" type="number" min="20" max="200" value="'+w+'" style="width:100px"></div><div><label>Altura (mm)</label><input id="e_h" type="number" min="15" max="100" value="'+h2+'" style="width:100px"></div><button class="p" data-act="imprimirGrp" style="align-self:end">Imprimir</button></div><div id="etqConf" class="msg s" style="display:none"></div></div>'+tabelaNfc([{tipo:"grupo",chave:g.k,rotulo:ambDe(g.local)+" · "+(l.codigo||"?"),url:urlGrupo(g.ancora.serial)}],"NFC desta etiqueta")+'</div>'
    +'<div class="etqs">'+Array.from({length:n},()=>un).join("")+'</div>';
   const aj=()=>{ const w2=Math.max(20,parseInt($("#e_w").value)||60), h3=Math.max(15,parseInt($("#e_h").value)||30); S.etq={w:w2,h:h3}; document.querySelectorAll(".etq").forEach(e=>{e.style.width=w2+"mm";e.style.height=h3+"mm"}); document.querySelectorAll(".etq .qr").forEach(e=>{e.style.width=(h3-4)+"mm";e.style.height=(h3-4)+"mm"}); };
   $("#e_w").oninput=aj; $("#e_h").oninput=aj; $("#g_n").onchange=e=>{ S.grupoQtd=parseInt(e.target.value)||g.ps.length; renderEtiquetasGrupo(); };
@@ -1489,6 +1516,7 @@ const ACT={
   locEtq:d=>{ S.locSel=[Number(d.a)]; S.locQtd=1; renderEtiquetasLocal(); window.scrollTo(0,0); },
   locEtqTodos:()=>{ S.locSel=S.ambs.map((a,i)=>i).filter(i=>imgLocal(S.obra.id,S.ambs[i].local)); S.locQtd=1; renderEtiquetasLocal(); window.scrollTo(0,0); },
   imprimirLoc:()=>window.print(),
+  nfcMarca:async d=>{ await nfcAlterna(d.t,d.k); if(S.nfcVolta==="loc") renderEtiquetasLocal(); else if(S.nfcVolta==="grp") renderEtiquetasGrupo(); else renderEtiquetas(); },
   grpUnidades:d=>{S.grpAberto=S.grpAberto===Number(d.i)?null:Number(d.i); renderObra();},
   imprimirEtq:()=>{ S.etqPendImp=S.pecas.filter(p=>p.obra_id===S.obra.id&&(!S.etqSoNaoImp||!p.impressa_em)).map(p=>p.id); window.print(); perguntaImpressao(S.etqPendImp.length); },
   etqMarcarImp:async()=>{ if(await marcarEtapaAdmin(S.etqPendImp,"impressa_em","impressa_por",false)){ if(S.view==="etiq") renderEtiquetas(); else { const c=$("#etqConf"); if(c) c.style.display="none"; } msg("Etiquetas marcadas como impressas."); } },

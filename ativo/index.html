@@ -182,17 +182,22 @@ function kitTotal(){
   return it.reduce((s,i)=>s+i.preco*i.quantidade,0);
 }
 // "Peça completa" = luminária + todos os itens instalados (LED, driver, óptica...)
+// luminária vendida por metro (perfil, linear): o preço da luminária é multiplicado pelos metros do trecho
+const metrosPeca=()=>{ const m=Number(P&&P.metros); return (P&&P.luminaria&&P.luminaria.por_metro&&m>0)?m:null; };
+const metrosTxt=()=>String(metrosPeca()).replace(".",",");
+function precoLum(){ const l=P.luminaria; if(l.preco==null) return null; return Math.round(l.preco*(metrosPeca()||1)*100)/100; }
 function completoTotal(){
   const l=P.luminaria; if(l.preco==null) return null;
-  if(l.integrada||!((P.itens||[]).length)) return l.preco;
-  const k=kitTotal(); return k==null?null:l.preco+k;
+  if(l.integrada||!((P.itens||[]).length)) return precoLum();
+  const k=kitTotal(); return k==null?null:Math.round((precoLum()+k)*100)/100;
 }
-function completoResumo(){ const l=P.luminaria; return (l.integrada||!((P.itens||[]).length))?(l.fabricante||""):("luminária + "+kitResumo()); }
+function completoResumo(){ const l=P.luminaria; return (l.integrada||!((P.itens||[]).length))?(l.fabricante||""):((metrosPeca()?metrosTxt()+" m de luminária + ":"luminária + ")+kitResumo()); }
+const subLum=()=>P.luminaria.codigo+(metrosPeca()?" · "+metrosTxt()+" m":"");
 function kitResumo(){ return ((P&&P.itens)||[]).map(i=>i.quantidade+"x "+i.codigo).join(" + "); }
 function resolve(l){
   const itens=P.itens||[];
   if(l.k==="kit"){ if(!P.kit||P.luminaria.integrada||P.kit_confere!==true) return null; return {nome:"Kit completo",sub:P.kit,preco:kitTotal(),max:1,fotos:itens.filter(i=>i.foto_url).map(i=>i.foto_url).slice(0,2),pl:{escopo:"kit",quantidade:1}}; }
-  if(l.k==="lum") return {nome:"Peça completa",sub:P.luminaria.codigo,preco:completoTotal(),max:1,fotos:P.luminaria.foto_url?[P.luminaria.foto_url]:[],pl:{escopo:"luminaria",quantidade:1}};
+  if(l.k==="lum") return {nome:"Peça completa",sub:subLum(),preco:completoTotal(),max:1,fotos:P.luminaria.foto_url?[P.luminaria.foto_url]:[],pl:{escopo:"luminaria",quantidade:1}};
   const m=/^item:(\d+):(\d+)$/.exec(String(l.k)); if(!m) return null;
   const i=itens.find(x=>x.peca_item_id===Number(m[1])); if(!i) return null;
   const sid=Number(m[2])||null, s=sid?(i.similares||[]).find(x=>x.id===sid):null; if(sid&&!s) return null;
@@ -281,7 +286,7 @@ function renderLoja(){
   const l=P.luminaria, itens=P.itens||[], integ=l.integrada, cards=[];
   if(!integ&&P.kit&&P.kit_confere===true) cards.push(cardKitLum("kit","Kit completo",P.kit,kitResumo(),kitTotal(),[...new Set(itens.filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,2)));
   if(!integ) itens.forEach(i=>cards.push(cardItem(i)));
-  cards.push(cardKitLum("lum","Peça completa",l.codigo,completoResumo(),completoTotal(),l.foto_url?[l.foto_url]:[...new Set(itens.filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,2)));
+  cards.push(cardKitLum("lum","Peça completa",subLum(),completoResumo(),completoTotal(),l.foto_url?[l.foto_url]:[...new Set(itens.filter(i=>i.foto_url).map(i=>i.foto_url))].slice(0,2)));
   $("#loja").innerHTML='<div class="shop-grid">'+cards.join("")+'</div><div class="small" style="margin:10px 4px 0">Preços de referência. A LumiDNA confirma valor, prazo e entrega antes de fechar; nada é cobrado agora.</div>';
 }
 function meuToken(id){ try{ const m=JSON.parse(localStorage.getItem("lumidna2_pedidos")||"{}"); return m[id]||""; }catch(e){ return ""; } }

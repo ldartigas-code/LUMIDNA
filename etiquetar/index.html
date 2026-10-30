@@ -52,6 +52,10 @@ h1{font-size:20px;margin:0 0 2px;letter-spacing:-.02em}
 .etqs{display:flex;flex-wrap:wrap;gap:8px}
 .etq{display:flex;gap:2mm;align-items:center;border:1px dashed #b4b2a9;padding:2mm;overflow:hidden;font-size:9pt;line-height:1.25;background:#fff;color:#000;break-inside:avoid}
 .etq .qr svg{width:100%;height:100%;display:block}.etq .qr{flex:none}.etq .et{min-width:0;overflow-wrap:anywhere}.etq .et b{font-size:11pt}
+.etqA .ecol2{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5mm;flex:1;min-width:0;text-align:center}.etqA .logo{font-size:9pt;letter-spacing:-.02em;font-weight:400;line-height:1}.etqA .logo b{font-weight:800}.etqA .amb{font-size:10pt;font-weight:800;line-height:1.1;overflow-wrap:anywhere}
+.etqL .eimg{object-fit:contain;flex:none}.etqL .ecol{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1mm;min-width:0;flex:1;text-align:center}.etqL .et{font-size:7pt}.etqL .et b{font-size:10pt}.etqL>.qr+.et{font-size:8.5pt}.etqL>.qr+.et b{font-size:13pt}
+.gh .kf{width:44px;height:44px;display:flex;gap:1px;background:#fff;border-radius:8px;overflow:hidden;flex:none}.gh .kf img{flex:1;min-width:0;width:auto;height:100%;border-radius:0;background:#fff;object-fit:contain}
+.locimg{width:44px;height:44px;object-fit:contain;background:#fff;border-radius:8px;flex:none}
 @media print{:root{--bg:#fff}body{background:#fff;padding:0}.wrap{max-width:none;padding:0}.noprint{display:none!important}.etq{border:0;outline:0.1mm dashed #bbb}.etqs{gap:0}}
 </style>
 </head>
@@ -78,10 +82,16 @@ const dh=d=>{ if(!d) return ""; const x=new Date(d); return x.toLocaleDateString
 const LINK=(new URLSearchParams(location.search).get("t")||"").trim();
 const urlPeca=s=>LUMIDNA_SITE_BASE+"/ativo/?c="+encodeURIComponent(s);
 const urlGrupo=s=>LUMIDNA_SITE_BASE+"/ativo/?c="+encodeURIComponent(s)+"&g=1";
+const urlLocal=s=>LUMIDNA_SITE_BASE+"/ativo/?c="+encodeURIComponent(s)+"&l=1";
 const ambDe=l=>{ const p=String(l||"").split(">").map(s=>s.trim()).filter(Boolean); return p.length?p[p.length-1]:"(sem ambiente)"; };
 const chaveLocal=l=>String(l||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/\s+/g," ").trim();
-function gruposFiltrados(){ const m=new Map(); filtradas().forEach(p=>{ const k=[chaveLocal(p.local),p.modelo,p.kit||0].join("|"); if(!m.has(k)) m.set(k,{local:p.local||"",modelo:p.modelo,foto:p.foto_url,ps:[]}); m.get(k).ps.push(p); }); const a=[...m.values()]; a.forEach(g=>g.ps.sort((x,y)=>(x.numero||0)-(y.numero||0)||x.serial.localeCompare(y.serial))); return a; }
-let GR=[], MODO="ind", PEND_IMP=[]; let D=null, ABA="etiquetar", AMB="", SO_PEND=true, NOME="", ETQ={w:60,h:30}, STREAM=null, LOOP=null, ULT={c:"",t:0}, BUSY=false;
+const nfcGA=()=>Array.isArray(D.nfc_marcas);
+const nfcMarca=(t,k)=>(D.nfc_marcas||[]).find(x=>x.tipo===t&&x.chave===k);
+const imgLocal=loc=>{ const r=(D.locais||[]).find(x=>chaveLocal(x.local)===chaveLocal(loc)); return r&&r.imagem_url?r.imagem_url:null; };
+const fotoHtml=(foto,kit)=>foto?'<img src="'+esc(foto)+'" alt="">':((kit&&kit.length)?'<div class="kf">'+kit.map(u=>'<img src="'+esc(u)+'" alt="">').join("")+'</div>':'');
+function ambientesFiltrados(){ const m=new Map(); filtradas().forEach(p=>{ const k=chaveLocal(p.local); if(!m.has(k)) m.set(k,{k:k,local:p.local||"",ps:[]}); m.get(k).ps.push(p); }); const a=[...m.values()]; a.forEach(x=>x.ps.sort((p,q)=>(p.numero||0)-(q.numero||0)||p.serial.localeCompare(q.serial))); return a; }
+function gruposFiltrados(){ const m=new Map(); filtradas().forEach(p=>{ const k=[chaveLocal(p.local),p.lum_id,p.kit||0].join("|"); if(!m.has(k)) m.set(k,{k:k,local:p.local||"",modelo:p.modelo,foto:p.foto_url,fk:p.fotos_kit||[],ps:[]}); m.get(k).ps.push(p); }); const a=[...m.values()]; a.forEach(g=>g.ps.sort((x,y)=>(x.numero||0)-(y.numero||0)||x.serial.localeCompare(y.serial))); return a; }
+let GR=[], MODO="ind", PEND_IMP=[], ETQL={w:40,h:20}, LQTD=1; let D=null, ABA="etiquetar", AMB="", SO_PEND=true, NOME="", ETQ={w:60,h:30}, STREAM=null, LOOP=null, ULT={c:"",t:0}, BUSY=false;
 try{ NOME=localStorage.getItem("lumidna_etiquetador")||""; }catch(e){}
 
 function msg(t,tipo){ $("#msg").innerHTML=t?'<div class="alert '+(tipo||"")+'">'+esc(t)+'</div>':""; if(t) window.scrollTo({top:0,behavior:"smooth"}); }
@@ -109,10 +119,11 @@ function render(){
   if($("#sopend")) $("#sopend").onchange=e=>{ SO_PEND=e.target.checked; render(); };
   if($("#modo")) $("#modo").onchange=e=>{ MODO=e.target.value; render(); };
   if($("#e_w")) { $("#e_w").oninput=ajusta; $("#e_h").oninput=ajusta; }
+  if($("#l_w")){ const aj=()=>{ ETQL={w:Math.max(20,parseInt($("#l_w").value)||40),h:Math.max(10,parseInt($("#l_h").value)||20)}; LQTD=parseInt($("#l_n").value)||1; render(); }; $("#l_w").onchange=aj; $("#l_h").onchange=aj; $("#l_n").onchange=aj; }
 }
 function telaEtiquetar(selAmb){
   const lista=filtradas().filter(p=>!SO_PEND||!p.etiquetada_em), por=new Map();
-  lista.forEach(p=>{ const a=por.get(p.modelo)||{m:p.modelo,foto:p.foto_url,fab:p.fabricante,l:[]}; a.l.push(p); por.set(p.modelo,a); });
+  lista.forEach(p=>{ const a=por.get(p.modelo)||{m:p.modelo,foto:p.foto_url,fk:p.fotos_kit||[],fab:p.fabricante,l:[]}; a.l.push(p); por.set(p.modelo,a); });
   const tot=filtradas();
   let h='<button type="button" class="btn p noprint" data-ac="scan" style="margin-bottom:12px">Escanear etiqueta</button>'
    +'<div class="card noprint"><div class="field" style="margin:0"><label>Ou digite a série (ou os últimos números)</label><div class="row2"><input id="manual" placeholder="Ex.: CRJ-002-071 ou 071" autocapitalize="characters" autocomplete="off"><button type="button" class="btn s p" data-ac="manual">Fixar</button></div></div></div>'
@@ -120,7 +131,7 @@ function telaEtiquetar(selAmb){
   if(!lista.length) h+='<div class="card noprint">'+(tot.length?'<b>Tudo fixado aqui ✓</b><div class="small" style="margin-top:4px">Não há etiquetas pendentes neste ambiente.</div>':'<div class="small">Nenhuma luminária neste ambiente.</div>')+'</div>';
   por.forEach(g=>{
     const pend=tot.filter(p=>p.modelo===g.m&&!p.etiquetada_em).length, tt=tot.filter(p=>p.modelo===g.m).length;
-    h+='<div class="grp noprint"><div class="gh">'+(g.foto?'<img src="'+esc(g.foto)+'" alt="">':'')+'<div class="t"><b>'+esc(g.m)+'</b><div class="small">'+esc(g.fab||"")+'</div></div><span class="pill '+(pend?"pe":"ok")+'">'+(pend?pend+" pendente(s)":"completo")+' · '+tt+'</span></div>'
+    h+='<div class="grp noprint"><div class="gh">'+fotoHtml(g.foto,g.fk)+'<div class="t"><b>'+esc(g.m)+'</b><div class="small">'+esc(g.fab||"")+'</div></div><span class="pill '+(pend?"pe":"ok")+'">'+(pend?pend+" pendente(s)":"completo")+' · '+tt+'</span></div>'
      +g.l.map(p=>'<div class="pc"><div class="s"><b>'+esc(p.serial)+'</b><div class="small">'+esc(p.local||"sem ambiente")+' · '+(p.impressa_em?'<span class="ok-t">impressa</span>':'<span style="color:var(--amber)">não impressa</span>')+(p.nfc_gravado_em?' · <span class="ok-t">NFC</span>':'')+(p.etiquetada_em?' · <span class="ok-t">fixada '+dh(p.etiquetada_em)+(p.etiquetada_por?' por '+esc(p.etiquetada_por):'')+'</span>':'')+'</div></div>'
        +'<button type="button" class="und" data-ac="nfc" data-s="'+esc(p.serial)+'">'+(p.nfc_gravado_em?'NFC ✓':'NFC')+'</button>'+(p.etiquetada_em?'<button type="button" class="und" data-ac="desfazer" data-s="'+esc(p.serial)+'">Desfazer</button>':'<button type="button" class="fix" data-ac="fixar" data-s="'+esc(p.serial)+'">Fixar</button>')+'</div>').join("")+'</div>';
   });
@@ -130,11 +141,29 @@ function telaGrupos(selAmb){
   GR=gruposFiltrados(); let h=selAmb+'<div class="small noprint" style="margin-bottom:10px">Luminárias iguais no mesmo ambiente formam um grupo e usam a mesma etiqueta. Toque em <b>+1 fixada</b> a cada etiqueta colada.</div>';
   if(!GR.length) return h+'<div class="card noprint">Nenhuma luminária neste ambiente.</div>';
   GR.forEach((g,i)=>{ const f=g.ps.filter(p=>p.etiquetada_em).length, n=g.ps.length, pc=Math.round(f*100/n);
-    h+='<div class="grp noprint"><div class="gh">'+(g.foto?'<img src="'+esc(g.foto)+'" alt="">':'')+'<div class="t"><b>'+esc(g.modelo)+'</b><div class="small">'+esc(ambDe(g.local))+'</div><div class="small">impressas '+g.ps.filter(p=>p.impressa_em).length+' · NFC '+g.ps.filter(p=>p.nfc_gravado_em).length+' · fixadas '+f+'</div></div><span class="pill '+(f===n?"ok":"pe")+'">'+f+' de '+n+'</span></div>'
-     +'<div style="padding:10px 12px"><div class="bar" style="margin:0 0 10px"><i style="width:'+pc+'%"></i></div><div class="row2"><button type="button" class="fix" data-ac="gmais" data-i="'+i+'" '+(f===n?'disabled style="opacity:.5"':'')+'>+1 fixada</button><button type="button" class="und" data-ac="gmenos" data-i="'+i+'" '+(f===0?'disabled':'')+'>−1</button></div></div></div>'; });
-  return h;
+    h+='<div class="grp noprint"><div class="gh">'+fotoHtml(g.foto,g.fk)+'<div class="t"><b>'+esc(g.modelo)+'</b><div class="small">'+esc(ambDe(g.local))+'</div><div class="small">impressas '+g.ps.filter(p=>p.impressa_em).length+' · NFC '+g.ps.filter(p=>p.nfc_gravado_em).length+' · fixadas '+f+'</div></div><span class="pill '+(f===n?"ok":"pe")+'">'+f+' de '+n+'</span></div>'
+     +'<div style="padding:10px 12px"><div class="bar" style="margin:0 0 10px"><i style="width:'+pc+'%"></i></div><div class="row2"><button type="button" class="fix" data-ac="gmais" data-i="'+i+'" '+(f===n?'disabled style="opacity:.5"':'')+'>+1 fixada</button><button type="button" class="und" data-ac="gmenos" data-i="'+i+'" '+(f===0?'disabled':'')+'>−1</button>'+(nfcGA()?'<button type="button" class="und" data-ac="gnfc" data-i="'+i+'" title="NFC desta etiqueta de grupo">'+(nfcMarca("grupo",g.k)?'NFC ✓':'NFC')+'</button>':'')+'</div></div></div>'; });
+  return selAmb+telaAmbientes()+h.slice(selAmb.length);
+}
+function telaAmbientes(){
+  const am=ambientesFiltrados(); if(!am.length) return "";
+  return '<div class="small noprint" style="margin:4px 0 8px"><b>Etiqueta do ambiente</b> (uma por ambiente: QR, logotipo e nome do local). Imprima na aba Imprimir, tipo "Do ambiente".</div>'
+   +am.map(a=>{ const im=imgLocal(a.local);
+     return '<div class="grp noprint"><div class="gh">'+(im?'<img class="locimg" src="'+esc(im)+'" alt="">':'')+'<div class="t"><b>'+esc(ambDe(a.local))+'</b><div class="small">'+a.ps.length+' luminária(s)</div></div>'
+      +(nfcGA()?'<button type="button" class="und" data-ac="anfc" data-k="'+esc(a.k)+'" title="NFC da etiqueta do ambiente">'+(nfcMarca("ambiente",a.k)?'NFC ✓':'NFC')+'</button>':'')+'</div></div>'; }).join("")
+   +'<div class="small noprint" style="margin:14px 0 8px"><b>Etiquetas dos grupos</b></div>';
+}
+const nomeEtqAmb=l=>String(ambDe(l)||"").split(/\s*\+\s*/)[0].trim();
+function telaImprimirAmb(selAmb){
+  const w=ETQL.w, h2=ETQL.h, n=Math.max(1,Math.min(50,LQTD||1)), am=ambientesFiltrados(), qs=Math.max(8,h2-2);
+  const un=a=>{ let qr=""; try{ const q=qrcode(0,"M"); q.addData(urlLocal(a.ps[0].serial)); q.make(); qr=q.createSvgTag({cellSize:4,margin:0,scalable:true}); }catch(e){}
+    return '<div class="etq etqA" style="width:'+w+'mm;height:'+h2+'mm;padding:1mm;gap:1mm"><div class="qr" style="width:'+qs+'mm;height:'+qs+'mm">'+qr+'</div><div class="ecol2"><div class="logo">Lumi<b>DNA</b></div><div class="amb">'+esc(nomeEtqAmb(a.local))+'</div></div></div>'; };
+  return selAmb+seletorModo()+'<div class="card noprint"><div class="small" style="margin-bottom:8px">Uma etiqueta por ambiente, só com o QR da página do ambiente, o logotipo LumiDNA e o nome do local (se o nome tiver "+", vale só a primeira parte). Serão impressas <b>'+(am.length*n)+'</b> etiqueta(s).</div>'
+   +'<div class="row2"><div class="field" style="margin:0"><label>Cópias de cada</label><input id="l_n" type="number" min="1" max="50" value="'+n+'"></div><div class="field" style="margin:0"><label>Largura (mm)</label><input id="l_w" type="number" min="20" max="210" value="'+w+'"></div><div class="field" style="margin:0"><label>Altura (mm)</label><input id="l_h" type="number" min="10" max="150" value="'+h2+'"></div></div>'
+   +'<button type="button" class="btn p" data-ac="imprimir" style="margin-top:12px">Imprimir</button></div><div class="etqs">'+am.map(a=>Array.from({length:n},()=>un(a)).join("")).join("")+'</div>';
 }
 function telaImprimir(selAmb){
+  if(MODO==="amb") return telaImprimirAmb(selAmb);
   if(MODO==="grupo") return telaImprimirGrupo(selAmb);
   const w=ETQ.w, h2=ETQ.h; let lista=filtradas().filter(p=>!SO_PEND||!p.etiquetada_em);
   const etq=lista.map(p=>{ let qr=""; try{ const q=qrcode(0,"M"); q.addData(urlPeca(p.serial)); q.make(); qr=q.createSvgTag({cellSize:4,margin:0,scalable:true}); }catch(e){}
@@ -144,7 +173,7 @@ function telaImprimir(selAmb){
    +'<div class="row2"><div class="field" style="margin:0"><label>Largura (mm)</label><input id="e_w" type="number" min="20" max="200" value="'+w+'"></div><div class="field" style="margin:0"><label>Altura (mm)</label><input id="e_h" type="number" min="15" max="100" value="'+h2+'"></div></div>'
    +'<button type="button" class="btn p" data-ac="imprimir" style="margin-top:12px">Imprimir</button><div id="impConf" class="alert noprint" style="display:none;margin-top:12px"></div></div><div class="etqs">'+etq+'</div>';
 }
-function seletorModo(){ return '<div class="field noprint"><label>Tipo de etiqueta</label><select id="modo"><option value="ind" '+(MODO==="ind"?"selected":"")+'>Individual: série de cada luminária</option><option value="grupo" '+(MODO==="grupo"?"selected":"")+'>Do grupo: igual para as luminárias iguais do ambiente</option></select></div>'; }
+function seletorModo(){ return '<div class="field noprint"><label>Tipo de etiqueta</label><select id="modo"><option value="ind" '+(MODO==="ind"?"selected":"")+'>Individual: série de cada luminária</option><option value="grupo" '+(MODO==="grupo"?"selected":"")+'>Do grupo: igual para as luminárias iguais do ambiente</option><option value="amb" '+(MODO==="amb"?"selected":"")+'>Do ambiente: uma por ambiente (QR e nome do local)</option></select></div>'; }
 function telaImprimirGrupo(selAmb){
   const w=ETQ.w, h2=ETQ.h, gs=gruposFiltrados(); let total=0, etq="";
   gs.forEach(g=>{ const n=SO_PEND?g.ps.filter(p=>!p.etiquetada_em).length:g.ps.length; if(!n) return; total+=n; let qr=""; try{ const q=qrcode(0,"M"); q.addData(urlGrupo(g.ps[0].serial)); q.make(); qr=q.createSvgTag({cellSize:4,margin:0,scalable:true}); }catch(e){}
@@ -210,6 +239,15 @@ document.addEventListener("click",async e=>{
   else if(a==="scan"){ abreScanner(); }
   else if(a==="fixar"||a==="desfazer"){ el.disabled=true; const x=await marcar(el.dataset.s,a==="desfazer"); if(x.erro){ el.disabled=false; return msg(x.erro,"e"); } msg(""); const y=window.scrollY; render(); window.scrollTo(0,y); }
   else if(a==="manual"){ const s=acharSerial($("#manual").value); if(!s) return msg("Não achei essa série nesta obra.","e"); if(s==="?") return msg("Mais de uma série termina assim. Digite a série completa.","e"); const x=await marcar(s,false); if(x.erro) return msg(x.erro,"e"); msg(x.ja_estava?(x.serial+" já estava fixada."):("✓ "+x.serial+" · "+x.modelo+" fixada."),x.ja_estava?"":"s"); render(); }
+  else if(a==="imprimir"&&MODO==="amb"){ window.print(); }
+  else if(a==="gnfc"||a==="anfc"){
+    const tipo=a==="gnfc"?"grupo":"ambiente", chave=a==="gnfc"?(GR[Number(el.dataset.i)]||{}).k:el.dataset.k; if(!chave) return;
+    const des=!!nfcMarca(tipo,chave); el.disabled=true;
+    const r=await sb.rpc("v2_etiq_nfc_marca",{p_link:LINK,p_tipo:tipo,p_chave:chave,p_por:NOME,p_desfazer:des});
+    if(r.error){ el.disabled=false; return msg(r.error.message,"e"); }
+    D.nfc_marcas=(D.nfc_marcas||[]).filter(x=>!(x.tipo===tipo&&x.chave===chave)); if(!des) D.nfc_marcas.push({tipo:tipo,chave:chave,gravado_em:new Date().toISOString(),gravado_por:NOME});
+    msg(""); const y=window.scrollY; render(); window.scrollTo(0,y);
+  }
   else if(a==="imprimir"){
     let ser=[]; if(MODO==="grupo"){ gruposFiltrados().forEach(g=>{ const n=SO_PEND?g.ps.filter(p=>!p.etiquetada_em).length:g.ps.length; ser=ser.concat(g.ps.filter(p=>!p.impressa_em).slice(0,n).map(p=>p.serial)); }); } else { ser=filtradas().filter(p=>!SO_PEND||!p.etiquetada_em).map(p=>p.serial); }
     PEND_IMP=ser; window.print(); const b=$("#impConf"); if(b){ b.style.display=""; b.innerHTML='Você imprimiu estas etiquetas? Marcar <b>'+ser.length+'</b> como impressas?<div class="row2" style="margin-top:8px"><button type="button" class="btn s p" data-ac="impok">Sim, marcar</button><button type="button" class="btn s" data-ac="impno">Ainda não</button></div>'; }

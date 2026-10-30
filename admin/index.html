@@ -273,6 +273,7 @@ function renderItem(){
         ${t==="optica"?`<div class="field"><label>Ângulo de facho (graus) *</label><input id="f_facho" type="number" step="0.1" value="${p.facho_graus??""}"></div>`:""}
       </div>
       ${t==="luminaria"?`<label style="display:flex;gap:8px;align-items:center;font-weight:400;color:var(--ink);margin:4px 0 12px"><input type="checkbox" id="f_integrada" data-act="trocaIntegrada" ${p.integrada?"checked":""}> Lâmpada integrada (vende só a peça completa, sem acessórios separados)</label>
+        <label style="display:flex;gap:8px;align-items:center;font-weight:400;color:var(--ink);margin:0 0 12px"><input type="checkbox" id="f_pormetro" ${p.por_metro?"checked":""}> Vendida por metro (perfil/linear: o preço acima é por metro; cada peça informa os metros do trecho)</label>
         <div id="blocoInteg" class="grid" style="${p.integrada?"":"display:none"}"><div class="field"><label>Potência da luminária (W) *</label><input id="f_potencia" type="number" step="0.01" value="${p.potencia_w??""}"></div><div class="field"><label>Temperatura de cor (K)</label><input id="f_cct" type="number" value="${p.cct_k??""}"></div></div>`:""}
       <div class="field"><label>Foto *</label>${!p.foto_url&&fotoAuto(p).length?`<div class="kfotoG" style="margin-bottom:6px">${fotoAuto(p).map(x=>`<figure><img src="${esc(x.foto_url)}" alt="${esc(x.codigo)}"><figcaption>${esc(x.codigo)}</figcaption></figure>`).join("")}</div><div class="small" style="margin-bottom:6px">Foto montada com os itens do kit. Envie uma foto da luminária pra substituir.</div>`:""}${p.foto_url?`<img id="f_prev" class="thumb" style="width:90px;height:90px" src="${esc(p.foto_url)}" alt="">`:`<img id="f_prev" class="thumb" style="width:90px;height:90px;display:none" alt="">`}<input id="f_foto" type="file" accept="image/*" style="margin-top:6px"></div>
       <div class="grid" style="margin-bottom:8px">
@@ -390,7 +391,7 @@ async function salvarItem(){
     potencia_w:(t==="led"||integ)?num(g("f_potencia")):(t==="driver"?(p.potencia_w??null):null),
     cct_k:(t==="led"||integ)?(num(g("f_cct"))==null?null:Math.round(num(g("f_cct")))):null,
     corrente_ma:t==="driver"?num(g("f_corrente")):null, facho_graus:t==="optica"?num(g("f_facho")):null,
-    integrada:integ, detalhes, foto_url:p.foto_url};
+    integrada:integ, por_metro:t==="luminaria"&&!!($("#f_pormetro")&&$("#f_pormetro").checked), detalhes, foto_url:p.foto_url};
   const file=$("#f_foto").files[0];
   if(file){
     if(!file.type.startsWith("image/")) return msg("O arquivo da foto precisa ser uma imagem.",false);
@@ -837,18 +838,30 @@ function renderPeca(){
    +'<div style="flex:1;min-width:200px"><h3 style="margin:0">'+esc(p.serial)+'</h3><div class="small">'+esc(l?l.codigo:"?")+(kit?' · '+esc(kit.nome):'')+' · obra '+esc(o.nome)+'</div><div class="small">Etiqueta: '+(p.etiquetada_em?'<span class="ok">fixada em '+dataHora(p.etiquetada_em)+(p.etiquetada_por?' por '+esc(p.etiquetada_por):'')+'</span>':'<span class="no">ainda não fixada</span>')+'</div></div><div class="'+g.c+'" style="font-size:14px">'+g.t+'</div></div></div>'
    +blocoNotas()
    +'<div class="card"><div class="field"><label>Local</label><input id="p_local" value="'+esc(p.local||"")+'"></div>'
+   +(l&&l.por_metro?'<div class="field"><label>Metros deste trecho (a luminária é vendida por metro)</label><input id="p_metros" type="number" step="0.01" min="0" value="'+esc(p.metros??"")+'"><div class="small" style="margin-top:4px">'+(p.metros>0&&l.preco!=null?esc(fmt(p.metros))+' m x '+brl(l.preco)+' = <b>'+brl(Math.round(l.preco*p.metros*100)/100)+'</b> só da luminária':'Sem metros informados: o preço da luminária conta como 1 metro.')+'</div></div>':'')
    +(precisaKit(p)?'<div class="field"><label>Kit desta peça</label><select data-act="trocaKitPeca" data-id="'+p.id+'"><option value="">— escolher kit —</option>'+S.kits.filter(k=>k.luminaria_id===p.luminaria_id).map(k=>'<option value="'+k.id+'" '+(p.kit_id===k.id?"selected":"")+'>'+esc(k.nome)+'</option>').join("")+'</select></div>':'')
    +'<div class="field"><label>Garantia até (a empresa pode ajustar)</label><input id="p_gar" type="date" value="'+esc(p.garantia_ate||garantiaPadrao(o,p)||"")+'">'+(garantiaPadrao(o,p)?'<div class="small" style="margin-top:4px">Padrão da obra: instalação '+dmy(dataInstPadrao(o,p))+' + '+o.garantia_meses+' meses = <b>'+dmy(garantiaPadrao(o,p))+'</b>'+(p.garantia_ate?(p.garantia_ate===garantiaPadrao(o,p)?'':' · esta peça foi ajustada'):' · toque em Salvar peça para gravar')+'</div>':'<div class="small" style="margin-top:4px">A obra ainda não tem dia de instalação.</div>')+'</div>'
    +'<div class="field"><label>Observação desta peça (só desta peça)</label><textarea id="p_obs" style="min-height:70px">'+esc(p.observacao||"")+'</textarea></div>'
    +'<div class="bar"><button class="p" data-act="salvarPeca">Salvar peça</button><button class="danger" data-act="apagarPeca">Excluir peça (cadastrada por engano)</button></div></div>'
-   +'<div class="card"><h3 style="margin-top:0">Itens instalados agora</h3>'+(atuais.length?atuais.map(linhaAtual).join(""):'<div class="small">'+(precisaKit(p)?'Nenhum item. Escolha o kit na lista da obra.':'Lâmpada integrada: não tem itens separados.')+'</div>')+formTroca
+   +'<div class="card"><h3 style="margin-top:0">Itens instalados agora</h3>'+resumoPeca(p,l,atuais)+(atuais.length?atuais.map(linhaAtual).join(""):'<div class="small">'+(precisaKit(p)?'Nenhum item. Escolha o kit na lista da obra.':'Lâmpada integrada: não tem itens separados.')+'</div>')+formTroca
    +(antigos.length?'<h4 style="margin:14px 0 6px">Itens que já saíram</h4><table><tr><th>Item</th><th>Qtd</th><th>Instalado</th><th>Saiu</th><th>Motivo</th></tr>'+antigos.map(i=>{const c=porId(i.produto_id);return '<tr><td>'+esc(c.codigo)+'</td><td>'+i.quantidade+'</td><td>'+dmy(i.instalado_em)+'</td><td>'+dmy(i.removido_em)+'</td><td>'+esc(i.motivo_remocao)+'</td></tr>'}).join("")+'</table>':'')+(precisaKit(p)?formAddItem:'')+'</div>'
    +'<div class="card"><h3 style="margin-top:0">Histórico <span class="small">(só acrescenta, nunca se apaga)</span></h3>'+(S.hist.length?'<table>'+S.hist.map(h=>'<tr><td style="width:130px" class="small">'+dmy(h.data)+'</td><td>'+esc(h.descricao||h.tipo)+(h.motivo?' <span class="small">· '+esc(h.motivo)+'</span>':'')+'</td></tr>').join("")+'</table>':'<div class="small">Sem registros.</div>')+'</div>'
    +'<div class="card"><h3 style="margin-top:0">Endereço da etiqueta</h3><div class="small" style="overflow-wrap:anywhere;margin-bottom:8px">'+esc(url)+'</div><div class="bar"><a href="'+esc(url)+'" target="_blank" rel="noopener"><button>Abrir página pública</button></a><button data-act="copiarUrl" data-u="'+esc(url)+'">Copiar endereço</button></div></div>';
 }
+// potência = soma dos LEDs (W x quantidade); valor da peça completa = luminária (x metros, se por metro) + itens instalados
+function resumoPeca(p,l,atuais){
+  if(!l) return "";
+  const leds=atuais.map(i=>({i:i,c:porId(i.produto_id)})).filter(x=>x.c&&x.c.tipo==="led");
+  const pot=l.integrada?l.potencia_w:(leds.length?leds.reduce((s,x)=>s+(x.c.potencia_w||0)*x.i.quantidade,0):null);
+  const semPreco=atuais.some(i=>{const c=porId(i.produto_id); return !c||c.preco==null;});
+  const mt=l.por_metro&&p.metros>0?Number(p.metros):1;
+  const val=(l.preco==null||semPreco)?null:Math.round((l.preco*mt+atuais.reduce((s,i)=>s+porId(i.produto_id).preco*i.quantidade,0))*100)/100;
+  return '<div class="small" style="margin-bottom:10px">Potência (soma dos LEDs): <b>'+(pot?fmt(Math.round(pot*100)/100)+' W':'—')+'</b> · Valor da peça completa: <b>'+brl(val)+'</b>'+(mt!==1?' <span class="small">(luminária: '+fmt(mt)+' m)</span>':'')+'</div>';
+}
 async function salvarPeca(){
   const p=S.pecas.find(x=>x.id===S.peca);
   const gar=nv($("#p_gar").value), ob=S.obras.find(x=>x.id===p.obra_id), upd={local:nv($("#p_local").value.trim()),observacao:nv($("#p_obs").value.trim()),garantia_ate:gar};
+  if($("#p_metros")){ const m=num($("#p_metros").value); if(m!=null&&m<=0) return msg("Metros: use um número maior que zero ou deixe em branco.",false); upd.metros=m; }
   if(!p.data_instalacao&&ob&&ob.inicio_instalacao) upd.data_instalacao=ob.inicio_instalacao;
   const r=await sb.from("v2_pecas").update(upd).eq("id",p.id);
   if(r.error) return msg("Erro ao salvar a peça: "+r.error.message,false);
